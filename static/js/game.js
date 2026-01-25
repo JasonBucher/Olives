@@ -146,6 +146,11 @@ function completeHarvest() {
         oliveCountdown.classList.remove('active');
         isHarvesting = false;
         harvestButton.disabled = false;
+        
+        // Check if press workers can now start with new olives
+        if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
+            startPressWorkerGeneration();
+        }
     }, 200);
 }
 
@@ -251,6 +256,11 @@ function startHarvesterGeneration() {
             updateDisplay();
             saveGame();
             
+            // Check if press workers can now start with new olives
+            if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
+                startPressWorkerGeneration();
+            }
+            
             // Restart the generation cycle
             clearInterval(harvesterInterval);
             startHarvesterGeneration();
@@ -291,6 +301,18 @@ function startPressWorkerGeneration() {
         pressWorkerCountdown.classList.remove('active');
         return;
     }
+    
+    // Check if we have enough olives to start production
+    if (oliveCount < PRESS_COST) {
+        pressWorkerProgressContainer.classList.remove('active');
+        pressWorkerCountdown.classList.remove('active');
+        return;
+    }
+    
+    // Consume olives to start production
+    oliveCount -= PRESS_COST;
+    updateDisplay();
+    saveGame();
     
     const generationTime = getPressWorkerTime();
     pressWorkerProgressContainer.classList.add('active');
