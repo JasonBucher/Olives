@@ -1,14 +1,17 @@
 // Game state
 let oliveCount = 0;
 let oilCount = 0;
+let harvesterCount = 0;
 let isHarvesting = false;
 let isPressing = false;
 
 // DOM elements
 const oliveCountElement = document.getElementById('olive-count');
 const oilCountElement = document.getElementById('oil-count');
+const harvesterCountElement = document.getElementById('harvester-count');
 const harvestButton = document.getElementById('harvest-btn');
 const pressButton = document.getElementById('press-btn');
+const hireButton = document.getElementById('hire-btn');
 
 const oliveProgressContainer = document.getElementById('olive-progress-container');
 const oliveProgressBar = document.getElementById('olive-progress-bar');
@@ -22,35 +25,42 @@ const oilCountdown = document.getElementById('oil-countdown');
 const HARVEST_TIME = 3000; // 3 seconds
 const PRESS_TIME = 5000; // 5 seconds
 const PRESS_COST = 3; // olives
+const HARVESTER_COST = 10; // oil
 const UPDATE_INTERVAL = 100; // Update every 100ms
 
 // Load saved game state
 function loadGame() {
     const savedOlives = localStorage.getItem('oliveCount');
     const savedOil = localStorage.getItem('oilCount');
+    const savedHarvesters = localStorage.getItem('harvesterCount');
     if (savedOlives) {
         oliveCount = parseInt(savedOlives, 10);
-        updateDisplay();
     }
     if (savedOil) {
         oilCount = parseInt(savedOil, 10);
-        updateDisplay();
     }
+    if (savedHarvesters) {
+        harvesterCount = parseInt(savedHarvesters, 10);
+    }
+    updateDisplay();
 }
 
 // Save game state
 function saveGame() {
     localStorage.setItem('oliveCount', oliveCount);
     localStorage.setItem('oilCount', oilCount);
+    localStorage.setItem('harvesterCount', harvesterCount);
 }
 
 // Update displays
 function updateDisplay() {
     oliveCountElement.textContent = oliveCount;
     oilCountElement.textContent = oilCount;
+    harvesterCountElement.textContent = harvesterCount;
     
-    // Update press button state
+    // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST;
+    hireButton.disabled = oilCount < HARVESTER_COST;
 }
 
 // Start harvesting olives
@@ -92,6 +102,9 @@ function completeHarvest() {
         oliveCountdown.classList.remove('active');
         isHarvesting = false;
         harvestButton.disabled = false;
+        
+        // Auto-harvest if we have harvesters
+        checkAutoHarvest();
     }, 200);
 }
 
@@ -142,10 +155,32 @@ function completePress() {
     }, 200);
 }
 
+// Hire olive harvester
+function hireHarvester() {
+    if (oilCount < HARVESTER_COST) return;
+    
+    oilCount -= HARVESTER_COST;
+    harvesterCount++;
+    updateDisplay();
+    saveGame();
+    
+    // Start auto-harvesting if not already harvesting
+    checkAutoHarvest();
+}
+
+// Check if we should auto-harvest
+function checkAutoHarvest() {
+    if (harvesterCount > 0 && !isHarvesting) {
+        startHarvest();
+    }
+}
+
 // Event listeners
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
+hireButton.addEventListener('click', hireHarvester);
 
 // Initialize game
 loadGame();
 updateDisplay();
+checkAutoHarvest();
