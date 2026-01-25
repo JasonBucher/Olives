@@ -8,19 +8,28 @@
 </head>
 <body>
     <div class="container">
-        <h1>🫒 Olives Idle Game 🫒</h1>
+        <!-- Olives Row -->
+        <div class="resource-row">
+            <div class="resource-label">Olives: <span id="olive-count">0</span></div>
+            <div class="progress-area">
+                <div class="progress-container" id="olive-progress-container">
+                    <div class="countdown" id="olive-countdown"></div>
+                    <div class="progress-bar" id="olive-progress-bar"></div>
+                </div>
+            </div>
+            <button id="harvest-btn" class="action-button">Harvest Olives</button>
+        </div>
         
-        <div class="game-area">
-            <div class="olive-counter">
-                <span class="label">Olives:</span>
-                <span id="olive-count" class="count">0</span>
+        <!-- Oil Row -->
+        <div class="resource-row">
+            <div class="resource-label">Oil: <span id="oil-count">0</span></div>
+            <div class="progress-area">
+                <div class="progress-container" id="oil-progress-container">
+                    <div class="countdown" id="oil-countdown"></div>
+                    <div class="progress-bar" id="oil-progress-bar"></div>
+                </div>
             </div>
-            
-            <button id="harvest-btn" class="harvest-button">Harvest Olive</button>
-            
-            <div class="progress-container" id="progress-container">
-                <div class="progress-bar" id="progress-bar"></div>
-            </div>
+            <button id="press-btn" class="action-button">Press Oil</button>
         </div>
     </div>
     
