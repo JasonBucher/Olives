@@ -17,7 +17,7 @@
                     <div class="progress-bar" id="olive-progress-bar"></div>
                 </div>
             </div>
-            <button id="harvest-btn" class="action-button">Harvest Olives</button>
+            <button id="harvest-btn" class="action-button">Harvest Olives <span class="timing-info">(3.0s)</span></button>
         </div>
         
         <!-- Oil Row -->
@@ -29,31 +29,37 @@
                     <div class="progress-bar" id="oil-progress-bar"></div>
                 </div>
             </div>
-            <button id="press-btn" class="action-button">Press Oil</button>
+            <button id="press-btn" class="action-button">Press Oil <span class="timing-info">(5.0s)</span></button>
         </div>
         
         <!-- Olive Harvester Row -->
         <div class="resource-row">
-            <div class="resource-label">Olive Harvester: <span id="harvester-count">0</span></div>
+            <div class="resource-label">
+                Olive Harvester: <span id="harvester-count">0</span>
+                <span class="timing-info" id="harvester-timing"></span>
+            </div>
             <div class="progress-area">
                 <div class="progress-container" id="harvester-progress-container">
                     <div class="countdown" id="harvester-countdown"></div>
                     <div class="progress-bar" id="harvester-progress-bar"></div>
                 </div>
             </div>
-            <button id="hire-btn" class="action-button">Hire Olive Harvester</button>
+            <button id="hire-btn" class="action-button">Hire Olive Harvester <span class="timing-info">(10 oil)</span></button>
         </div>
         
         <!-- Press Worker Row -->
         <div class="resource-row">
-            <div class="resource-label">Press Worker: <span id="press-worker-count">0</span></div>
+            <div class="resource-label">
+                Press Worker: <span id="press-worker-count">0</span>
+                <span class="timing-info" id="press-worker-timing"></span>
+            </div>
             <div class="progress-area">
                 <div class="progress-container" id="press-worker-progress-container">
                     <div class="countdown" id="press-worker-countdown"></div>
                     <div class="progress-bar" id="press-worker-progress-bar"></div>
                 </div>
             </div>
-            <button id="hire-press-btn" class="action-button">Hire Press Worker</button>
+            <button id="hire-press-btn" class="action-button">Hire Press Worker <span class="timing-info">(25 oil)</span></button>
         </div>
     </div>
     

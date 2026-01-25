@@ -32,6 +32,9 @@ const pressWorkerProgressContainer = document.getElementById('press-worker-progr
 const pressWorkerProgressBar = document.getElementById('press-worker-progress-bar');
 const pressWorkerCountdown = document.getElementById('press-worker-countdown');
 
+const harvesterTimingElement = document.getElementById('harvester-timing');
+const pressWorkerTimingElement = document.getElementById('press-worker-timing');
+
 // Constants
 const HARVEST_TIME = 3000; // 3 seconds
 const PRESS_TIME = 5000; // 5 seconds
@@ -82,6 +85,21 @@ function updateDisplay() {
     oilCountElement.textContent = oilCount;
     harvesterCountElement.textContent = harvesterCount;
     pressWorkerCountElement.textContent = pressWorkerCount;
+    
+    // Update timing info
+    if (harvesterCount > 0) {
+        const time = (getHarvesterTime() / 1000).toFixed(1);
+        harvesterTimingElement.textContent = `(${time}s, -0.1s per harvester)`;
+    } else {
+        harvesterTimingElement.textContent = '(3.0s base, -0.1s per harvester)';
+    }
+    
+    if (pressWorkerCount > 0) {
+        const time = (getPressWorkerTime() / 1000).toFixed(1);
+        pressWorkerTimingElement.textContent = `(${time}s, -0.1s per worker)`;
+    } else {
+        pressWorkerTimingElement.textContent = '(5.0s base, -0.1s per worker)';
+    }
     
     // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST;

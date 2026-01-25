@@ -91,3 +91,9 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.timing-info {
+    font-size: 12px;
+    color: #666;
+    font-weight: normal;
+}
