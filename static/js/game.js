@@ -2,6 +2,7 @@
 let oliveCount = 0;
 let oilCount = 0;
 let harvesterCount = 0;
+let pressWorkerCount = 0;
 let isHarvesting = false;
 let isPressing = false;
 
@@ -9,9 +10,11 @@ let isPressing = false;
 const oliveCountElement = document.getElementById('olive-count');
 const oilCountElement = document.getElementById('oil-count');
 const harvesterCountElement = document.getElementById('harvester-count');
+const pressWorkerCountElement = document.getElementById('press-worker-count');
 const harvestButton = document.getElementById('harvest-btn');
 const pressButton = document.getElementById('press-btn');
 const hireButton = document.getElementById('hire-btn');
+const hirePressButton = document.getElementById('hire-press-btn');
 
 const oliveProgressContainer = document.getElementById('olive-progress-container');
 const oliveProgressBar = document.getElementById('olive-progress-bar');
@@ -21,18 +24,35 @@ const oilProgressContainer = document.getElementById('oil-progress-container');
 const oilProgressBar = document.getElementById('oil-progress-bar');
 const oilCountdown = document.getElementById('oil-countdown');
 
+const harvesterProgressContainer = document.getElementById('harvester-progress-container');
+const harvesterProgressBar = document.getElementById('harvester-progress-bar');
+const harvesterCountdown = document.getElementById('harvester-countdown');
+
+const pressWorkerProgressContainer = document.getElementById('press-worker-progress-container');
+const pressWorkerProgressBar = document.getElementById('press-worker-progress-bar');
+const pressWorkerCountdown = document.getElementById('press-worker-countdown');
+
 // Constants
 const HARVEST_TIME = 3000; // 3 seconds
 const PRESS_TIME = 5000; // 5 seconds
 const PRESS_COST = 3; // olives
 const HARVESTER_COST = 10; // oil
+const PRESS_WORKER_COST = 25; // oil
+const HARVESTER_BASE_TIME = 3000; // 3 seconds for first harvester
+const HARVESTER_TIME_REDUCTION = 100; // 0.1 seconds per additional harvester
+const PRESS_WORKER_BASE_TIME = 5000; // 5 seconds for first press worker
+const PRESS_WORKER_TIME_REDUCTION = 100; // 0.1 seconds per additional press worker
 const UPDATE_INTERVAL = 100; // Update every 100ms
+
+let harvesterInterval = null;
+let pressWorkerInterval = null;
 
 // Load saved game state
 function loadGame() {
     const savedOlives = localStorage.getItem('oliveCount');
     const savedOil = localStorage.getItem('oilCount');
     const savedHarvesters = localStorage.getItem('harvesterCount');
+    const savedPressWorkers = localStorage.getItem('pressWorkerCount');
     if (savedOlives) {
         oliveCount = parseInt(savedOlives, 10);
     }
@@ -42,6 +62,9 @@ function loadGame() {
     if (savedHarvesters) {
         harvesterCount = parseInt(savedHarvesters, 10);
     }
+    if (savedPressWorkers) {
+        pressWorkerCount = parseInt(savedPressWorkers, 10);
+    }
     updateDisplay();
 }
 
@@ -50,6 +73,7 @@ function saveGame() {
     localStorage.setItem('oliveCount', oliveCount);
     localStorage.setItem('oilCount', oilCount);
     localStorage.setItem('harvesterCount', harvesterCount);
+    localStorage.setItem('pressWorkerCount', pressWorkerCount);
 }
 
 // Update displays
@@ -57,10 +81,12 @@ function updateDisplay() {
     oliveCountElement.textContent = oliveCount;
     oilCountElement.textContent = oilCount;
     harvesterCountElement.textContent = harvesterCount;
+    pressWorkerCountElement.textContent = pressWorkerCount;
     
     // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST;
     hireButton.disabled = oilCount < HARVESTER_COST;
+    hirePressButton.disabled = oilCount < PRESS_WORKER_COST;
 }
 
 // Start harvesting olives
@@ -102,9 +128,6 @@ function completeHarvest() {
         oliveCountdown.classList.remove('active');
         isHarvesting = false;
         harvestButton.disabled = false;
-        
-        // Auto-harvest if we have harvesters
-        checkAutoHarvest();
     }, 200);
 }
 
@@ -164,23 +187,129 @@ function hireHarvester() {
     updateDisplay();
     saveGame();
     
-    // Start auto-harvesting if not already harvesting
-    checkAutoHarvest();
+    // Start or restart harvester generation
+    startHarvesterGeneration();
 }
 
-// Check if we should auto-harvest
-function checkAutoHarvest() {
-    if (harvesterCount > 0 && !isHarvesting) {
-        startHarvest();
+// Calculate harvester generation time
+function getHarvesterTime() {
+    if (harvesterCount === 0) return 0;
+    // 2 seconds base, minus 0.1s per additional harvester
+    return HARVESTER_BASE_TIME - ((harvesterCount - 1) * HARVESTER_TIME_REDUCTION);
+}
+
+// Start passive olive generation from harvesters
+function startHarvesterGeneration() {
+    // Clear any existing interval
+    if (harvesterInterval) {
+        clearInterval(harvesterInterval);
+        harvesterInterval = null;
     }
+    
+    if (harvesterCount === 0) {
+        harvesterProgressContainer.classList.remove('active');
+        harvesterCountdown.classList.remove('active');
+        return;
+    }
+    
+    const generationTime = getHarvesterTime();
+    harvesterProgressContainer.classList.add('active');
+    harvesterCountdown.classList.add('active');
+    harvesterProgressBar.style.width = '0%';
+    
+    const startTime = Date.now();
+    
+    harvesterInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / generationTime) * 100, 100);
+        const timeLeft = Math.max(0, (generationTime - elapsed) / 1000);
+        
+        harvesterProgressBar.style.width = progress + '%';
+        harvesterCountdown.textContent = timeLeft.toFixed(1);
+        
+        if (progress >= 100) {
+            // Generate an olive
+            oliveCount++;
+            updateDisplay();
+            saveGame();
+            
+            // Restart the generation cycle
+            clearInterval(harvesterInterval);
+            startHarvesterGeneration();
+        }
+    }, UPDATE_INTERVAL);
+}
+
+// Hire press worker
+function hirePressWorker() {
+    if (oilCount < PRESS_WORKER_COST) return;
+    
+    oilCount -= PRESS_WORKER_COST;
+    pressWorkerCount++;
+    updateDisplay();
+    saveGame();
+    
+    // Start or restart press worker generation
+    startPressWorkerGeneration();
+}
+
+// Calculate press worker generation time
+function getPressWorkerTime() {
+    if (pressWorkerCount === 0) return 0;
+    // 5 seconds base, minus 0.1s per additional press worker
+    return PRESS_WORKER_BASE_TIME - ((pressWorkerCount - 1) * PRESS_WORKER_TIME_REDUCTION);
+}
+
+// Start passive oil generation from press workers
+function startPressWorkerGeneration() {
+    // Clear any existing interval
+    if (pressWorkerInterval) {
+        clearInterval(pressWorkerInterval);
+        pressWorkerInterval = null;
+    }
+    
+    if (pressWorkerCount === 0) {
+        pressWorkerProgressContainer.classList.remove('active');
+        pressWorkerCountdown.classList.remove('active');
+        return;
+    }
+    
+    const generationTime = getPressWorkerTime();
+    pressWorkerProgressContainer.classList.add('active');
+    pressWorkerCountdown.classList.add('active');
+    pressWorkerProgressBar.style.width = '0%';
+    
+    const startTime = Date.now();
+    
+    pressWorkerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / generationTime) * 100, 100);
+        const timeLeft = Math.max(0, (generationTime - elapsed) / 1000);
+        
+        pressWorkerProgressBar.style.width = progress + '%';
+        pressWorkerCountdown.textContent = timeLeft.toFixed(1);
+        
+        if (progress >= 100) {
+            // Generate oil
+            oilCount++;
+            updateDisplay();
+            saveGame();
+            
+            // Restart the generation cycle
+            clearInterval(pressWorkerInterval);
+            startPressWorkerGeneration();
+        }
+    }, UPDATE_INTERVAL);
 }
 
 // Event listeners
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
 hireButton.addEventListener('click', hireHarvester);
+hirePressButton.addEventListener('click', hirePressWorker);
 
 // Initialize game
 loadGame();
 updateDisplay();
-checkAutoHarvest();
+startHarvesterGeneration();
+startPressWorkerGeneration();
