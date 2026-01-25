@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olives - Idle Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🫒 Olives Idle Game 🫒</h1>
+        
+        <div class="game-area">
+            <div class="olive-counter">
+                <span class="label">Olives:</span>
+                <span id="olive-count" class="count">0</span>
+            </div>
+            
+            <button id="harvest-btn" class="harvest-button">Harvest Olive</button>
+            
+            <div class="progress-container" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
