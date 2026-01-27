@@ -342,11 +342,111 @@ function startPressWorkerGeneration() {
     }, UPDATE_INTERVAL);
 }
 
+// Debug Panel
+const debugButton = document.getElementById('debug-btn');
+const debugModal = document.getElementById('debug-modal');
+const closeDebugButton = document.getElementById('close-debug');
+const resetGameButton = document.getElementById('reset-game-btn');
+const addOlivesButton = document.getElementById('add-olives-btn');
+const addOilButton = document.getElementById('add-oil-btn');
+
+function openDebugPanel() {
+    debugModal.classList.add('active');
+}
+
+function closeDebugPanel() {
+    debugModal.classList.remove('active');
+}
+
+function resetGame() {
+    if (confirm('Are you sure you want to reset the game? All progress will be lost!')) {
+        // Clear localStorage
+        localStorage.clear();
+        
+        // Reset all game state
+        oliveCount = 0;
+        oilCount = 0;
+        harvesterCount = 0;
+        pressWorkerCount = 0;
+        isHarvesting = false;
+        isPressing = false;
+        
+        // Clear all intervals
+        if (harvesterInterval) {
+            clearInterval(harvesterInterval);
+            harvesterInterval = null;
+        }
+        if (pressWorkerInterval) {
+            clearInterval(pressWorkerInterval);
+            pressWorkerInterval = null;
+        }
+        
+        // Reset UI
+        oliveProgressContainer.classList.remove('active');
+        oliveCountdown.classList.remove('active');
+        oliveProgressBar.style.width = '0%';
+        
+        oilProgressContainer.classList.remove('active');
+        oilCountdown.classList.remove('active');
+        oilProgressBar.style.width = '0%';
+        
+        harvesterProgressContainer.classList.remove('active');
+        harvesterCountdown.classList.remove('active');
+        harvesterProgressBar.style.width = '0%';
+        
+        pressWorkerProgressContainer.classList.remove('active');
+        pressWorkerCountdown.classList.remove('active');
+        pressWorkerProgressBar.style.width = '0%';
+        
+        harvestButton.disabled = false;
+        
+        // Update display
+        updateDisplay();
+        
+        // Close debug panel
+        closeDebugPanel();
+        
+        // Restart generation systems
+        startHarvesterGeneration();
+        startPressWorkerGeneration();
+    }
+}
+
+function addOlives() {
+    oliveCount += 100;
+    updateDisplay();
+    saveGame();
+    
+    // Check if press workers can now start
+    if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
+        startPressWorkerGeneration();
+    }
+}
+
+function addOil() {
+    oilCount += 100;
+    updateDisplay();
+    saveGame();
+}
+
 // Event listeners
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
 hireButton.addEventListener('click', hireHarvester);
 hirePressButton.addEventListener('click', hirePressWorker);
+
+debugButton.addEventListener('click', openDebugPanel);
+closeDebugButton.addEventListener('click', closeDebugPanel);
+resetGameButton.addEventListener('click', resetGame);
+addOlivesButton.addEventListener('click', addOlives);
+addOilButton.addEventListener('click', addOil);
+
+// Close modal when clicking outside
+debugModal.addEventListener('click', (e) => {
+    if (e.target === debugModal) {
+        closeDebugPanel();
+    }
+});
 
 // Initialize game
 loadGame();

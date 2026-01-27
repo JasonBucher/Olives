@@ -7,6 +7,24 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- Debug Button -->
+    <button id="debug-btn" class="debug-button" title="Debug Panel">⚒️</button>
+    
+    <!-- Debug Modal -->
+    <div id="debug-modal" class="debug-modal">
+        <div class="debug-modal-content">
+            <div class="debug-header">
+                <h3>Debug Panel</h3>
+                <button id="close-debug" class="close-button">×</button>
+            </div>
+            <div class="debug-body">
+                <button id="reset-game-btn" class="debug-action-btn">Reset Game State</button>
+                <button id="add-olives-btn" class="debug-action-btn secondary">Add 100 Olives</button>
+                <button id="add-oil-btn" class="debug-action-btn secondary">Add 100 Oil</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="container">
         <!-- Olives Row -->
         <div class="resource-row">

@@ -97,3 +97,112 @@ body {
     color: #666;
     font-weight: normal;
 }
+
+/* Debug Panel */
+.debug-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: 1px solid #999;
+    border-radius: 5px;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 1000;
+    transition: background 0.2s;
+}
+
+.debug-button:hover {
+    background: #f0f0f0;
+}
+
+.debug-modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.debug-modal.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.debug-modal-content {
+    background: white;
+    border-radius: 10px;
+    padding: 0;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+.debug-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 30px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+}
+
+.close-button:hover {
+    color: #333;
+}
+
+.debug-body {
+    padding: 20px;
+}
+
+.debug-action-btn {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.debug-action-btn:hover {
+    background: #c0392b;
+}
+
+.debug-action-btn:last-child {
+    margin-bottom: 0;
+}
+
+.debug-action-btn.secondary {
+    background: #3498db;
+}
+
+.debug-action-btn.secondary:hover {
+    background: #2980b9;
+}
