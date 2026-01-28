@@ -88,16 +88,16 @@ function updateDisplay() {
     // Update timing info
     if (harvesterCount > 0) {
         const timePerOlive = 1 / (harvesterCount * HARVESTER_RATE_PER_SEC);
-        harvesterTimingElement.textContent = `(${timePerOlive.toFixed(1)}s per olive)`;
+        harvesterTimingElement.textContent = `(${timePerOlive.toFixed(2)}s per olive)`;
     } else {
-        harvesterTimingElement.textContent = '(10.0s per olive base)';
+        harvesterTimingElement.textContent = '(10.00s per olive base)';
     }
     
     if (pressWorkerCount > 0) {
         const timePerPress = 1 / (pressWorkerCount * PRESS_WORKER_RATE_PER_SEC);
-        pressWorkerTimingElement.textContent = `(${timePerPress.toFixed(1)}s per press)`;
+        pressWorkerTimingElement.textContent = `(${timePerPress.toFixed(2)}s per press)`;
     } else {
-        pressWorkerTimingElement.textContent = '(20.0s per press base)';
+        pressWorkerTimingElement.textContent = '(20.00s per press base)';
     }
     
     // Update button states
