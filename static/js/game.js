@@ -5,6 +5,10 @@ let harvesterCount = 0;
 let pressWorkerCount = 0;
 let isHarvesting = false;
 let isPressing = false;
+let harvesterProgress = 0;     // 0..1 progress toward producing 1 olive
+let pressWorkerProgress = 0;   // 0..1 progress toward producing 1 press operation
+let automationInterval = null;
+let autoPressReserved = false; // true if we've already paid olives for the current auto press
 
 // DOM elements
 const oliveCountElement = document.getElementById('olive-count');
@@ -41,14 +45,9 @@ const PRESS_TIME = 5000; // 5 seconds
 const PRESS_COST = 3; // olives
 const HARVESTER_COST = 5; // oil
 const PRESS_WORKER_COST = 10; // oil
-const HARVESTER_BASE_TIME = 3000; // 3 seconds for first harvester
-const HARVESTER_TIME_REDUCTION = 100; // 0.1 seconds per additional harvester
-const PRESS_WORKER_BASE_TIME = 5000; // 5 seconds for first press worker
-const PRESS_WORKER_TIME_REDUCTION = 100; // 0.1 seconds per additional press worker
+const HARVESTER_RATE_PER_SEC = 0.10;     // each harvester produces 0.10 olives/sec (1 olive per 10s)
+const PRESS_WORKER_RATE_PER_SEC = 0.05;  // each press worker does 0.05 presses/sec (1 press per 20s)
 const UPDATE_INTERVAL = 100; // Update every 100ms
-
-let harvesterInterval = null;
-let pressWorkerInterval = null;
 
 // Load saved game state
 function loadGame() {
@@ -88,17 +87,17 @@ function updateDisplay() {
     
     // Update timing info
     if (harvesterCount > 0) {
-        const time = (getHarvesterTime() / 1000).toFixed(1);
-        harvesterTimingElement.textContent = `(${time}s, -0.1s per harvester)`;
+        const timePerOlive = 1 / (harvesterCount * HARVESTER_RATE_PER_SEC);
+        harvesterTimingElement.textContent = `(${timePerOlive.toFixed(1)}s per olive)`;
     } else {
-        harvesterTimingElement.textContent = '(3.0s base, -0.1s per harvester)';
+        harvesterTimingElement.textContent = '(10.0s per olive base)';
     }
     
     if (pressWorkerCount > 0) {
-        const time = (getPressWorkerTime() / 1000).toFixed(1);
-        pressWorkerTimingElement.textContent = `(${time}s, -0.1s per worker)`;
+        const timePerPress = 1 / (pressWorkerCount * PRESS_WORKER_RATE_PER_SEC);
+        pressWorkerTimingElement.textContent = `(${timePerPress.toFixed(1)}s per press)`;
     } else {
-        pressWorkerTimingElement.textContent = '(5.0s base, -0.1s per worker)';
+        pressWorkerTimingElement.textContent = '(20.0s per press base)';
     }
     
     // Update button states
@@ -146,11 +145,6 @@ function completeHarvest() {
         oliveCountdown.classList.remove('active');
         isHarvesting = false;
         harvestButton.disabled = false;
-        
-        // Check if press workers can now start with new olives
-        if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
-            startPressWorkerGeneration();
-        }
     }, 200);
 }
 
@@ -209,63 +203,6 @@ function hireHarvester() {
     harvesterCount++;
     updateDisplay();
     saveGame();
-    
-    // Start or restart harvester generation
-    startHarvesterGeneration();
-}
-
-// Calculate harvester generation time
-function getHarvesterTime() {
-    if (harvesterCount === 0) return 0;
-    // 2 seconds base, minus 0.1s per additional harvester
-    return HARVESTER_BASE_TIME - ((harvesterCount - 1) * HARVESTER_TIME_REDUCTION);
-}
-
-// Start passive olive generation from harvesters
-function startHarvesterGeneration() {
-    // Clear any existing interval
-    if (harvesterInterval) {
-        clearInterval(harvesterInterval);
-        harvesterInterval = null;
-    }
-    
-    if (harvesterCount === 0) {
-        harvesterProgressContainer.classList.remove('active');
-        harvesterCountdown.classList.remove('active');
-        return;
-    }
-    
-    const generationTime = getHarvesterTime();
-    harvesterProgressContainer.classList.add('active');
-    harvesterCountdown.classList.add('active');
-    harvesterProgressBar.style.width = '0%';
-    
-    const startTime = Date.now();
-    
-    harvesterInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / generationTime) * 100, 100);
-        const timeLeft = Math.max(0, (generationTime - elapsed) / 1000);
-        
-        harvesterProgressBar.style.width = progress + '%';
-        harvesterCountdown.textContent = timeLeft.toFixed(1);
-        
-        if (progress >= 100) {
-            // Generate an olive
-            oliveCount++;
-            updateDisplay();
-            saveGame();
-            
-            // Check if press workers can now start with new olives
-            if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
-                startPressWorkerGeneration();
-            }
-            
-            // Restart the generation cycle
-            clearInterval(harvesterInterval);
-            startHarvesterGeneration();
-        }
-    }, UPDATE_INTERVAL);
 }
 
 // Hire press worker
@@ -276,69 +213,111 @@ function hirePressWorker() {
     pressWorkerCount++;
     updateDisplay();
     saveGame();
-    
-    // Start or restart press worker generation
-    startPressWorkerGeneration();
 }
 
-// Calculate press worker generation time
-function getPressWorkerTime() {
-    if (pressWorkerCount === 0) return 0;
-    // 5 seconds base, minus 0.1s per additional press worker
-    return PRESS_WORKER_BASE_TIME - ((pressWorkerCount - 1) * PRESS_WORKER_TIME_REDUCTION);
-}
+// Start automation loop for rate-based generation
+function startAutomationLoop() {
+    if (automationInterval) clearInterval(automationInterval);
 
-// Start passive oil generation from press workers
-function startPressWorkerGeneration() {
-    // Clear any existing interval
-    if (pressWorkerInterval) {
-        clearInterval(pressWorkerInterval);
-        pressWorkerInterval = null;
-    }
-    
-    if (pressWorkerCount === 0) {
-        pressWorkerProgressContainer.classList.remove('active');
-        pressWorkerCountdown.classList.remove('active');
-        return;
-    }
-    
-    // Check if we have enough olives to start production
-    if (oliveCount < PRESS_COST) {
-        pressWorkerProgressContainer.classList.remove('active');
-        pressWorkerCountdown.classList.remove('active');
-        return;
-    }
-    
-    // Consume olives to start production
-    oliveCount -= PRESS_COST;
-    updateDisplay();
-    saveGame();
-    
-    const generationTime = getPressWorkerTime();
-    pressWorkerProgressContainer.classList.add('active');
-    pressWorkerCountdown.classList.add('active');
-    pressWorkerProgressBar.style.width = '0%';
-    
-    const startTime = Date.now();
-    
-    pressWorkerInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / generationTime) * 100, 100);
-        const timeLeft = Math.max(0, (generationTime - elapsed) / 1000);
-        
-        pressWorkerProgressBar.style.width = progress + '%';
-        pressWorkerCountdown.textContent = timeLeft.toFixed(1);
-        
-        if (progress >= 100) {
-            // Generate oil
-            oilCount++;
-            updateDisplay();
-            saveGame();
-            
-            // Restart the generation cycle
-            clearInterval(pressWorkerInterval);
-            startPressWorkerGeneration();
+    automationInterval = setInterval(() => {
+        const dt = UPDATE_INTERVAL / 1000;
+
+        // ---- Harvesters: generate olives by rate ----
+        const oliveRate = harvesterCount * HARVESTER_RATE_PER_SEC; // olives/sec
+        if (oliveRate > 0) {
+            harvesterProgress += oliveRate * dt;
+
+            const producedOlives = Math.floor(harvesterProgress);
+            if (producedOlives > 0) {
+                oliveCount += producedOlives;
+                harvesterProgress -= producedOlives;
+                saveGame();
+            }
+
+            // UI
+            harvesterProgressContainer.classList.add('active');
+            harvesterCountdown.classList.add('active');
+            harvesterProgressBar.style.width = `${Math.min(harvesterProgress * 100, 100)}%`;
+
+            const secondsLeft = (1 - harvesterProgress) / oliveRate;
+            harvesterCountdown.textContent = secondsLeft.toFixed(1);
+        } else {
+            harvesterProgressContainer.classList.remove('active');
+            harvesterCountdown.classList.remove('active');
+            harvesterProgressBar.style.width = '0%';
         }
+        
+        // ---- Press workers: SINGLE press, cost paid at start, speed scales with workers ----
+        const pressRate = pressWorkerCount * PRESS_WORKER_RATE_PER_SEC; // presses/sec
+
+        if (pressRate <= 0) {
+            // No workers
+            pressWorkerProgress = 0;
+            autoPressReserved = false;
+            pressWorkerProgressContainer.classList.remove('active');
+            pressWorkerCountdown.classList.remove('active');
+            pressWorkerProgressBar.style.width = '0%';
+        } else {
+            // If not currently pressing, try to start a new press
+            if (!autoPressReserved) {
+                if (oliveCount >= PRESS_COST) {
+                    oliveCount -= PRESS_COST;       // PAY COST UP FRONT
+                    autoPressReserved = true;
+                    pressWorkerProgress = 0;
+                    saveGame();
+                } else {
+                    // Idle: not enough olives
+                    pressWorkerProgress = 0;
+                    pressWorkerProgressContainer.classList.remove('active');
+                    pressWorkerCountdown.classList.remove('active');
+                    pressWorkerProgressBar.style.width = '0%';
+                    // Do not proceed further this tick
+                    // commented this out to make the loop easier to reason about
+                    // updateDisplay();
+                    // return;
+                }
+            }
+
+            // Advance progress for the active press
+            pressWorkerProgress += pressRate * dt;
+
+            // Handle completion(s) — supports dt spikes cleanly
+            while (pressWorkerProgress >= 1.0) {
+                // Complete one press
+                oilCount += 1;
+                pressWorkerProgress -= 1.0;
+                autoPressReserved = false;
+
+                // Immediately try to start the next press if we can afford it
+                if (oliveCount >= PRESS_COST) {
+                    oliveCount -= PRESS_COST;
+                    autoPressReserved = true;
+                } else {
+                    // Can't continue pressing
+                    pressWorkerProgress = 0;
+                    break;
+                }
+            }
+
+            saveGame();
+
+            // UI
+            if (autoPressReserved) {
+                pressWorkerProgressContainer.classList.add('active');
+                pressWorkerCountdown.classList.add('active');
+                pressWorkerProgressBar.style.width =
+                    `${Math.min(pressWorkerProgress * 100, 100)}%`;
+
+                const secondsLeft = (1 - pressWorkerProgress) / pressRate;
+                pressWorkerCountdown.textContent = secondsLeft.toFixed(1);
+            } else {
+                pressWorkerProgressContainer.classList.remove('active');
+                pressWorkerCountdown.classList.remove('active');
+                pressWorkerProgressBar.style.width = '0%';
+            }
+        }
+
+        updateDisplay();
     }, UPDATE_INTERVAL);
 }
 
@@ -370,15 +349,14 @@ function resetGame() {
         pressWorkerCount = 0;
         isHarvesting = false;
         isPressing = false;
+        harvesterProgress = 0;
+        pressWorkerProgress = 0;
+        autoPressReserved = false;
         
-        // Clear all intervals
-        if (harvesterInterval) {
-            clearInterval(harvesterInterval);
-            harvesterInterval = null;
-        }
-        if (pressWorkerInterval) {
-            clearInterval(pressWorkerInterval);
-            pressWorkerInterval = null;
+        // Clear automation interval
+        if (automationInterval) {
+            clearInterval(automationInterval);
+            automationInterval = null;
         }
         
         // Reset UI
@@ -406,9 +384,8 @@ function resetGame() {
         // Close debug panel
         closeDebugPanel();
         
-        // Restart generation systems
-        startHarvesterGeneration();
-        startPressWorkerGeneration();
+        // Restart automation
+        startAutomationLoop();
     }
 }
 
@@ -416,11 +393,6 @@ function addOlives() {
     oliveCount += 100;
     updateDisplay();
     saveGame();
-    
-    // Check if press workers can now start
-    if (pressWorkerCount > 0 && !pressWorkerInterval && oliveCount >= PRESS_COST) {
-        startPressWorkerGeneration();
-    }
 }
 
 function addOil() {
@@ -451,5 +423,4 @@ debugModal.addEventListener('click', (e) => {
 // Initialize game
 loadGame();
 updateDisplay();
-startHarvesterGeneration();
-startPressWorkerGeneration();
+startAutomationLoop();
