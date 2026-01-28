@@ -1,48 +1,79 @@
 # Olives - Idle Game
 
-A simple idle game where you collect olives!
+A simple idle game where you collect olives and produce olive oil!
 
-## Setup
+## About
 
-1. Create a virtual environment:
-   ```bash
-   python3 -m venv venv
-   ```
+This is a static web-based idle game built with HTML, CSS, and vanilla JavaScript. No backend required!
 
-2. Activate the virtual environment:
-   - macOS/Linux: `source venv/bin/activate`
-   - Windows: `venv\Scripts\activate`
+## Running Locally
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Simply open `index.html` in your web browser, or use a local server:
 
-4. Run the application:
-   ```bash
-   python app.py
-   ```
+```bash
+# Python 3
+python3 -m http.server 8000
 
-5. Open your browser and navigate to `http://localhost:5000`
+# Node.js
+npx http-server
+
+# VS Code Live Server extension
+# Right-click index.html → "Open with Live Server"
+```
+
+Then navigate to `http://localhost:8000`
 
 ## Game Features
 
-- Click the "Harvest" button to collect olives
-- Watch the progress bar fill up over 3 seconds
-- Button is disabled while harvesting
-- Your olive count increases by 1 after each harvest
+- **Harvest Olives**: Click to manually harvest olives (3 second timer)
+- **Press Oil**: Convert 10 olives into 1 oil (5 second timer)
+- **Hire Olive Harvesters**: Automated olive harvesting (costs 10 oil, produces 1 olive every 15 seconds)
+- **Hire Press Workers**: Automated oil pressing (costs 25 oil, produces 1 oil every 30 seconds)
+- **Progress Bars**: Visual countdown timers for all actions
+- **Auto-Save**: Game state automatically saves to browser localStorage
+- **Debug Panel**: Click the ⚒️ button for debug tools (reset game, add resources)
 
-## Git Setup
+## Deployment
 
-```bash
-git init
-git add .
-git commit -m "Initial commit: Olives idle game"
+This is a static site that can be deployed to any static hosting service:
+
+### GitHub Pages
+1. Push your code to GitHub
+2. Go to Settings → Pages
+3. Select your branch (usually `main`)
+4. Your site will be live at `https://username.github.io/repository-name`
+
+### Netlify
+1. Connect your GitHub repository
+2. Netlify auto-deploys on every push
+3. No build command needed
+
+### Vercel
+1. Import your GitHub repository
+2. Auto-deploys on every push
+3. No configuration needed
+
+### Cloudflare Pages
+1. Connect your GitHub repository
+2. Set build output directory to `.` (root)
+3. Auto-deploys on every push
+
+## Project Structure
+
+```
+IdleGame1/
+├── index.html          # Main game page
+├── static/
+│   ├── css/
+│   │   └── style.css   # Game styling
+│   └── js/
+│       └── game.js     # Game logic and state management
+└── README.md
 ```
 
-To push to GitHub:
-```bash
-git remote add origin <your-github-repo-url>
-git branch -M main
-git push -u origin main
-```
+## Technologies Used
+
+- HTML5
+- CSS3 (with CSS animations)
+- Vanilla JavaScript (ES6+)
+- LocalStorage API for save persistence
