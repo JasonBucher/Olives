@@ -1,6 +1,7 @@
 // Game state
 let oliveCount = 0;
 let oilCount = 0;
+let florinCount = 0;
 let harvesterCount = 0;
 let pressWorkerCount = 0;
 let isHarvesting = false;
@@ -13,10 +14,12 @@ let autoPressReserved = false; // true if we've already paid olives for the curr
 // DOM elements
 const oliveCountElement = document.getElementById('olive-count');
 const oilCountElement = document.getElementById('oil-count');
+const florinCountElement = document.getElementById('florin-count');
 const harvesterCountElement = document.getElementById('harvester-count');
 const pressWorkerCountElement = document.getElementById('press-worker-count');
 const harvestButton = document.getElementById('harvest-btn');
 const pressButton = document.getElementById('press-btn');
+const sellOilButton = document.getElementById('sell-oil-btn');
 const hireButton = document.getElementById('hire-btn');
 const hirePressButton = document.getElementById('hire-press-btn');
 
@@ -53,6 +56,7 @@ const UPDATE_INTERVAL = 100; // Update every 100ms
 function loadGame() {
     const savedOlives = localStorage.getItem('oliveCount');
     const savedOil = localStorage.getItem('oilCount');
+    const savedFlorins = localStorage.getItem('florinCount');
     const savedHarvesters = localStorage.getItem('harvesterCount');
     const savedPressWorkers = localStorage.getItem('pressWorkerCount');
     if (savedOlives) {
@@ -60,6 +64,9 @@ function loadGame() {
     }
     if (savedOil) {
         oilCount = parseInt(savedOil, 10);
+    }
+    if (savedFlorins) {
+        florinCount = parseInt(savedFlorins, 10);
     }
     if (savedHarvesters) {
         harvesterCount = parseInt(savedHarvesters, 10);
@@ -74,6 +81,7 @@ function loadGame() {
 function saveGame() {
     localStorage.setItem('oliveCount', oliveCount);
     localStorage.setItem('oilCount', oilCount);
+    localStorage.setItem('florinCount', florinCount);
     localStorage.setItem('harvesterCount', harvesterCount);
     localStorage.setItem('pressWorkerCount', pressWorkerCount);
 }
@@ -82,6 +90,7 @@ function saveGame() {
 function updateDisplay() {
     oliveCountElement.textContent = oliveCount;
     oilCountElement.textContent = oilCount;
+    florinCountElement.textContent = florinCount;
     harvesterCountElement.textContent = harvesterCount;
     pressWorkerCountElement.textContent = pressWorkerCount;
     
@@ -102,6 +111,7 @@ function updateDisplay() {
     
     // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST;
+    sellOilButton.disabled = oilCount < 1;
     hireButton.disabled = oilCount < HARVESTER_COST;
     hirePressButton.disabled = oilCount < PRESS_WORKER_COST;
 }
@@ -193,6 +203,16 @@ function completePress() {
         isPressing = false;
         updateDisplay(); // Re-check button state
     }, 200);
+}
+
+// Sell oil for florins
+function sellOil() {
+    if (oilCount < 1) return;
+    
+    oilCount -= 1;
+    florinCount += 1;
+    updateDisplay();
+    saveGame();
 }
 
 // Hire olive harvester
@@ -345,6 +365,7 @@ function resetGame() {
         // Reset all game state
         oliveCount = 0;
         oilCount = 0;
+        florinCount = 0;
         harvesterCount = 0;
         pressWorkerCount = 0;
         isHarvesting = false;
@@ -404,6 +425,7 @@ function addOil() {
 // Event listeners
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
+sellOilButton.addEventListener('click', sellOil);
 hireButton.addEventListener('click', hireHarvester);
 hirePressButton.addEventListener('click', hirePressWorker);
 

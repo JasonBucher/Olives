@@ -77,3 +77,8 @@ IdleGame1/
 - CSS3 (with CSS animations)
 - Vanilla JavaScript (ES6+)
 - LocalStorage API for save persistence
+
+## Design Principles
+
+> Every new system should change what the player values, not just add production.
+> Florins exist to measure value and recontextualize olives and oil.
