@@ -4,6 +4,7 @@ let oilCount = 0;
 let florinCount = 0;
 let harvesterCount = 0;
 let pressWorkerCount = 0;
+let bankingHouseEstablished = false;
 let isHarvesting = false;
 let isPressing = false;
 let harvesterProgress = 0;     // 0..1 progress toward producing 1 olive
@@ -22,6 +23,8 @@ const pressButton = document.getElementById('press-btn');
 const sellOilButton = document.getElementById('sell-oil-btn');
 const hireButton = document.getElementById('hire-btn');
 const hirePressButton = document.getElementById('hire-press-btn');
+const establishBankingButton = document.getElementById('establish-banking-btn');
+const bankingStatusElement = document.getElementById('banking-status');
 
 const oliveProgressContainer = document.getElementById('olive-progress-container');
 const oliveProgressBar = document.getElementById('olive-progress-bar');
@@ -48,6 +51,7 @@ const PRESS_TIME = 5000; // 5 seconds
 const PRESS_COST = 3; // olives
 const HARVESTER_COST = 5; // oil
 const PRESS_WORKER_COST = 10; // oil
+const BANKING_HOUSE_COST = 25; // florins
 const HARVESTER_RATE_PER_SEC = 0.10;     // each harvester produces 0.10 olives/sec (1 olive per 10s)
 const PRESS_WORKER_RATE_PER_SEC = 0.05;  // each press worker does 0.05 presses/sec (1 press per 20s)
 const UPDATE_INTERVAL = 100; // Update every 100ms
@@ -59,6 +63,7 @@ function loadGame() {
     const savedFlorins = localStorage.getItem('florinCount');
     const savedHarvesters = localStorage.getItem('harvesterCount');
     const savedPressWorkers = localStorage.getItem('pressWorkerCount');
+    const savedBankingHouse = localStorage.getItem('bankingHouseEstablished');
     if (savedOlives) {
         oliveCount = parseInt(savedOlives, 10);
     }
@@ -74,6 +79,9 @@ function loadGame() {
     if (savedPressWorkers) {
         pressWorkerCount = parseInt(savedPressWorkers, 10);
     }
+    if (savedBankingHouse === 'true') {
+        bankingHouseEstablished = true;
+    }
     updateDisplay();
 }
 
@@ -84,6 +92,7 @@ function saveGame() {
     localStorage.setItem('florinCount', florinCount);
     localStorage.setItem('harvesterCount', harvesterCount);
     localStorage.setItem('pressWorkerCount', pressWorkerCount);
+    localStorage.setItem('bankingHouseEstablished', bankingHouseEstablished);
 }
 
 // Update displays
@@ -111,9 +120,19 @@ function updateDisplay() {
     
     // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST;
-    sellOilButton.disabled = oilCount < 1;
+    sellOilButton.disabled = oilCount < 3;
     hireButton.disabled = oilCount < HARVESTER_COST;
     hirePressButton.disabled = oilCount < PRESS_WORKER_COST;
+    
+    // Banking house button and status
+    if (bankingHouseEstablished) {
+        establishBankingButton.style.display = 'none';
+        bankingStatusElement.style.display = 'block';
+    } else {
+        establishBankingButton.style.display = 'inline-block';
+        establishBankingButton.disabled = florinCount < BANKING_HOUSE_COST;
+        bankingStatusElement.style.display = 'none';
+    }
 }
 
 // Start harvesting olives
@@ -207,10 +226,20 @@ function completePress() {
 
 // Sell oil for florins
 function sellOil() {
-    if (oilCount < 1) return;
+    if (oilCount < 3) return;
     
-    oilCount -= 1;
+    oilCount -= 3;
     florinCount += 1;
+    updateDisplay();
+    saveGame();
+}
+
+// Establish banking house
+function establishBankingHouse() {
+    if (florinCount < BANKING_HOUSE_COST || bankingHouseEstablished) return;
+    
+    florinCount -= BANKING_HOUSE_COST;
+    bankingHouseEstablished = true;
     updateDisplay();
     saveGame();
 }
@@ -368,6 +397,7 @@ function resetGame() {
         florinCount = 0;
         harvesterCount = 0;
         pressWorkerCount = 0;
+        bankingHouseEstablished = false;
         isHarvesting = false;
         isPressing = false;
         harvesterProgress = 0;
@@ -426,6 +456,7 @@ function addOil() {
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
 sellOilButton.addEventListener('click', sellOil);
+establishBankingButton.addEventListener('click', establishBankingHouse);
 hireButton.addEventListener('click', hireHarvester);
 hirePressButton.addEventListener('click', hirePressWorker);
 
