@@ -9,7 +9,7 @@
 <body>
     <!-- Title Area -->
     <div class="title-area">
-        <h1>Olives <span style="font-size: 0.5em; font-weight: normal;">(v0.0.4)</span></h1>
+        <h1>Olives <span style="font-size: 0.5em; font-weight: normal;">(v0.0.5)</span></h1>
         <button id="debug-btn" class="debug-button">debug</button>
     </div>
     
@@ -56,15 +56,6 @@
             <button id="press-btn" class="action-button">Press Olives <span class="timing-info">(3 olives, 5.0s)</span></button>
         </div>
         
-        <!-- Florins Row -->
-        <div class="resource-row">
-            <div class="resource-label">Florins: <span id="florin-count">0</span></div>
-            <div class="progress-area">
-                <!-- No progress bar for florins -->
-            </div>
-            <button id="sell-oil-btn" class="action-button">Sell Oil <span class="timing-info">(3 oil → 1 florin)</span></button>
-        </div>
-        
         <h3 class="subsection-header">Automated</h3>
         <hr class="section-divider">
         
@@ -96,6 +87,36 @@
                 </div>
             </div>
             <button id="hire-press-btn" class="action-button">Hire Olive Presser <span class="timing-info">(10 oil)</span></button>
+        </div>
+        
+        <!-- Press Strain Block -->
+        <div id="press-strain-container" class="strain-block">
+            <div class="strain-label">Press Strain</div>
+            <div class="strain-row">
+                <div id="press-strain-bar" class="strain-bar">
+                    <div id="press-strain-fill" class="strain-fill"></div>
+                </div>
+                <span id="press-strain-text" class="strain-text">0%</span>
+            </div>
+            <button id="repair-pressing-btn" class="action-button">Repair Pressing <span class="timing-info">(5 florins)</span></button>
+        </div>
+        
+        <!-- Value Section -->
+        <div style="margin-top: 40px;">
+            <h2 class="section-header">Value</h2>
+            <p style="font-size: 0.9em; color: #666; margin: 0 0 15px 0;">Extracted value and trade</p>
+            <hr class="section-divider">
+            
+            <div class="resource-row">
+                <div class="resource-label">Florins: <span id="florin-count">0</span></div>
+                <div class="progress-area">
+                    <!-- No progress bar for florins -->
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="sell-oil-btn" class="action-button">Sell Oil <span class="timing-info">(3 oil → 1 florin)</span></button>
+                    <button id="sell-olives-btn" class="action-button">Sell Olives <span class="timing-info">(10 olives → 1 florin)</span></button>
+                </div>
+            </div>
         </div>
         
         <!-- Institutions Section -->

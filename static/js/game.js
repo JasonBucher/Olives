@@ -5,6 +5,7 @@ let florinCount = 0;
 let harvesterCount = 0;
 let pressWorkerCount = 0;
 let bankingHouseEstablished = false;
+let pressStrain = 0; // 0..100
 let isHarvesting = false;
 let isPressing = false;
 let harvesterProgress = 0;     // 0..1 progress toward producing 1 olive
@@ -21,10 +22,14 @@ const pressWorkerCountElement = document.getElementById('press-worker-count');
 const harvestButton = document.getElementById('harvest-btn');
 const pressButton = document.getElementById('press-btn');
 const sellOilButton = document.getElementById('sell-oil-btn');
+const sellOlivesButton = document.getElementById('sell-olives-btn');
 const hireButton = document.getElementById('hire-btn');
 const hirePressButton = document.getElementById('hire-press-btn');
 const establishBankingButton = document.getElementById('establish-banking-btn');
 const bankingStatusElement = document.getElementById('banking-status');
+const pressStrainFill = document.getElementById('press-strain-fill');
+const pressStrainText = document.getElementById('press-strain-text');
+const repairPressingButton = document.getElementById('repair-pressing-btn');
 
 const oliveProgressContainer = document.getElementById('olive-progress-container');
 const oliveProgressBar = document.getElementById('olive-progress-bar');
@@ -55,6 +60,11 @@ const BANKING_HOUSE_COST = 25; // florins
 const HARVESTER_RATE_PER_SEC = 0.10;     // each harvester produces 0.10 olives/sec (1 olive per 10s)
 const PRESS_WORKER_RATE_PER_SEC = 0.05;  // each press worker does 0.05 presses/sec (1 press per 20s)
 const UPDATE_INTERVAL = 100; // Update every 100ms
+const PRESS_STRAIN_MAX = 100;
+const STRAIN_PER_OIL = 0.3333; // ~300 oil to reach 100
+const REPAIR_COST_FLORINS = 5;
+const OIL_SELL_COST = 3; // 3 oil -> 1 florin
+const OLIVE_SELL_COST = 10; // 10 olives -> 1 florin (worse rate, deadlock escape)
 
 // Load saved game state
 function loadGame() {
@@ -64,6 +74,7 @@ function loadGame() {
     const savedHarvesters = localStorage.getItem('harvesterCount');
     const savedPressWorkers = localStorage.getItem('pressWorkerCount');
     const savedBankingHouse = localStorage.getItem('bankingHouseEstablished');
+    const savedPressStrain = localStorage.getItem('pressStrain');
     if (savedOlives) {
         oliveCount = parseInt(savedOlives, 10);
     }
@@ -82,6 +93,9 @@ function loadGame() {
     if (savedBankingHouse === 'true') {
         bankingHouseEstablished = true;
     }
+    if (savedPressStrain) {
+        pressStrain = parseFloat(savedPressStrain);
+    }
     updateDisplay();
 }
 
@@ -93,6 +107,7 @@ function saveGame() {
     localStorage.setItem('harvesterCount', harvesterCount);
     localStorage.setItem('pressWorkerCount', pressWorkerCount);
     localStorage.setItem('bankingHouseEstablished', bankingHouseEstablished);
+    localStorage.setItem('pressStrain', pressStrain);
 }
 
 // Update displays
@@ -118,11 +133,18 @@ function updateDisplay() {
         pressWorkerTimingElement.textContent = '(20.00s per press base)';
     }
     
+    // Update strain UI
+    pressStrain = Math.max(0, Math.min(PRESS_STRAIN_MAX, pressStrain));
+    pressStrainFill.style.width = `${pressStrain}%`;
+    pressStrainText.textContent = `${Math.floor(pressStrain)}%`;
+    
     // Update button states
-    pressButton.disabled = isPressing || oliveCount < PRESS_COST;
-    sellOilButton.disabled = oilCount < 3;
+    pressButton.disabled = isPressing || oliveCount < PRESS_COST || pressStrain >= PRESS_STRAIN_MAX;
+    sellOilButton.disabled = oilCount < OIL_SELL_COST;
+    sellOlivesButton.disabled = oliveCount < OLIVE_SELL_COST;
     hireButton.disabled = oilCount < HARVESTER_COST;
     hirePressButton.disabled = oilCount < PRESS_WORKER_COST;
+    repairPressingButton.disabled = pressStrain <= 0 || florinCount < REPAIR_COST_FLORINS;
     
     // Banking house button and status
     if (bankingHouseEstablished) {
@@ -162,6 +184,12 @@ function startHarvest() {
     }, UPDATE_INTERVAL);
 }
 
+// Helper: add strain when oil is produced
+function addPressStrainForOilProduced(oilProduced) {
+    pressStrain += oilProduced * STRAIN_PER_OIL;
+    pressStrain = Math.min(PRESS_STRAIN_MAX, pressStrain);
+}
+
 // Complete harvest
 function completeHarvest() {
     oliveCount++;
@@ -179,7 +207,7 @@ function completeHarvest() {
 
 // Start pressing oil
 function startPress() {
-    if (isPressing || oliveCount < PRESS_COST) return;
+    if (isPressing || oliveCount < PRESS_COST || pressStrain >= PRESS_STRAIN_MAX) return;
     
     // Deduct olives
     oliveCount -= PRESS_COST;
@@ -212,6 +240,7 @@ function startPress() {
 // Complete oil pressing
 function completePress() {
     oilCount++;
+    addPressStrainForOilProduced(1);
     updateDisplay();
     saveGame();
     
@@ -226,10 +255,30 @@ function completePress() {
 
 // Sell oil for florins
 function sellOil() {
-    if (oilCount < 3) return;
+    if (oilCount < OIL_SELL_COST) return;
     
-    oilCount -= 3;
+    oilCount -= OIL_SELL_COST;
     florinCount += 1;
+    updateDisplay();
+    saveGame();
+}
+
+// Sell olives for florins (deadlock escape hatch)
+function sellOlives() {
+    if (oliveCount < OLIVE_SELL_COST) return;
+    
+    oliveCount -= OLIVE_SELL_COST;
+    florinCount += 1;
+    updateDisplay();
+    saveGame();
+}
+
+// Repair pressing (reduce strain)
+function repairPressing() {
+    if (florinCount < REPAIR_COST_FLORINS || pressStrain <= 0) return;
+    
+    florinCount -= REPAIR_COST_FLORINS;
+    pressStrain = 0;
     updateDisplay();
     saveGame();
 }
@@ -309,7 +358,14 @@ function startAutomationLoop() {
         } else {
             // If not currently pressing, try to start a new press
             if (!autoPressReserved) {
-                if (oliveCount >= PRESS_COST) {
+                if (pressStrain >= PRESS_STRAIN_MAX) {
+                    // Can't press: strain maxed out
+                    pressWorkerProgress = 0;
+                    autoPressReserved = false;
+                    pressWorkerProgressContainer.classList.remove('active');
+                    pressWorkerCountdown.classList.remove('active');
+                    pressWorkerProgressBar.style.width = '0%';
+                } else if (oliveCount >= PRESS_COST) {
                     oliveCount -= PRESS_COST;       // PAY COST UP FRONT
                     autoPressReserved = true;
                     pressWorkerProgress = 0;
@@ -331,11 +387,20 @@ function startAutomationLoop() {
             pressWorkerProgress += pressRate * dt;
 
             // Handle completion(s) — supports dt spikes cleanly
+            let oilProducedThisTick = 0;
             while (pressWorkerProgress >= 1.0) {
                 // Complete one press
                 oilCount += 1;
+                oilProducedThisTick += 1;
                 pressWorkerProgress -= 1.0;
                 autoPressReserved = false;
+
+                // Check strain before starting next press
+                if (pressStrain >= PRESS_STRAIN_MAX) {
+                    // Can't continue: strain maxed
+                    pressWorkerProgress = 0;
+                    break;
+                }
 
                 // Immediately try to start the next press if we can afford it
                 if (oliveCount >= PRESS_COST) {
@@ -346,6 +411,11 @@ function startAutomationLoop() {
                     pressWorkerProgress = 0;
                     break;
                 }
+            }
+            
+            // Add strain for all oil produced this tick
+            if (oilProducedThisTick > 0) {
+                addPressStrainForOilProduced(oilProducedThisTick);
             }
 
             saveGame();
@@ -398,6 +468,7 @@ function resetGame() {
         harvesterCount = 0;
         pressWorkerCount = 0;
         bankingHouseEstablished = false;
+        pressStrain = 0;
         isHarvesting = false;
         isPressing = false;
         harvesterProgress = 0;
@@ -456,6 +527,8 @@ function addOil() {
 harvestButton.addEventListener('click', startHarvest);
 pressButton.addEventListener('click', startPress);
 sellOilButton.addEventListener('click', sellOil);
+sellOlivesButton.addEventListener('click', sellOlives);
+repairPressingButton.addEventListener('click', repairPressing);
 establishBankingButton.addEventListener('click', establishBankingHouse);
 hireButton.addEventListener('click', hireHarvester);
 hirePressButton.addEventListener('click', hirePressWorker);
