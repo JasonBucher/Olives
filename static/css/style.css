@@ -10,6 +10,13 @@ body {
     padding: 0;
     color: #333;
 }
+.resource-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 12px;
+    position: relative;
+}
 
 .title-area {
     background: #6B8E23;
@@ -36,7 +43,7 @@ body {
     display: flex;
     align-items: center;
     gap: 20px;
-    margin-bottom: 18px;
+    margin-bottom: 12px;
     position: relative;
 }
 
@@ -226,14 +233,18 @@ body {
 
 .subsection-header {
     font-size: 1.0em;
-    margin: 30px 0 5px 0;
+    margin: 14px 0 4px 0;
     font-weight: bold;
 }
 
 .section-divider {
-    margin: 15px 0 25px 0;
+    margin: 10px 0 14px 0;
     border: none;
     border-top: 2px solid #ccc;
+}
+
+.section-block {
+    margin-top: 18px;
 }
 
 /* Press Strain Block */
@@ -253,11 +264,11 @@ body {
     align-items: center;
     gap: 10px;
     margin-bottom: 8px;
-}
+    margin: 14px 0 4px 0;
 
 .strain-bar {
     flex: 1;
-    height: 10px;
+    margin: 10px 0 14px 0;
     background: #ddd;
     border: 1px solid #999;
     position: relative;
@@ -267,7 +278,11 @@ body {
     height: 100%;
     background: #333;
     width: 0%;
-    transition: width 0.3s ease;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strain-fill.danger {
+    background: #d32f2f;
 }
 
 .strain-text {
@@ -275,4 +290,10 @@ body {
     min-width: 35px;
     text-align: right;
     color: #666;
+    transition: color 0.3s ease;
+}
+
+.strain-text.danger {
+    color: #d32f2f;
+    font-weight: bold;
 }

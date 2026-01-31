@@ -65,6 +65,9 @@ const STRAIN_PER_OIL = 0.3333; // ~300 oil to reach 100
 const REPAIR_COST_FLORINS = 5;
 const OIL_SELL_COST = 3; // 3 oil -> 1 florin
 const OLIVE_SELL_COST = 10; // 10 olives -> 1 florin (worse rate, deadlock escape)
+const BREAKDOWN_RISK_START = 70; // risk starts at 70% strain
+const BREAKDOWN_PMAX = 0.08; // 8% chance per oil at 100% strain
+const BREAKDOWN_ENABLED = true;
 
 // Load saved game state
 function loadGame() {
@@ -138,6 +141,15 @@ function updateDisplay() {
     pressStrainFill.style.width = `${pressStrain}%`;
     pressStrainText.textContent = `${Math.floor(pressStrain)}%`;
     
+    // Add danger styling at 85%+
+    if (pressStrain >= 85) {
+        pressStrainFill.classList.add('danger');
+        pressStrainText.classList.add('danger');
+    } else {
+        pressStrainFill.classList.remove('danger');
+        pressStrainText.classList.remove('danger');
+    }
+    
     // Update button states
     pressButton.disabled = isPressing || oliveCount < PRESS_COST || pressStrain >= PRESS_STRAIN_MAX;
     sellOilButton.disabled = oilCount < OIL_SELL_COST;
@@ -184,10 +196,52 @@ function startHarvest() {
     }, UPDATE_INTERVAL);
 }
 
-// Helper: add strain when oil is produced
+// Helper: calculate breakdown probability based on current strain
+function getBreakdownProbability() {
+    if (!BREAKDOWN_ENABLED || pressStrain < BREAKDOWN_RISK_START) {
+        return 0;
+    }
+    
+    const s = pressStrain / 100; // 0..1
+    const t = Math.max(0, Math.min(1, (s - 0.70) / 0.30)); // clamp to 0..1
+    return (t * t) * BREAKDOWN_PMAX; // quadratic ramp
+}
+
+// Helper: trigger press breakdown (force strain to max, stop pressing)
+function triggerPressBreakdown() {
+    pressStrain = PRESS_STRAIN_MAX;
+    
+    // Reset automated press state
+    autoPressReserved = false;
+    pressWorkerProgress = 0;
+    
+    // Hide automated press UI
+    pressWorkerProgressContainer.classList.remove('active');
+    pressWorkerCountdown.classList.remove('active');
+    pressWorkerProgressBar.style.width = '0%';
+    
+    updateDisplay();
+    saveGame();
+}
+
+// Helper: add strain when oil is produced, with breakdown risk
+// Returns true if breakdown occurred (caller should stop producing more oil)
 function addPressStrainForOilProduced(oilProduced) {
-    pressStrain += oilProduced * STRAIN_PER_OIL;
-    pressStrain = Math.min(PRESS_STRAIN_MAX, pressStrain);
+    for (let i = 0; i < oilProduced; i++) {
+        // Increase strain for this oil
+        pressStrain += STRAIN_PER_OIL;
+        pressStrain = Math.min(PRESS_STRAIN_MAX, pressStrain);
+        
+        // Check for breakdown risk (only if not already at max)
+        if (pressStrain >= BREAKDOWN_RISK_START && pressStrain < PRESS_STRAIN_MAX) {
+            const breakdownChance = getBreakdownProbability();
+            if (Math.random() < breakdownChance) {
+                triggerPressBreakdown();
+                return true; // breakdown occurred
+            }
+        }
+    }
+    return false; // no breakdown
 }
 
 // Complete harvest
@@ -240,7 +294,7 @@ function startPress() {
 // Complete oil pressing
 function completePress() {
     oilCount++;
-    addPressStrainForOilProduced(1);
+    const brokeDown = addPressStrainForOilProduced(1);
     updateDisplay();
     saveGame();
     
@@ -249,7 +303,7 @@ function completePress() {
         oilProgressContainer.classList.remove('active');
         oilCountdown.classList.remove('active');
         isPressing = false;
-        updateDisplay(); // Re-check button state
+        updateDisplay(); // Re-check button state (may be disabled if breakdown occurred)
     }, 200);
 }
 
@@ -387,13 +441,19 @@ function startAutomationLoop() {
             pressWorkerProgress += pressRate * dt;
 
             // Handle completion(s) — supports dt spikes cleanly
-            let oilProducedThisTick = 0;
-            while (pressWorkerProgress >= 1.0) {
+            let brokeDown = false;
+            while (pressWorkerProgress >= 1.0 && !brokeDown) {
                 // Complete one press
                 oilCount += 1;
-                oilProducedThisTick += 1;
                 pressWorkerProgress -= 1.0;
                 autoPressReserved = false;
+                
+                // Add strain and check for breakdown
+                brokeDown = addPressStrainForOilProduced(1);
+                if (brokeDown) {
+                    // Breakdown occurred - stop processing
+                    break;
+                }
 
                 // Check strain before starting next press
                 if (pressStrain >= PRESS_STRAIN_MAX) {
@@ -411,11 +471,6 @@ function startAutomationLoop() {
                     pressWorkerProgress = 0;
                     break;
                 }
-            }
-            
-            // Add strain for all oil produced this tick
-            if (oilProducedThisTick > 0) {
-                addPressStrainForOilProduced(oilProducedThisTick);
             }
 
             saveGame();
