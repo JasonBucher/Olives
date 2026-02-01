@@ -18,33 +18,60 @@
 
     <hr class="divider" />
 
-    <section id="production-section" class="section">
-      <div class="section-title">Production</div>
-
-      <div class="row">
-        <div class="label">On Trees</div>
-        <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
+    <div class="layout">
+      <!-- Left Column: Florins -->
+      <div class="col col-left">
+        <section class="section">
+          <div class="section-title">Florins</div>
+          <div class="florin-display">
+            <span id="florin-count">0</span>
+          </div>
+        </section>
       </div>
 
-      <div class="row">
-        <div class="label">Harvested</div>
-        <div class="value"><span id="harvested-olives">0</span></div>
+      <!-- Middle Column: Production -->
+      <div class="col col-mid">
+        <section id="production-section" class="section">
+          <div class="section-title">Production</div>
+
+          <div class="row">
+            <div class="label">On Trees</div>
+            <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
+          </div>
+
+          <div class="row">
+            <div class="label">Harvested</div>
+            <div class="value"><span id="harvested-olives">0</span></div>
+          </div>
+
+          <div class="actions">
+            <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
+          </div>
+
+          <div id="harvest-progress-container" class="progress-container" style="display: none;">
+            <div id="harvest-progress-bar" class="progress-bar"></div>
+          </div>
+          <div id="harvest-countdown" class="countdown"></div>
+        </section>
+
+        <section id="log-section" class="section">
+          <div class="section-title">Log</div>
+          <div id="log" class="log"></div>
+        </section>
       </div>
 
-      <div class="actions">
-        <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
+      <!-- Right Column: Market -->
+      <div class="col col-right">
+        <section class="section">
+          <div class="section-title">Market</div>
+          
+          <div class="row">
+            <div class="label">Olives Listed</div>
+            <div class="value"><span id="market-olives">0</span></div>
+          </div>
+        </section>
       </div>
-
-      <div id="harvest-progress-container" class="progress-container" style="display: none;">
-        <div id="harvest-progress-bar" class="progress-bar"></div>
-      </div>
-      <div id="harvest-countdown" class="countdown"></div>
-    </section>
-
-    <section id="log-section" class="section">
-      <div class="section-title">Log</div>
-      <div id="log" class="log"></div>
-    </section>
+    </div>
   </div>
 
   <!-- Debug Modal -->

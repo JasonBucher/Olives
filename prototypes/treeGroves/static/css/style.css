@@ -33,9 +33,27 @@ html, body {
 }
 
 .container {
-  max-width: 560px;
+  max-width: 1200px;
   margin: 18px auto;
   padding: 0 14px 18px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.col {
+  min-width: 0;
+}
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .topbar {
@@ -61,7 +79,20 @@ h1 {
   background: var(--panel);
   border-radius: var(--radius);
   padding: var(--pad);
-  margin-top: 12px;
+}
+
+.layout .section {
+  margin-top: 0;
+}
+
+.florin-display {
+  text-align: center;
+  padding: 20px 0;
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.02em;
 }
 
 .section-title {

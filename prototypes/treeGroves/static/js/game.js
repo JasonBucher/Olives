@@ -48,9 +48,11 @@ let harvestJob = {
 };
 
 // --- DOM ---
+const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
 const harvestedOlivesEl = document.getElementById("harvested-olives");
+const marketOlivesEl = document.getElementById("market-olives");
 const logEl = document.getElementById("log");
 
 const harvestBtn = document.getElementById("harvest-btn");
@@ -128,9 +130,11 @@ function growTrees(dt) {
 
 // --- UI ---
 function updateUI() {
+  florinCountEl.textContent = state.florinCount;
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
   harvestedOlivesEl.textContent = state.harvestedOlives;
+  marketOlivesEl.textContent = 0; // placeholder for now
 }
 
 // --- Harvest System ---
