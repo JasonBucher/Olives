@@ -1,607 +1,618 @@
-// Game state
+// Olives Idle Game: Minimalist System Reset
+// State
 let oliveCount = 0;
-let oilCount = 0;
 let florinCount = 0;
-let harvesterCount = 0;
-let pressWorkerCount = 0;
-let bankingHouseEstablished = false;
-let pressStrain = 0; // 0..100
-let isHarvesting = false;
-let isPressing = false;
-let harvesterProgress = 0;     // 0..1 progress toward producing 1 olive
-let pressWorkerProgress = 0;   // 0..1 progress toward producing 1 press operation
-let automationInterval = null;
-let autoPressReserved = false; // true if we've already paid olives for the current auto press
+let oilCount = 0;
+let totalOlivesPicked = 0;
+let pickersCount = 0;
+let pressesCount = 0;
+let olivesPerClick = 1;
+let pickerRate = 0.2; // olives/sec per picker
+let pickerMultiplier = 1.0;
+let oliveMarketCapacity = 25;
+let oliveSellEfficiency = 0.7;
+let oliveSellRate = 5; // olives sold per second
+let oilMarketCapacity = 5;
+let oilSellEfficiency = 0.7;
+let oilSellRate = 1; // oil sold per second
+let oilPerPress = 1; // per press per cycle
+let oilPressTime = 5.0; // seconds per press cycle
+let oilPressCost = 5; // olives per press
+let upgrades = {
+    hands: false,
+    baskets: false,
+    connections: false,
+    stalls: false,
+    spoilage: false
+};
+let clickTimestamps = [];
+const CLICK_OPS_WINDOW = 5.0;
 
-// DOM elements
-const oliveCountElement = document.getElementById('olive-count');
-const oilCountElement = document.getElementById('oil-count');
-const florinCountElement = document.getElementById('florin-count');
-const harvesterCountElement = document.getElementById('harvester-count');
-const pressWorkerCountElement = document.getElementById('press-worker-count');
-const harvestButton = document.getElementById('harvest-btn');
-const pressButton = document.getElementById('press-btn');
-const sellOilButton = document.getElementById('sell-oil-btn');
-const sellOlivesButton = document.getElementById('sell-olives-btn');
-const hireButton = document.getElementById('hire-btn');
-const hirePressButton = document.getElementById('hire-press-btn');
-const establishBankingButton = document.getElementById('establish-banking-btn');
-const bankingStatusElement = document.getElementById('banking-status');
-const pressStrainFill = document.getElementById('press-strain-fill');
-const pressStrainText = document.getElementById('press-strain-text');
-const repairPressingButton = document.getElementById('repair-pressing-btn');
+// Market shipment state
+let oliveShipmentActive = false;
+let oliveShipmentRemaining = 0;
+let oliveShipmentTimer = 0;
+let oliveShipmentTotal = 0;
 
-const oliveProgressContainer = document.getElementById('olive-progress-container');
-const oliveProgressBar = document.getElementById('olive-progress-bar');
-const oliveCountdown = document.getElementById('olive-countdown');
+let oilShipmentActive = false;
+let oilShipmentRemaining = 0;
+let oilShipmentTimer = 0;
+let oilShipmentTotal = 0;
 
-const oilProgressContainer = document.getElementById('oil-progress-container');
-const oilProgressBar = document.getElementById('oil-progress-bar');
-const oilCountdown = document.getElementById('oil-countdown');
+// Unlock flags
+let oliveMarketUnlocked = false;
+let pickersUnlocked = false;
+let pressesUnlocked = false;
+let oilMarketUnlocked = false;
 
-const harvesterProgressContainer = document.getElementById('harvester-progress-container');
-const harvesterProgressBar = document.getElementById('harvester-progress-bar');
-const harvesterCountdown = document.getElementById('harvester-countdown');
+// DOM
+const oliveCountEl = document.getElementById('olive-count');
+const florinCountEl = document.getElementById('florin-count');
+const oilCountEl = document.getElementById('oil-count');
+const opsCountEl = document.getElementById('ops-count');
+const pickOliveBtn = document.getElementById('pick-olive-btn');
+const oliveMarketSection = document.getElementById('olive-market-section');
+const oliveMarketCapacityEl = document.getElementById('olive-market-capacity');
+const sell10OlivesBtn = document.getElementById('sell-10-olives-btn');
+const sell25OlivesBtn = document.getElementById('sell-25-olives-btn');
+const sellMaxOlivesBtn = document.getElementById('sell-max-olives-btn');
+const oliveShipmentProgress = document.getElementById('olive-shipment-progress');
+const oliveShipmentBar = document.getElementById('olive-shipment-bar');
+const oliveShipmentCountdown = document.getElementById('olive-shipment-countdown');
+const pickerCountEl = document.getElementById('picker-count');
+const hirePickerBtn = document.getElementById('hire-picker-btn');
+const pickerCostEl = document.getElementById('picker-cost');
+const passiveOpsEl = document.getElementById('passive-ops');
+const pressCountEl = document.getElementById('press-count');
+const buyPressBtn = document.getElementById('buy-press-btn');
+const pressCostEl = document.getElementById('press-cost');
+const pressOlivesBtn = document.getElementById('press-olives-btn');
+const pressProgressContainer = document.getElementById('press-progress-container');
+const pressProgressBar = document.getElementById('press-progress-bar');
+const pressCountdown = document.getElementById('press-countdown');
+const oilMarketSection = document.getElementById('oil-market-section');
+const oilMarketCapacityEl = document.getElementById('oil-market-capacity');
+const sell5OilBtn = document.getElementById('sell-5-oil-btn');
+const sell10OilBtn = document.getElementById('sell-10-oil-btn');
+const sellMaxOilBtn = document.getElementById('sell-max-oil-btn');
+const oilShipmentProgress = document.getElementById('oil-shipment-progress');
+const oilShipmentBar = document.getElementById('oil-shipment-bar');
+const oilShipmentCountdown = document.getElementById('oil-shipment-countdown');
+const upgradesSection = document.getElementById('upgrades-section');
+const upgradeHandsBtn = document.getElementById('upgrade-hands-btn');
+const upgradeBasketsBtn = document.getElementById('upgrade-baskets-btn');
+const upgradeConnectionsBtn = document.getElementById('upgrade-connections-btn');
+const upgradeStallsBtn = document.getElementById('upgrade-stalls-btn');
+const upgradeSpoilageBtn = document.getElementById('upgrade-spoilage-btn');
+const resetBtn = document.getElementById('reset-btn');
 
-const pressWorkerProgressContainer = document.getElementById('press-worker-progress-container');
-const pressWorkerProgressBar = document.getElementById('press-worker-progress-bar');
-const pressWorkerCountdown = document.getElementById('press-worker-countdown');
-
-const harvesterTimingElement = document.getElementById('harvester-timing');
-const pressWorkerTimingElement = document.getElementById('press-worker-timing');
-
-// Constants
-const HARVEST_TIME = 3000; // 3 seconds
-const PRESS_TIME = 5000; // 5 seconds
-const PRESS_COST = 3; // olives
-const HARVESTER_COST = 5; // oil
-const PRESS_WORKER_COST = 10; // oil
-const BANKING_HOUSE_COST = 25; // florins
-const HARVESTER_RATE_PER_SEC = 0.10;     // each harvester produces 0.10 olives/sec (1 olive per 10s)
-const PRESS_WORKER_RATE_PER_SEC = 0.05;  // each press worker does 0.05 presses/sec (1 press per 20s)
-const UPDATE_INTERVAL = 100; // Update every 100ms
-const PRESS_STRAIN_MAX = 100;
-const STRAIN_PER_OIL = 0.3333; // ~300 oil to reach 100
-const REPAIR_COST_FLORINS = 5;
-const OIL_SELL_COST = 3; // 3 oil -> 1 florin
-const OLIVE_SELL_COST = 10; // 10 olives -> 1 florin (worse rate, deadlock escape)
-const BREAKDOWN_RISK_START = 70; // risk starts at 70% strain
-const BREAKDOWN_PMAX = 0.08; // 8% chance per oil at 100% strain
-const BREAKDOWN_ENABLED = true;
-
-// Load saved game state
-function loadGame() {
-    const savedOlives = localStorage.getItem('oliveCount');
-    const savedOil = localStorage.getItem('oilCount');
-    const savedFlorins = localStorage.getItem('florinCount');
-    const savedHarvesters = localStorage.getItem('harvesterCount');
-    const savedPressWorkers = localStorage.getItem('pressWorkerCount');
-    const savedBankingHouse = localStorage.getItem('bankingHouseEstablished');
-    const savedPressStrain = localStorage.getItem('pressStrain');
-    if (savedOlives) {
-        oliveCount = parseInt(savedOlives, 10);
-    }
-    if (savedOil) {
-        oilCount = parseInt(savedOil, 10);
-    }
-    if (savedFlorins) {
-        florinCount = parseInt(savedFlorins, 10);
-    }
-    if (savedHarvesters) {
-        harvesterCount = parseInt(savedHarvesters, 10);
-    }
-    if (savedPressWorkers) {
-        pressWorkerCount = parseInt(savedPressWorkers, 10);
-    }
-    if (savedBankingHouse === 'true') {
-        bankingHouseEstablished = true;
-    }
-    if (savedPressStrain) {
-        pressStrain = parseFloat(savedPressStrain);
-    }
-    updateDisplay();
-}
-
-// Save game state
+// --- Utility ---
 function saveGame() {
-    localStorage.setItem('oliveCount', oliveCount);
-    localStorage.setItem('oilCount', oilCount);
-    localStorage.setItem('florinCount', florinCount);
-    localStorage.setItem('harvesterCount', harvesterCount);
-    localStorage.setItem('pressWorkerCount', pressWorkerCount);
-    localStorage.setItem('bankingHouseEstablished', bankingHouseEstablished);
-    localStorage.setItem('pressStrain', pressStrain);
+    const state = {
+        oliveCount, florinCount, oilCount, totalOlivesPicked, pickersCount, pressesCount, olivesPerClick, pickerMultiplier,
+        oliveMarketCapacity, oliveSellEfficiency, oliveSellRate, oilMarketCapacity, oilSellEfficiency, oilSellRate, oilPerPress, oilPressTime, oilPressCost,
+        upgrades, clickTimestamps,
+        oliveShipmentActive, oliveShipmentRemaining, oliveShipmentTimer, oliveShipmentTotal,
+        oilShipmentActive, oilShipmentRemaining, oilShipmentTimer, oilShipmentTotal,
+        oliveMarketUnlocked, pickersUnlocked, pressesUnlocked, oilMarketUnlocked
+    };
+    localStorage.setItem('olivesGameState', JSON.stringify(state));
 }
 
-// Update displays
-function updateDisplay() {
-    oliveCountElement.textContent = oliveCount;
-    oilCountElement.textContent = oilCount;
-    florinCountElement.textContent = florinCount;
-    harvesterCountElement.textContent = harvesterCount;
-    pressWorkerCountElement.textContent = pressWorkerCount;
-    
-    // Update timing info
-    if (harvesterCount > 0) {
-        const timePerOlive = 1 / (harvesterCount * HARVESTER_RATE_PER_SEC);
-        harvesterTimingElement.textContent = `(${timePerOlive.toFixed(2)}s per olive)`;
-    } else {
-        harvesterTimingElement.textContent = '(10.00s per olive base)';
-    }
-    
-    if (pressWorkerCount > 0) {
-        const timePerPress = 1 / (pressWorkerCount * PRESS_WORKER_RATE_PER_SEC);
-        pressWorkerTimingElement.textContent = `(${timePerPress.toFixed(2)}s per press)`;
-    } else {
-        pressWorkerTimingElement.textContent = '(20.00s per press base)';
-    }
-    
-    // Update strain UI
-    pressStrain = Math.max(0, Math.min(PRESS_STRAIN_MAX, pressStrain));
-    pressStrainFill.style.width = `${pressStrain}%`;
-    pressStrainText.textContent = `${Math.floor(pressStrain)}%`;
-    
-    // Add danger styling at 85%+
-    if (pressStrain >= 85) {
-        pressStrainFill.classList.add('danger');
-        pressStrainText.classList.add('danger');
-    } else {
-        pressStrainFill.classList.remove('danger');
-        pressStrainText.classList.remove('danger');
-    }
-    
-    // Update button states
-    pressButton.disabled = isPressing || oliveCount < PRESS_COST || pressStrain >= PRESS_STRAIN_MAX;
-    sellOilButton.disabled = oilCount < OIL_SELL_COST;
-    sellOlivesButton.disabled = oliveCount < OLIVE_SELL_COST;
-    hireButton.disabled = oilCount < HARVESTER_COST;
-    hirePressButton.disabled = oilCount < PRESS_WORKER_COST;
-    repairPressingButton.disabled = pressStrain <= 0 || florinCount < REPAIR_COST_FLORINS;
-    
-    // Banking house button and status
-    if (bankingHouseEstablished) {
-        establishBankingButton.style.display = 'none';
-        bankingStatusElement.style.display = 'block';
-    } else {
-        establishBankingButton.style.display = 'inline-block';
-        establishBankingButton.disabled = florinCount < BANKING_HOUSE_COST;
-        bankingStatusElement.style.display = 'none';
-    }
-}
-
-// Start harvesting olives
-function startHarvest() {
-    if (isHarvesting) return;
-    
-    isHarvesting = true;
-    harvestButton.disabled = true;
-    oliveProgressContainer.classList.add('active');
-    oliveCountdown.classList.add('active');
-    oliveProgressBar.style.width = '0%';
-    
-    const startTime = Date.now();
-    
-    const progressInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / HARVEST_TIME) * 100, 100);
-        const timeLeft = Math.max(0, (HARVEST_TIME - elapsed) / 1000);
-        
-        oliveProgressBar.style.width = progress + '%';
-        oliveCountdown.textContent = timeLeft.toFixed(1);
-        
-        if (progress >= 100) {
-            clearInterval(progressInterval);
-            completeHarvest();
-        }
-    }, UPDATE_INTERVAL);
-}
-
-// Helper: calculate breakdown probability based on current strain
-function getBreakdownProbability() {
-    if (!BREAKDOWN_ENABLED || pressStrain < BREAKDOWN_RISK_START) {
-        return 0;
-    }
-    
-    const s = pressStrain / 100; // 0..1
-    const t = Math.max(0, Math.min(1, (s - 0.70) / 0.30)); // clamp to 0..1
-    return (t * t) * BREAKDOWN_PMAX; // quadratic ramp
-}
-
-// Helper: trigger press breakdown (force strain to max, stop pressing)
-function triggerPressBreakdown() {
-    pressStrain = PRESS_STRAIN_MAX;
-    
-    // Reset automated press state
-    autoPressReserved = false;
-    pressWorkerProgress = 0;
-    
-    // Hide automated press UI
-    pressWorkerProgressContainer.classList.remove('active');
-    pressWorkerCountdown.classList.remove('active');
-    pressWorkerProgressBar.style.width = '0%';
-    
-    updateDisplay();
-    saveGame();
-}
-
-// Helper: add strain when oil is produced, with breakdown risk
-// Returns true if breakdown occurred (caller should stop producing more oil)
-function addPressStrainForOilProduced(oilProduced) {
-    for (let i = 0; i < oilProduced; i++) {
-        // Increase strain for this oil
-        pressStrain += STRAIN_PER_OIL;
-        pressStrain = Math.min(PRESS_STRAIN_MAX, pressStrain);
-        
-        // Check for breakdown risk (only if not already at max)
-        if (pressStrain >= BREAKDOWN_RISK_START && pressStrain < PRESS_STRAIN_MAX) {
-            const breakdownChance = getBreakdownProbability();
-            if (Math.random() < breakdownChance) {
-                triggerPressBreakdown();
-                return true; // breakdown occurred
-            }
-        }
-    }
-    return false; // no breakdown
-}
-
-// Complete harvest
-function completeHarvest() {
-    oliveCount++;
-    updateDisplay();
-    saveGame();
-    
-    setTimeout(() => {
-        oliveProgressBar.style.width = '0%';
-        oliveProgressContainer.classList.remove('active');
-        oliveCountdown.classList.remove('active');
-        isHarvesting = false;
-        harvestButton.disabled = false;
-    }, 200);
-}
-
-// Start pressing oil
-function startPress() {
-    if (isPressing || oliveCount < PRESS_COST || pressStrain >= PRESS_STRAIN_MAX) return;
-    
-    // Deduct olives
-    oliveCount -= PRESS_COST;
-    updateDisplay();
-    saveGame();
-    
-    isPressing = true;
-    pressButton.disabled = true;
-    oilProgressContainer.classList.add('active');
-    oilCountdown.classList.add('active');
-    oilProgressBar.style.width = '0%';
-    
-    const startTime = Date.now();
-    
-    const progressInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min((elapsed / PRESS_TIME) * 100, 100);
-        const timeLeft = Math.max(0, (PRESS_TIME - elapsed) / 1000);
-        
-        oilProgressBar.style.width = progress + '%';
-        oilCountdown.textContent = timeLeft.toFixed(1);
-        
-        if (progress >= 100) {
-            clearInterval(progressInterval);
-            completePress();
-        }
-    }, UPDATE_INTERVAL);
-}
-
-// Complete oil pressing
-function completePress() {
-    oilCount++;
-    const brokeDown = addPressStrainForOilProduced(1);
-    updateDisplay();
-    saveGame();
-    
-    setTimeout(() => {
-        oilProgressBar.style.width = '0%';
-        oilProgressContainer.classList.remove('active');
-        oilCountdown.classList.remove('active');
-        isPressing = false;
-        updateDisplay(); // Re-check button state (may be disabled if breakdown occurred)
-    }, 200);
-}
-
-// Sell oil for florins
-function sellOil() {
-    if (oilCount < OIL_SELL_COST) return;
-    
-    oilCount -= OIL_SELL_COST;
-    florinCount += 1;
-    updateDisplay();
-    saveGame();
-}
-
-// Sell olives for florins (deadlock escape hatch)
-function sellOlives() {
-    if (oliveCount < OLIVE_SELL_COST) return;
-    
-    oliveCount -= OLIVE_SELL_COST;
-    florinCount += 1;
-    updateDisplay();
-    saveGame();
-}
-
-// Repair pressing (reduce strain)
-function repairPressing() {
-    if (florinCount < REPAIR_COST_FLORINS || pressStrain <= 0) return;
-    
-    florinCount -= REPAIR_COST_FLORINS;
-    pressStrain = 0;
-    updateDisplay();
-    saveGame();
-}
-
-// Establish banking house
-function establishBankingHouse() {
-    if (florinCount < BANKING_HOUSE_COST || bankingHouseEstablished) return;
-    
-    florinCount -= BANKING_HOUSE_COST;
-    bankingHouseEstablished = true;
-    updateDisplay();
-    saveGame();
-}
-
-// Hire olive harvester
-function hireHarvester() {
-    if (oilCount < HARVESTER_COST) return;
-    
-    oilCount -= HARVESTER_COST;
-    harvesterCount++;
-    updateDisplay();
-    saveGame();
-}
-
-// Hire press worker
-function hirePressWorker() {
-    if (oilCount < PRESS_WORKER_COST) return;
-    
-    oilCount -= PRESS_WORKER_COST;
-    pressWorkerCount++;
-    updateDisplay();
-    saveGame();
-}
-
-// Start automation loop for rate-based generation
-function startAutomationLoop() {
-    if (automationInterval) clearInterval(automationInterval);
-
-    automationInterval = setInterval(() => {
-        const dt = UPDATE_INTERVAL / 1000;
-
-        // ---- Harvesters: generate olives by rate ----
-        const oliveRate = harvesterCount * HARVESTER_RATE_PER_SEC; // olives/sec
-        if (oliveRate > 0) {
-            harvesterProgress += oliveRate * dt;
-
-            const producedOlives = Math.floor(harvesterProgress);
-            if (producedOlives > 0) {
-                oliveCount += producedOlives;
-                harvesterProgress -= producedOlives;
-                saveGame();
-            }
-
-            // UI
-            harvesterProgressContainer.classList.add('active');
-            harvesterCountdown.classList.add('active');
-            harvesterProgressBar.style.width = `${Math.min(harvesterProgress * 100, 100)}%`;
-
-            const secondsLeft = (1 - harvesterProgress) / oliveRate;
-            harvesterCountdown.textContent = secondsLeft.toFixed(1);
-        } else {
-            harvesterProgressContainer.classList.remove('active');
-            harvesterCountdown.classList.remove('active');
-            harvesterProgressBar.style.width = '0%';
-        }
-        
-        // ---- Press workers: SINGLE press, cost paid at start, speed scales with workers ----
-        const pressRate = pressWorkerCount * PRESS_WORKER_RATE_PER_SEC; // presses/sec
-
-        if (pressRate <= 0) {
-            // No workers
-            pressWorkerProgress = 0;
-            autoPressReserved = false;
-            pressWorkerProgressContainer.classList.remove('active');
-            pressWorkerCountdown.classList.remove('active');
-            pressWorkerProgressBar.style.width = '0%';
-        } else {
-            // If not currently pressing, try to start a new press
-            if (!autoPressReserved) {
-                if (pressStrain >= PRESS_STRAIN_MAX) {
-                    // Can't press: strain maxed out
-                    pressWorkerProgress = 0;
-                    autoPressReserved = false;
-                    pressWorkerProgressContainer.classList.remove('active');
-                    pressWorkerCountdown.classList.remove('active');
-                    pressWorkerProgressBar.style.width = '0%';
-                } else if (oliveCount >= PRESS_COST) {
-                    oliveCount -= PRESS_COST;       // PAY COST UP FRONT
-                    autoPressReserved = true;
-                    pressWorkerProgress = 0;
-                    saveGame();
-                } else {
-                    // Idle: not enough olives
-                    pressWorkerProgress = 0;
-                    pressWorkerProgressContainer.classList.remove('active');
-                    pressWorkerCountdown.classList.remove('active');
-                    pressWorkerProgressBar.style.width = '0%';
-                    // Do not proceed further this tick
-                    // commented this out to make the loop easier to reason about
-                    // updateDisplay();
-                    // return;
-                }
-            }
-
-            // Advance progress for the active press
-            pressWorkerProgress += pressRate * dt;
-
-            // Handle completion(s) — supports dt spikes cleanly
-            let brokeDown = false;
-            while (pressWorkerProgress >= 1.0 && !brokeDown) {
-                // Complete one press
-                oilCount += 1;
-                pressWorkerProgress -= 1.0;
-                autoPressReserved = false;
-                
-                // Add strain and check for breakdown
-                brokeDown = addPressStrainForOilProduced(1);
-                if (brokeDown) {
-                    // Breakdown occurred - stop processing
-                    break;
-                }
-
-                // Check strain before starting next press
-                if (pressStrain >= PRESS_STRAIN_MAX) {
-                    // Can't continue: strain maxed
-                    pressWorkerProgress = 0;
-                    break;
-                }
-
-                // Immediately try to start the next press if we can afford it
-                if (oliveCount >= PRESS_COST) {
-                    oliveCount -= PRESS_COST;
-                    autoPressReserved = true;
-                } else {
-                    // Can't continue pressing
-                    pressWorkerProgress = 0;
-                    break;
-                }
-            }
-
-            saveGame();
-
-            // UI
-            if (autoPressReserved) {
-                pressWorkerProgressContainer.classList.add('active');
-                pressWorkerCountdown.classList.add('active');
-                pressWorkerProgressBar.style.width =
-                    `${Math.min(pressWorkerProgress * 100, 100)}%`;
-
-                const secondsLeft = (1 - pressWorkerProgress) / pressRate;
-                pressWorkerCountdown.textContent = secondsLeft.toFixed(1);
-            } else {
-                pressWorkerProgressContainer.classList.remove('active');
-                pressWorkerCountdown.classList.remove('active');
-                pressWorkerProgressBar.style.width = '0%';
-            }
-        }
-
-        updateDisplay();
-    }, UPDATE_INTERVAL);
-}
-
-// Debug Panel
-const debugButton = document.getElementById('debug-btn');
-const debugModal = document.getElementById('debug-modal');
-const closeDebugButton = document.getElementById('close-debug');
-const resetGameButton = document.getElementById('reset-game-btn');
-const addOlivesButton = document.getElementById('add-olives-btn');
-const addOilButton = document.getElementById('add-oil-btn');
-
-function openDebugPanel() {
-    debugModal.classList.add('active');
-}
-
-function closeDebugPanel() {
-    debugModal.classList.remove('active');
+function loadGame() {
+    const state = JSON.parse(localStorage.getItem('olivesGameState') || '{}');
+    if (!state) return;
+    oliveCount = state.oliveCount || 0;
+    florinCount = state.florinCount || 0;
+    oilCount = state.oilCount || 0;
+    totalOlivesPicked = state.totalOlivesPicked || 0;
+    pickersCount = state.pickersCount || 0;
+    pressesCount = state.pressesCount || 0;
+    olivesPerClick = state.olivesPerClick || 1;
+    pickerMultiplier = state.pickerMultiplier || 1.0;
+    oliveMarketCapacity = state.oliveMarketCapacity || 25;
+    oliveSellEfficiency = state.oliveSellEfficiency || 0.7;
+    oliveSellRate = state.oliveSellRate || 5;
+    oilMarketCapacity = state.oilMarketCapacity || 5;
+    oilSellEfficiency = state.oilSellEfficiency || 0.7;
+    oilSellRate = state.oilSellRate || 1;
+    oilPerPress = state.oilPerPress || 1;
+    oilPressTime = state.oilPressTime || 5.0;
+    oilPressCost = state.oilPressCost || 5;
+    upgrades = state.upgrades || {hands:false,baskets:false,connections:false,stalls:false,spoilage:false};
+    clickTimestamps = state.clickTimestamps || [];
+    oliveShipmentActive = state.oliveShipmentActive || false;
+    oliveShipmentRemaining = state.oliveShipmentRemaining || 0;
+    oliveShipmentTimer = state.oliveShipmentTimer || 0;
+    oliveShipmentTotal = state.oliveShipmentTotal || 0;
+    oilShipmentActive = state.oilShipmentActive || false;
+    oilShipmentRemaining = state.oilShipmentRemaining || 0;
+    oilShipmentTimer = state.oilShipmentTimer || 0;
+    oilShipmentTotal = state.oilShipmentTotal || 0;
+    oliveMarketUnlocked = state.oliveMarketUnlocked || false;
+    pickersUnlocked = state.pickersUnlocked || false;
+    pressesUnlocked = state.pressesUnlocked || false;
+    oilMarketUnlocked = state.oilMarketUnlocked || false;
 }
 
 function resetGame() {
     if (confirm('Are you sure you want to reset the game? All progress will be lost!')) {
-        // Clear localStorage
         localStorage.clear();
-        
-        // Reset all game state
+        sessionStorage.clear();
+        oliveMarketUnlocked = false;
+        pickersUnlocked = false;
+        pressesUnlocked = false;
+        oilMarketUnlocked = false;
+        upgrades = {hands:false,baskets:false,connections:false,stalls:false,spoilage:false};
+        oliveShipmentActive = false;
+        oliveShipmentRemaining = 0;
+        oliveShipmentTimer = 0;
+        oliveShipmentTotal = 0;
+        oilShipmentActive = false;
+        oilShipmentRemaining = 0;
+        oilShipmentTimer = 0;
+        oilShipmentTotal = 0;
+        clickTimestamps = [];
         oliveCount = 0;
-        oilCount = 0;
         florinCount = 0;
-        harvesterCount = 0;
-        pressWorkerCount = 0;
-        bankingHouseEstablished = false;
-        pressStrain = 0;
-        isHarvesting = false;
-        isPressing = false;
-        harvesterProgress = 0;
-        pressWorkerProgress = 0;
-        autoPressReserved = false;
-        
-        // Clear automation interval
-        if (automationInterval) {
-            clearInterval(automationInterval);
-            automationInterval = null;
+        oilCount = 0;
+        totalOlivesPicked = 0;
+        pickersCount = 0;
+        pressesCount = 0;
+        olivesPerClick = 1;
+        pickerMultiplier = 1.0;
+        oliveMarketCapacity = 25;
+        oliveSellEfficiency = 0.7;
+        oliveSellRate = 5;
+        oilMarketCapacity = 5;
+        oilSellEfficiency = 0.7;
+        oilSellRate = 1;
+        oilPerPress = 1;
+        oilPressTime = 5.0;
+        oilPressCost = 5;
+        // Defensive: ensure all other flags are reset
+    } else {
+        oliveCount = state.oliveCount || 0;
+        florinCount = state.florinCount || 0;
+        oilCount = state.oilCount || 0;
+        totalOlivesPicked = state.totalOlivesPicked || 0;
+        pickersCount = state.pickersCount || 0;
+        pressesCount = state.pressesCount || 0;
+        olivesPerClick = state.olivesPerClick || 1;
+        pickerMultiplier = state.pickerMultiplier || 1.0;
+        oliveMarketCapacity = state.oliveMarketCapacity || 25;
+        oliveSellEfficiency = state.oliveSellEfficiency || 0.7;
+        oliveSellRate = state.oliveSellRate || 5;
+        oilMarketCapacity = state.oilMarketCapacity || 5;
+        oilSellEfficiency = state.oilSellEfficiency || 0.7;
+        oilSellRate = state.oilSellRate || 1;
+        oilPerPress = state.oilPerPress || 1;
+        oilPressTime = state.oilPressTime || 5.0;
+        oilPressCost = state.oilPressCost || 5;
+        upgrades = state.upgrades || {hands:false,baskets:false,connections:false,stalls:false,spoilage:false};
+        clickTimestamps = state.clickTimestamps || [];
+        oliveShipmentActive = state.oliveShipmentActive || false;
+        oliveShipmentRemaining = state.oliveShipmentRemaining || 0;
+        oliveShipmentTimer = state.oliveShipmentTimer || 0;
+        oliveShipmentTotal = state.oliveShipmentTotal || 0;
+        oilShipmentActive = state.oilShipmentActive || false;
+        oilShipmentRemaining = state.oilShipmentRemaining || 0;
+        oilShipmentTimer = state.oilShipmentTimer || 0;
+        oilShipmentTotal = state.oilShipmentTotal || 0;
+        oliveMarketUnlocked = state.oliveMarketUnlocked || false;
+        pickersUnlocked = state.pickersUnlocked || false;
+        pressesUnlocked = state.pressesUnlocked || false;
+        oilMarketUnlocked = state.oilMarketUnlocked || false;
+    }
+    updateUI();
+    updateVisibility();
+    window.location.href = window.location.pathname + '?t=' + Date.now();
+}
+
+// --- OPS Calculation ---
+function getPassiveOPS() {
+    return pickersCount * pickerRate * pickerMultiplier;
+}
+function getClickOPS() {
+    const now = Date.now();
+    clickTimestamps = clickTimestamps.filter(ts => now - ts < CLICK_OPS_WINDOW * 1000);
+    return (clickTimestamps.length / CLICK_OPS_WINDOW) * olivesPerClick;
+}
+function getTotalOPS() {
+    return getPassiveOPS() + getClickOPS();
+}
+
+// --- UI Update ---
+function updateUI() {
+    oliveCountEl.textContent = Math.floor(oliveCount);
+    florinCountEl.textContent = Math.floor(florinCount);
+    oilCountEl.textContent = Math.floor(oilCount);
+    opsCountEl.textContent = getTotalOPS().toFixed(2);
+    pickerCountEl.textContent = pickersCount;
+    pickerCostEl.textContent = getPickerCost();
+    passiveOpsEl.textContent = getPassiveOPS().toFixed(2);
+    pressCountEl.textContent = pressesCount;
+    pressCostEl.textContent = getPressCost();
+    oliveMarketCapacityEl.textContent = oliveMarketCapacity;
+    oilMarketCapacityEl.textContent = oilMarketCapacity;
+
+    // Unlocks (controlled by updateVisibility for sections, buttons always visible within their sections)
+    if (buyPressBtn) buyPressBtn.style.display = pressesUnlocked ? '' : 'none';
+    if (pressOlivesBtn) pressOlivesBtn.style.display = pressesUnlocked ? '' : 'none';
+    if (pressCountEl && pressCountEl.parentElement) pressCountEl.parentElement.style.display = pressesUnlocked ? '' : 'none';
+
+    // Olive Market
+    if (sell10OlivesBtn) sell10OlivesBtn.disabled = oliveCount < 10 || oliveShipmentActive;
+    if (sell25OlivesBtn) sell25OlivesBtn.disabled = oliveCount < 25 || oliveShipmentActive;
+    if (sellMaxOlivesBtn) sellMaxOlivesBtn.disabled = oliveCount < 1 || oliveShipmentActive;
+    // Oil Market
+    if (sell5OilBtn) sell5OilBtn.disabled = oilCount < 5 || oilShipmentActive;
+    if (sell10OilBtn) sell10OilBtn.disabled = oilCount < 10 || oilShipmentActive;
+    if (sellMaxOilBtn) sellMaxOilBtn.disabled = oilCount < 1 || oilShipmentActive;
+    // Labor
+    if (hirePickerBtn) hirePickerBtn.disabled = florinCount < getPickerCost();
+    // Processing
+    if (buyPressBtn) buyPressBtn.disabled = florinCount < getPressCost();
+    if (pressOlivesBtn) pressOlivesBtn.disabled = oliveCount < oilPressCost || pressesCount < 1 || pressActive;
+    // Upgrades
+    if (upgradeHandsBtn) upgradeHandsBtn.disabled = upgrades.hands || florinCount < 10;
+    if (upgradeBasketsBtn) upgradeBasketsBtn.disabled = upgrades.baskets || florinCount < 15;
+    if (upgradeConnectionsBtn) upgradeConnectionsBtn.disabled = upgrades.connections || florinCount < 12;
+    if (upgradeStallsBtn) upgradeStallsBtn.disabled = upgrades.stalls || florinCount < 20;
+    if (upgradeSpoilageBtn) upgradeSpoilageBtn.disabled = upgrades.spoilage || florinCount < 18;
+
+    // Progress bars
+    if (oliveShipmentActive) {
+        oliveShipmentProgress.style.display = '';
+        oliveShipmentBar.style.width = ((oliveShipmentTotal - oliveShipmentRemaining) / oliveShipmentTotal * 100) + '%';
+        oliveShipmentCountdown.textContent = Math.ceil(oliveShipmentTimer) + 's';
+    } else {
+        oliveShipmentProgress.style.display = 'none';
+        oliveShipmentBar.style.width = '0%';
+        oliveShipmentCountdown.textContent = '';
+    }
+    if (pressActive) {
+        pressProgressContainer.style.display = '';
+        pressProgressBar.style.width = ((oilPressTime - pressTimer) / oilPressTime * 100) + '%';
+        pressCountdown.textContent = Math.ceil(pressTimer) + 's';
+    } else {
+        pressProgressContainer.style.display = 'none';
+        pressProgressBar.style.width = '0%';
+        pressCountdown.textContent = '';
+    }
+    if (oilShipmentActive) {
+        oilShipmentProgress.style.display = '';
+        oilShipmentBar.style.width = ((oilShipmentTotal - oilShipmentRemaining) / oilShipmentTotal * 100) + '%';
+        oilShipmentCountdown.textContent = Math.ceil(oilShipmentTimer) + 's';
+    } else {
+        oilShipmentProgress.style.display = 'none';
+        oilShipmentBar.style.width = '0%';
+        oilShipmentCountdown.textContent = '';
+    }
+}
+
+// --- Game Logic ---
+function getPickerCost() {
+    return 5 + Math.floor(pickersCount * 3.5);
+}
+function getPressCost() {
+    return 25 + Math.floor(pressesCount * 10);
+}
+
+let pressActive = false;
+let pressTimer = 0;
+
+function tick(dt) {
+    // Passive olives
+    oliveCount += getPassiveOPS() * dt;
+
+    // Market unlock
+    if (!oliveMarketUnlocked && totalOlivesPicked >= 25) oliveMarketUnlocked = true;
+    if (!pickersUnlocked && (florinCount >= 5 || oliveShipmentActive || florinCount > 0)) pickersUnlocked = true;
+    if (!pressesUnlocked && florinCount >= 25) pressesUnlocked = true;
+    if (!oilMarketUnlocked && oilCount > 0) oilMarketUnlocked = true;
+
+    // Olive shipment
+    if (oliveShipmentActive) {
+        const sellThisTick = Math.min(oliveSellRate * dt, oliveShipmentRemaining);
+        oliveShipmentRemaining -= sellThisTick;
+        oliveShipmentTimer -= dt;
+        if (oliveShipmentRemaining <= 0 || oliveShipmentTimer <= 0) {
+            // Shipment complete
+            const sold = Math.floor(oliveShipmentTotal * oliveSellEfficiency);
+            const florinsGained = sold; // 1 olive = 1 florin (after efficiency)
+            florinCount += florinsGained;
+            oliveShipmentActive = false;
+            oliveShipmentRemaining = 0;
+            oliveShipmentTimer = 0;
+            oliveShipmentTotal = 0;
         }
-        
-        // Reset UI
-        oliveProgressContainer.classList.remove('active');
-        oliveCountdown.classList.remove('active');
-        oliveProgressBar.style.width = '0%';
-        
-        oilProgressContainer.classList.remove('active');
-        oilCountdown.classList.remove('active');
-        oilProgressBar.style.width = '0%';
-        
-        harvesterProgressContainer.classList.remove('active');
-        harvesterCountdown.classList.remove('active');
-        harvesterProgressBar.style.width = '0%';
-        
-        pressWorkerProgressContainer.classList.remove('active');
-        pressWorkerCountdown.classList.remove('active');
-        pressWorkerProgressBar.style.width = '0%';
-        
-        harvestButton.disabled = false;
-        
-        // Update display
-        updateDisplay();
-        
-        // Close debug panel
-        closeDebugPanel();
-        
-        // Restart automation
-        startAutomationLoop();
     }
-}
 
-function addOlives() {
-    oliveCount += 100;
-    updateDisplay();
+    // Oil shipment
+    if (oilShipmentActive) {
+        const sellThisTick = Math.min(oilSellRate * dt, oilShipmentRemaining);
+        oilShipmentRemaining -= sellThisTick;
+        oilShipmentTimer -= dt;
+        if (oilShipmentRemaining <= 0 || oilShipmentTimer <= 0) {
+            // Shipment complete
+            const sold = Math.floor(oilShipmentTotal * oilSellEfficiency);
+            const florinsGained = sold * 2; // 1 oil = 2 florins
+            florinCount += florinsGained;
+            oilShipmentActive = false;
+            oilShipmentRemaining = 0;
+            oilShipmentTimer = 0;
+            oilShipmentTotal = 0;
+        }
+    }
+
+    // Pressing
+    if (pressActive) {
+        pressTimer -= dt;
+        if (pressTimer <= 0) {
+            oilCount += pressesCount * oilPerPress;
+            pressActive = false;
+            pressTimer = 0;
+        }
+    }
+
+    updateUI();
+    updateVisibility();
     saveGame();
 }
 
-function addOil() {
-    oilCount += 100;
-    updateDisplay();
+// --- Shipment Functions ---
+function startOliveShipment(amount) {
+    if (oliveShipmentActive || oliveCount < amount) return;
+    oliveCount -= amount;
+    oliveShipmentActive = true;
+    oliveShipmentRemaining = amount;
+    oliveShipmentTotal = amount;
+    oliveShipmentTimer = 10;
+    updateUI();
     saveGame();
 }
 
-// Event listeners
-harvestButton.addEventListener('click', startHarvest);
-pressButton.addEventListener('click', startPress);
-sellOilButton.addEventListener('click', sellOil);
-sellOlivesButton.addEventListener('click', sellOlives);
-repairPressingButton.addEventListener('click', repairPressing);
-establishBankingButton.addEventListener('click', establishBankingHouse);
-hireButton.addEventListener('click', hireHarvester);
-hirePressButton.addEventListener('click', hirePressWorker);
+function startOilShipment(amount) {
+    if (oilShipmentActive || oilCount < amount) return;
+    oilCount -= amount;
+    oilShipmentActive = true;
+    oilShipmentRemaining = amount;
+    oilShipmentTotal = amount;
+    oilShipmentTimer = 12;
+    updateUI();
+    saveGame();
+}
 
-debugButton.addEventListener('click', openDebugPanel);
-closeDebugButton.addEventListener('click', closeDebugPanel);
-resetGameButton.addEventListener('click', resetGame);
-addOlivesButton.addEventListener('click', addOlives);
-addOilButton.addEventListener('click', addOil);
+// --- Button Handlers ---
+if (pickOliveBtn) {
+  pickOliveBtn.onclick = function() {
+    oliveCount += olivesPerClick;
+    totalOlivesPicked += olivesPerClick;
+    clickTimestamps.push(Date.now());
+    updateUI();
+    updateVisibility();
+    saveGame();
+  };
+}
+if (sell10OlivesBtn) sell10OlivesBtn.onclick = function() { startOliveShipment(10); updateVisibility(); };
+if (sell25OlivesBtn) sell25OlivesBtn.onclick = function() { startOliveShipment(25); updateVisibility(); };
+if (sellMaxOlivesBtn) sellMaxOlivesBtn.onclick = function() { startOliveShipment(Math.min(oliveMarketCapacity, Math.floor(oliveCount))); updateVisibility(); };
+if (hirePickerBtn) hirePickerBtn.onclick = function() {
+  const cost = getPickerCost();
+  if (florinCount < cost) return;
+  florinCount -= cost;
+  pickersCount++;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (buyPressBtn) buyPressBtn.onclick = function() {
+  const cost = getPressCost();
+  if (florinCount < cost) return;
+  florinCount -= cost;
+  pressesCount++;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (pressOlivesBtn) pressOlivesBtn.onclick = function() {
+  if (pressActive || oliveCount < oilPressCost || pressesCount < 1) return;
+  oliveCount -= oilPressCost;
+  pressActive = true;
+  pressTimer = oilPressTime;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (sell5OilBtn) sell5OilBtn.onclick = function() { startOilShipment(5); updateVisibility(); };
+if (sell10OilBtn) sell10OilBtn.onclick = function() { startOilShipment(10); updateVisibility(); };
+if (sellMaxOilBtn) sellMaxOilBtn.onclick = function() { startOilShipment(Math.min(oilMarketCapacity, Math.floor(oilCount))); updateVisibility(); };
+if (upgradeHandsBtn) upgradeHandsBtn.onclick = function() {
+  if (upgrades.hands || florinCount < 10) return;
+  florinCount -= 10;
+  upgrades.hands = true;
+  olivesPerClick = 2;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (upgradeBasketsBtn) upgradeBasketsBtn.onclick = function() {
+  if (upgrades.baskets || florinCount < 15) return;
+  florinCount -= 15;
+  upgrades.baskets = true;
+  pickerMultiplier = 1.25;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (upgradeConnectionsBtn) upgradeConnectionsBtn.onclick = function() {
+  if (upgrades.connections || florinCount < 12) return;
+  florinCount -= 12;
+  upgrades.connections = true;
+  oliveMarketCapacity += 10;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (upgradeStallsBtn) upgradeStallsBtn.onclick = function() {
+  if (upgrades.stalls || florinCount < 20) return;
+  florinCount -= 20;
+  upgrades.stalls = true;
+  oilMarketCapacity += 5;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+if (upgradeSpoilageBtn) upgradeSpoilageBtn.onclick = function() {
+  if (upgrades.spoilage || florinCount < 18) return;
+  florinCount -= 18;
+  upgrades.spoilage = true;
+  oliveSellEfficiency += 0.2;
+  oilSellEfficiency += 0.2;
+  updateUI();
+  updateVisibility();
+  saveGame();
+};
+resetBtn.addEventListener('click', resetGame);
+if (typeof resetGameButton !== 'undefined' && resetGameButton) {
+    resetGameButton.addEventListener('click', resetGame);
+}
 
-// Close modal when clicking outside
-debugModal.addEventListener('click', (e) => {
-    if (e.target === debugModal) {
-        closeDebugPanel();
+// --- Section Reveal Logic ---
+function updateVisibility() {
+  // Market section (outer wrapper)
+  const marketSection = document.getElementById('market-section');
+  if (marketSection) {
+    marketSection.style.display = (totalOlivesPicked >= 25 || oliveMarketUnlocked) ? '' : 'none';
+  }
+  // Olive Market section (inner - actual sell buttons)
+  const oliveMarketSectionInner = document.getElementById('olive-market-section');
+  if (oliveMarketSectionInner) {
+    oliveMarketSectionInner.style.display = (totalOlivesPicked >= 25 || oliveMarketUnlocked) ? '' : 'none';
+  }
+
+  // Labor section
+  const laborSection = document.getElementById('labor-section');
+  if (laborSection) {
+    const oliveShipmentDone = florinCount > 0 || oliveShipmentActive || (typeof oliveShipmentTotal !== 'undefined' && oliveShipmentTotal > 0);
+    laborSection.style.display = (florinCount >= 5 || oliveShipmentDone || pickersUnlocked) ? '' : 'none';
+  }
+
+  // Processing section
+  const processingSection = document.getElementById('processing-section');
+  if (processingSection) {
+    processingSection.style.display = (florinCount >= 25 || pressesUnlocked) ? '' : 'none';
+  }
+
+  // Oil Market section (outer wrapper)
+  const oilMarketSectionWrapper = document.getElementById('oilmarket-section');
+  if (oilMarketSectionWrapper) {
+    oilMarketSectionWrapper.style.display = (oilCount > 0 || pressesCount > 0 || oilMarketUnlocked) ? '' : 'none';
+  }
+  // Oil Market section (inner - actual sell buttons)
+  const oilMarketSectionInner = document.getElementById('oil-market-section');
+  if (oilMarketSectionInner) {
+    oilMarketSectionInner.style.display = (oilCount > 0 || pressesCount > 0 || oilMarketUnlocked) ? '' : 'none';
+  }
+
+  // Upgrades section (outer wrapper)
+  const upgradesSectionWrapper = document.getElementById('upgrades-section-wrapper');
+  if (upgradesSectionWrapper) {
+    upgradesSectionWrapper.style.display = (florinCount >= 10 || oliveMarketUnlocked) ? '' : 'none';
+  }
+  // Upgrades section (inner - actual upgrade buttons)
+  const upgradesSectionInner = document.getElementById('upgrades-section');
+  if (upgradesSectionInner) {
+    upgradesSectionInner.style.display = (florinCount >= 10 || oliveMarketUnlocked) ? '' : 'none';
+  }
+}
+
+// --- Main Loop ---
+function loadGame() {
+    const stateRaw = localStorage.getItem('olivesGameState');
+    let state = {};
+    if (stateRaw) {
+        try { state = JSON.parse(stateRaw); } catch { state = {}; }
     }
-});
+    // If missing or empty, set all unlocks/flags to default
+    if (!stateRaw || Object.keys(state).length === 0) {
+        oliveMarketUnlocked = false;
+        pickersUnlocked = false;
+        pressesUnlocked = false;
+        oilMarketUnlocked = false;
+        upgrades = {hands:false,baskets:false,connections:false,stalls:false,spoilage:false};
+        oliveShipmentActive = false;
+        oliveShipmentRemaining = 0;
+        oliveShipmentTimer = 0;
+        oliveShipmentTotal = 0;
+        oilShipmentActive = false;
+        oilShipmentRemaining = 0;
+        oilShipmentTimer = 0;
+        oilShipmentTotal = 0;
+        clickTimestamps = [];
+        oliveCount = 0;
+        florinCount = 0;
+        oilCount = 0;
+        totalOlivesPicked = 0;
+        pickersCount = 0;
+        pressesCount = 0;
+        olivesPerClick = 1;
+        pickerMultiplier = 1.0;
+        oliveMarketCapacity = 25;
+        oliveSellEfficiency = 0.7;
+        oliveSellRate = 5;
+        oilMarketCapacity = 5;
+        oilSellEfficiency = 0.7;
+        oilSellRate = 1;
+        oilPerPress = 1;
+        oilPressTime = 5.0;
+        oilPressCost = 5;
+        // Defensive: ensure all other flags are reset
+    } else {
+        oliveCount = state.oliveCount || 0;
+        florinCount = state.florinCount || 0;
+        oilCount = state.oilCount || 0;
+        totalOlivesPicked = state.totalOlivesPicked || 0;
+        pickersCount = state.pickersCount || 0;
+        pressesCount = state.pressesCount || 0;
+        olivesPerClick = state.olivesPerClick || 1;
+        pickerMultiplier = state.pickerMultiplier || 1.0;
+        oliveMarketCapacity = state.oliveMarketCapacity || 25;
+        oliveSellEfficiency = state.oliveSellEfficiency || 0.7;
+        oliveSellRate = state.oliveSellRate || 5;
+        oilMarketCapacity = state.oilMarketCapacity || 5;
+        oilSellEfficiency = state.oilSellEfficiency || 0.7;
+        oilSellRate = state.oilSellRate || 1;
+        oilPerPress = state.oilPerPress || 1;
+        oilPressTime = state.oilPressTime || 5.0;
+        oilPressCost = state.oilPressCost || 5;
+        upgrades = state.upgrades || {hands:false,baskets:false,connections:false,stalls:false,spoilage:false};
+        clickTimestamps = state.clickTimestamps || [];
+        oliveShipmentActive = state.oliveShipmentActive || false;
+        oliveShipmentRemaining = state.oliveShipmentRemaining || 0;
+        oliveShipmentTimer = state.oliveShipmentTimer || 0;
+        oliveShipmentTotal = state.oliveShipmentTotal || 0;
+        oilShipmentActive = state.oilShipmentActive || false;
+        oilShipmentRemaining = state.oilShipmentRemaining || 0;
+        oilShipmentTimer = state.oilShipmentTimer || 0;
+        oilShipmentTotal = state.oilShipmentTotal || 0;
+        oliveMarketUnlocked = state.oliveMarketUnlocked || false;
+        pickersUnlocked = state.pickersUnlocked || false;
+        pressesUnlocked = state.pressesUnlocked || false;
+        oilMarketUnlocked = state.oilMarketUnlocked || false;
+    }
+    updateUI();
+    updateVisibility();
+}
 
-// Initialize game
+// --- Main Game Loop ---
 loadGame();
-updateDisplay();
-startAutomationLoop();
+
+let lastTime = Date.now();
+setInterval(function() {
+    const now = Date.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    tick(dt);
+}, 100);
