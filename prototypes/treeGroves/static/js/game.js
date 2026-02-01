@@ -10,10 +10,10 @@ let mainLoopInterval = null;
 
 // --- Game State ---
 let state = {
-  // Tree mechanics
+  // Grove mechanics
   treeOlives: 0,
-  treeCapacity: 10,
-  treeGrowthPerSec: 0.5,
+  treeCapacity: 25,
+  treeGrowthPerSec: 0.25,
   
   // Player inventory
   harvestedOlives: 0,
@@ -27,6 +27,26 @@ let state = {
   },
 };
 
+// --- Harvest Config (upgrade-tweakable) ---
+const harvestConfig = {
+  batchSize: 10,
+  outcomes: [
+    { key: "interrupted_short", weight: 0.10, durationMs: 2000, collectedPct: 0.30, lostPct: 0.00 },
+    { key: "poor", weight: 0.25, durationMs: 5500, collectedPct: 0.50, lostPct: 0.50 },
+    { key: "normal", weight: 0.55, durationMs: 4500, collectedPct: 0.80, lostPct: 0.20 },
+    { key: "efficient", weight: 0.10, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
+  ],
+};
+
+// --- Harvest Job State (not persisted) ---
+let isHarvesting = false;
+let harvestJob = {
+  startTimeMs: 0,
+  durationMs: 0,
+  attempted: 0,
+  outcome: null,
+};
+
 // --- DOM ---
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
@@ -34,7 +54,9 @@ const harvestedOlivesEl = document.getElementById("harvested-olives");
 const logEl = document.getElementById("log");
 
 const harvestBtn = document.getElementById("harvest-btn");
-const resetBtn = document.getElementById("reset-btn");
+const harvestProgressContainer = document.getElementById("harvest-progress-container");
+const harvestProgressBar = document.getElementById("harvest-progress-bar");
+const harvestCountdown = document.getElementById("harvest-countdown");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -111,18 +133,100 @@ function updateUI() {
   harvestedOlivesEl.textContent = state.harvestedOlives;
 }
 
-// --- Actions ---
-function harvest() {
+// --- Harvest System ---
+function selectWeightedOutcome() {
+  const totalWeight = harvestConfig.outcomes.reduce((sum, o) => sum + o.weight, 0);
+  let roll = Math.random() * totalWeight;
+  
+  for (const outcome of harvestConfig.outcomes) {
+    roll -= outcome.weight;
+    if (roll <= 0) return outcome;
+  }
+  
+  // Fallback (shouldn't happen)
+  return harvestConfig.outcomes[2]; // normal
+}
+
+function startHarvest() {
+  if (isHarvesting) return;
   if (state.treeOlives < 1) {
-    logLine("No olives on trees to harvest");
+    logLine("No olives to harvest");
     return;
   }
   
-  state.treeOlives -= 1;
-  state.harvestedOlives += 1;
+  // Determine batch
+  const attempted = Math.min(Math.floor(state.treeOlives), harvestConfig.batchSize);
+  
+  // Select outcome
+  const outcome = selectWeightedOutcome();
+  
+  // Start job
+  isHarvesting = true;
+  harvestJob = {
+    startTimeMs: Date.now(),
+    durationMs: outcome.durationMs,
+    attempted,
+    outcome,
+  };
+  
+  // Update UI
+  harvestBtn.disabled = true;
+  harvestProgressContainer.style.display = "block";
+  harvestProgressBar.style.width = "0%";
+  harvestCountdown.style.display = "block";
+  
+  logLine(`Starting harvest: attempting ${attempted} olives`);
+}
+
+function completeHarvest() {
+  const { attempted, outcome } = harvestJob;
+  
+  // Calculate results
+  const collected = Math.floor(attempted * outcome.collectedPct);
+  const lost = Math.floor(attempted * outcome.lostPct);
+  const remaining = attempted - collected - lost;
+  
+  // Apply changes
+  state.treeOlives -= (collected + lost);
+  state.harvestedOlives += collected;
+  
+  // Log outcome
+  const outcomeLabel = outcome.key.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+  if (remaining > 0) {
+    logLine(`Harvest (${outcomeLabel}): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`);
+  } else {
+    logLine(`Harvest (${outcomeLabel}): attempted ${attempted}, collected ${collected}, lost ${lost}`);
+  }
+  
+  // Reset state
+  isHarvesting = false;
+  
+  // Hide progress UI after brief delay
+  setTimeout(() => {
+    harvestProgressContainer.style.display = "none";
+    harvestProgressBar.style.width = "0%";
+    harvestCountdown.style.display = "none";
+    harvestBtn.disabled = false;
+  }, 150);
+  
   saveGame();
   updateUI();
-  logLine("Harvested 1 olive");
+}
+
+function updateHarvestProgress() {
+  if (!isHarvesting) return;
+  
+  const now = Date.now();
+  const elapsed = now - harvestJob.startTimeMs;
+  const progress = Math.min(1, elapsed / harvestJob.durationMs);
+  const remaining = Math.max(0, (harvestJob.durationMs - elapsed) / 1000);
+  
+  harvestProgressBar.style.width = (progress * 100) + "%";
+  harvestCountdown.textContent = Math.ceil(remaining) + "s";
+  
+  if (elapsed >= harvestJob.durationMs) {
+    completeHarvest();
+  }
 }
 
 // --- Main Loop ---
@@ -137,6 +241,9 @@ function startLoop() {
 
     // Trees grow olives automatically
     growTrees(dt);
+    
+    // Update harvest progress
+    updateHarvestProgress();
 
     // UI refresh
     updateUI();
@@ -157,8 +264,7 @@ function closeDebug() {
 }
 
 // --- Wire Events ---
-harvestBtn.addEventListener("click", harvest);
-resetBtn.addEventListener("click", resetGame);
+harvestBtn.addEventListener("click", startHarvest);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);

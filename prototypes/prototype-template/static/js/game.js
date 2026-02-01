@@ -32,7 +32,6 @@ const opsCountEl = document.getElementById("ops-count");
 const logEl = document.getElementById("log");
 
 const pickOliveBtn = document.getElementById("pick-olive-btn");
-const resetBtn = document.getElementById("reset-btn");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -165,7 +164,6 @@ function closeDebug() {
 
 // --- Wire Events ---
 pickOliveBtn.addEventListener("click", pickOlive);
-resetBtn.addEventListener("click", resetGame);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
