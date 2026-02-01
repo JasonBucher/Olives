@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Olives — Prototype Template</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="title">
+        <h1>Olives</h1>
+        <div class="subtitle">Prototype Template</div>
+      </div>
+      <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+    </header>
+
+    <hr class="divider" />
+
+    <section id="production-section" class="section">
+      <div class="section-title">Production</div>
+
+      <div class="row">
+        <div class="label">Olives</div>
+        <div class="value"><span id="olive-count">0</span></div>
+      </div>
+
+      <div class="row">
+        <div class="label">OPS</div>
+        <div class="value"><span id="ops-count">0.0</span></div>
+      </div>
+
+      <div class="actions">
+        <button id="pick-olive-btn" class="btn btn-primary" type="button">Pick Olive</button>
+      </div>
+    </section>
+
+    <section id="log-section" class="section">
+      <div class="section-title">Log</div>
+      <div id="log" class="log"></div>
+    </section>
+
+    <footer class="footer">
+      <button id="reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+    </footer>
+  </div>
+
+  <!-- Debug Modal -->
+  <div id="debug-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Debug</div>
+        <button id="debug-close-btn" class="btn btn-quiet" type="button">Close</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="muted">
+          Template includes a safe reset + storage isolation pattern.
+          When you copy this template into a new prototype, rename STORAGE_PREFIX.
+        </div>
+
+        <div class="debug-actions">
+          <button id="debug-add-olives-btn" class="btn" type="button">+100 Olives</button>
+          <button id="debug-add-florins-btn" class="btn" type="button">+100 Florins</button>
+          <button id="debug-add-oil-btn" class="btn" type="button">+100 Oil</button>
+        </div>
+
+        <hr class="divider" />
+
+        <button id="debug-reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/js/game.js"></script>
+</body>
+</html>
