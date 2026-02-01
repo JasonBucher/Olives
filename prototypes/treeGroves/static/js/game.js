@@ -17,6 +17,7 @@ let state = {
   
   // Player inventory
   harvestedOlives: 0,
+  marketOlives: 0,
   oilCount: 0,
   florinCount: 0,
 
@@ -38,6 +39,39 @@ const harvestConfig = {
   ],
 };
 
+// --- Shipping Config ---
+const shippingConfig = {
+  batchSize: 10,
+  timeOutcomes: [
+    { key: "fast", weight: 0.20, durationMs: 3000 },
+    { key: "normal", weight: 0.60, durationMs: 5000 },
+    { key: "slow", weight: 0.20, durationMs: 8000 },
+  ],
+  incidentOutcomes: [
+    { key: "none", weight: 0.60, lostPct: 0.00, stolenPct: 0.00 },
+    { key: "bumps", weight: 0.20, lostPct: 0.10, stolenPct: 0.00 },
+    { key: "snack", weight: 0.10, lostPct: 0.05, stolenPct: 0.00 },
+    { key: "bandits", weight: 0.10, lostPct: 0.00, stolenPct: 0.30 },
+  ],
+};
+
+// --- Market Config ---
+const marketConfig = {
+  tickSeconds: 4,
+  olivePriceFlorins: 1,
+  buyerOutcomes: [
+    { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
+    { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
+    { key: "giuseppe", weight: 0.15, buyAll: true },
+  ],
+  mishapOutcomes: [
+    { key: "none", weight: 0.70 },
+    { key: "urchin", weight: 0.15, stolenMin: 1, stolenMax: 3 },
+    { key: "crow", weight: 0.10, stolenMin: 1, stolenMax: 2 },
+    { key: "spoil", weight: 0.05, rottedMin: 1, rottedMax: 4 },
+  ],
+};
+
 // --- Harvest Job State (not persisted) ---
 let isHarvesting = false;
 let harvestJob = {
@@ -47,18 +81,40 @@ let harvestJob = {
   outcome: null,
 };
 
+// --- Ship Job State (not persisted) ---
+let isShipping = false;
+let shipJob = {
+  startTimeMs: 0,
+  durationMs: 0,
+  amount: 0,
+  timeOutcomeKey: null,
+  incidentKey: null,
+  lostCount: 0,
+  stolenCount: 0,
+};
+
+// --- Market Timer (not persisted) ---
+let marketTickAcc = 0;
+
 // --- DOM ---
 const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
-const harvestedOlivesEl = document.getElementById("harvested-olives");
-const marketOlivesEl = document.getElementById("market-olives");
+const harvestedOliveCountEl = document.getElementById("harvested-olive-count");
+const marketOliveCountEl = document.getElementById("market-olive-count");
 const logEl = document.getElementById("log");
+const marketLogEl = document.getElementById("market-log");
 
 const harvestBtn = document.getElementById("harvest-btn");
 const harvestProgressContainer = document.getElementById("harvest-progress-container");
 const harvestProgressBar = document.getElementById("harvest-progress-bar");
 const harvestCountdown = document.getElementById("harvest-countdown");
+
+const shipOlivesBtn = document.getElementById("ship-olives-btn");
+const shipProgressContainer = document.getElementById("ship-progress-container");
+const shipProgressBar = document.getElementById("ship-progress-bar");
+const shipCountdown = document.getElementById("ship-countdown");
+const shipStatus = document.getElementById("ship-status");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -81,6 +137,20 @@ function logLine(message) {
   const maxLines = 60;
   while (logEl.children.length > maxLines) {
     logEl.removeChild(logEl.lastChild);
+  }
+}
+
+function marketLogLine(message) {
+  const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const div = document.createElement("div");
+  div.className = "line";
+  div.textContent = `[${ts}] ${message}`;
+  marketLogEl.prepend(div);
+
+  // Cap lines
+  const maxLines = 60;
+  while (marketLogEl.children.length > maxLines) {
+    marketLogEl.removeChild(marketLogEl.lastChild);
   }
 }
 
@@ -133,22 +203,26 @@ function updateUI() {
   florinCountEl.textContent = state.florinCount;
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
-  harvestedOlivesEl.textContent = state.harvestedOlives;
-  marketOlivesEl.textContent = 0; // placeholder for now
+  harvestedOliveCountEl.textContent = state.harvestedOlives;
+  marketOliveCountEl.textContent = state.marketOlives;
 }
 
-// --- Harvest System ---
-function selectWeightedOutcome() {
-  const totalWeight = harvestConfig.outcomes.reduce((sum, o) => sum + o.weight, 0);
+// --- Weighted Random Helper ---
+function rollWeighted(outcomesArray) {
+  const totalWeight = outcomesArray.reduce((sum, o) => sum + o.weight, 0);
   let roll = Math.random() * totalWeight;
   
-  for (const outcome of harvestConfig.outcomes) {
+  for (const outcome of outcomesArray) {
     roll -= outcome.weight;
     if (roll <= 0) return outcome;
   }
   
-  // Fallback (shouldn't happen)
-  return harvestConfig.outcomes[2]; // normal
+  return outcomesArray[outcomesArray.length - 1];
+}
+
+// --- Harvest System ---
+function selectWeightedOutcome() {
+  return rollWeighted(harvestConfig.outcomes);
 }
 
 function startHarvest() {
@@ -233,6 +307,168 @@ function updateHarvestProgress() {
   }
 }
 
+// --- Shipping System ---
+function startShipping() {
+  if (isShipping) return;
+  
+  if (state.harvestedOlives < 1) {
+    logLine("No harvested olives to ship");
+    return;
+  }
+  
+  // Determine amount to ship
+  const amount = Math.min(state.harvestedOlives, shippingConfig.batchSize);
+  
+  // Deduct from farm inventory immediately (loaded onto cart)
+  state.harvestedOlives -= amount;
+  
+  // Roll time outcome and incident outcome
+  const timeOutcome = rollWeighted(shippingConfig.timeOutcomes);
+  const incidentOutcome = rollWeighted(shippingConfig.incidentOutcomes);
+  
+  // Calculate losses
+  let lostCount = Math.floor(amount * incidentOutcome.lostPct);
+  let stolenCount = Math.floor(amount * incidentOutcome.stolenPct);
+  
+  // Ensure total losses don't exceed amount
+  if (lostCount + stolenCount > amount) {
+    const total = lostCount + stolenCount;
+    lostCount = Math.floor(amount * (lostCount / total));
+    stolenCount = amount - lostCount;
+  }
+  
+  // Set up ship job
+  shipJob = {
+    startTimeMs: Date.now(),
+    durationMs: timeOutcome.durationMs,
+    amount,
+    timeOutcomeKey: timeOutcome.key,
+    incidentKey: incidentOutcome.key,
+    lostCount,
+    stolenCount,
+  };
+  
+  isShipping = true;
+  shipOlivesBtn.disabled = true;
+  
+  // Show transit UI
+  shipProgressContainer.style.display = "block";
+  shipProgressBar.style.width = "0%";
+  shipCountdown.style.display = "block";
+  shipCountdown.textContent = Math.ceil(timeOutcome.durationMs / 1000) + "s";
+  
+  // Set status text based on time outcome
+  const statusMessages = {
+    fast: "Fresh horses — making great time.",
+    normal: "Rolling toward the market…",
+    slow: "Bad roads — moving slowly.",
+  };
+  shipStatus.textContent = statusMessages[timeOutcome.key] || "En route to market.";
+  
+  logLine(`Loaded ${amount} olives onto cart for market`);
+  saveGame();
+  updateUI();
+}
+
+function completeShipping() {
+  // Calculate how many arrive
+  const arrived = shipJob.amount - shipJob.lostCount - shipJob.stolenCount;
+  
+  // Add to market inventory
+  state.marketOlives += arrived;
+  
+  // Log to market log
+  const timeKey = shipJob.timeOutcomeKey.toUpperCase();
+  const incidentKey = shipJob.incidentKey.toUpperCase();
+  marketLogLine(
+    `Shipment arrived (${timeKey}, ${incidentKey}): sent ${shipJob.amount}, arrived ${arrived}, lost ${shipJob.lostCount}, stolen ${shipJob.stolenCount}.`
+  );
+  
+  // Reset state
+  isShipping = false;
+  
+  // Hide/clear UI after brief delay
+  setTimeout(() => {
+    shipProgressContainer.style.display = "none";
+    shipProgressBar.style.width = "0%";
+    shipCountdown.style.display = "none";
+    shipCountdown.textContent = "";
+    shipStatus.textContent = "";
+    shipOlivesBtn.disabled = false;
+  }, 150);
+  
+  saveGame();
+  updateUI();
+}
+
+function updateShipProgress() {
+  if (!isShipping) return;
+  
+  const now = Date.now();
+  const elapsed = now - shipJob.startTimeMs;
+  const progress = Math.min(1, elapsed / shipJob.durationMs);
+  const remaining = Math.max(0, (shipJob.durationMs - elapsed) / 1000);
+  
+  shipProgressBar.style.width = (progress * 100) + "%";
+  shipCountdown.textContent = Math.ceil(remaining) + "s";
+  
+  if (elapsed >= shipJob.durationMs) {
+    completeShipping();
+  }
+}
+
+// --- Market System ---
+function runMarketTick() {
+  if (state.marketOlives <= 0) return;
+  
+  // Buyer step
+  const buyer = rollWeighted(marketConfig.buyerOutcomes);
+  let buyCount;
+  
+  if (buyer.buyAll) {
+    buyCount = state.marketOlives;
+  } else {
+    // Random int between buyMin and buyMax
+    buyCount = Math.floor(Math.random() * (buyer.buyMax - buyer.buyMin + 1)) + buyer.buyMin;
+    buyCount = Math.min(buyCount, state.marketOlives);
+  }
+  
+  state.marketOlives -= buyCount;
+  const earned = buyCount * marketConfig.olivePriceFlorins;
+  state.florinCount += earned;
+  
+  // Capitalize buyer name for display
+  const buyerName = buyer.key.charAt(0).toUpperCase() + buyer.key.slice(1);
+  marketLogLine(`Buyer (${buyerName}) bought ${buyCount} olives (+${earned} florins).`);
+  
+  // Mishap step (only if olives remain)
+  if (state.marketOlives <= 0) return;
+  
+  const mishap = rollWeighted(marketConfig.mishapOutcomes);
+  
+  if (mishap.key === "none") {
+    // No mishap, no log
+    return;
+  }
+  
+  if (mishap.key === "urchin" || mishap.key === "crow") {
+    // Stolen mishap
+    const stolenCount = Math.floor(Math.random() * (mishap.stolenMax - mishap.stolenMin + 1)) + mishap.stolenMin;
+    const actualStolen = Math.min(stolenCount, state.marketOlives);
+    state.marketOlives -= actualStolen;
+    
+    const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
+    marketLogLine(`Mishap (${mishapName}): ${actualStolen} olives stolen.`);
+  } else if (mishap.key === "spoil") {
+    // Rotted mishap
+    const rottedCount = Math.floor(Math.random() * (mishap.rottedMax - mishap.rottedMin + 1)) + mishap.rottedMin;
+    const actualRotted = Math.min(rottedCount, state.marketOlives);
+    state.marketOlives -= actualRotted;
+    
+    marketLogLine(`Mishap (Spoil): ${actualRotted} olives rotted.`);
+  }
+}
+
 // --- Main Loop ---
 function startLoop() {
   const tickMs = 200;
@@ -248,6 +484,16 @@ function startLoop() {
     
     // Update harvest progress
     updateHarvestProgress();
+    
+    // Update ship progress
+    updateShipProgress();
+    
+    // Market tick accumulator
+    marketTickAcc += dt;
+    while (marketTickAcc >= marketConfig.tickSeconds) {
+      marketTickAcc -= marketConfig.tickSeconds;
+      runMarketTick();
+    }
 
     // UI refresh
     updateUI();
@@ -269,6 +515,7 @@ function closeDebug() {
 
 // --- Wire Events ---
 harvestBtn.addEventListener("click", startHarvest);
+shipOlivesBtn.addEventListener("click", startShipping);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
