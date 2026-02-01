@@ -75,3 +75,27 @@ h1 {
     color: #666;
     font-style: italic;
 }
+
+.tag {
+    display: inline-block;
+    font-size: 0.5em;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: #e9ecef;
+    color: #666;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+.tag.stable {
+    background: #d4edda;
+    color: #155724;
+}
+
+.tag.experimental {
+    background: #fff3cd;
+    color: #856404;
+}

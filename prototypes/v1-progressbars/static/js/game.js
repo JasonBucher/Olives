@@ -1,3 +1,10 @@
+// Storage prefix to avoid collisions with other prototypes
+const STORAGE_PREFIX = "progressBars_";
+const STORAGE_KEY = STORAGE_PREFIX + "gameState";
+
+// Reset tracking
+let isResetting = false;
+
 // Game state
 let oliveCount = 0;
 let oilCount = 0;
@@ -71,46 +78,70 @@ const BREAKDOWN_ENABLED = true;
 
 // Load saved game state
 function loadGame() {
-    const savedOlives = localStorage.getItem('oliveCount');
-    const savedOil = localStorage.getItem('oilCount');
-    const savedFlorins = localStorage.getItem('florinCount');
-    const savedHarvesters = localStorage.getItem('harvesterCount');
-    const savedPressWorkers = localStorage.getItem('pressWorkerCount');
-    const savedBankingHouse = localStorage.getItem('bankingHouseEstablished');
-    const savedPressStrain = localStorage.getItem('pressStrain');
-    if (savedOlives) {
-        oliveCount = parseInt(savedOlives, 10);
+    const savedState = localStorage.getItem(STORAGE_KEY);
+    
+    if (savedState) {
+        // Load from new JSON format
+        try {
+            const state = JSON.parse(savedState);
+            oliveCount = state.oliveCount || 0;
+            oilCount = state.oilCount || 0;
+            florinCount = state.florinCount || 0;
+            harvesterCount = state.harvesterCount || 0;
+            pressWorkerCount = state.pressWorkerCount || 0;
+            bankingHouseEstablished = state.bankingHouseEstablished || false;
+            pressStrain = state.pressStrain || 0;
+        } catch (e) {
+            console.error('Failed to parse saved game state:', e);
+        }
+    } else {
+        // Migration: check for old multi-key format
+        const savedOlives = localStorage.getItem(STORAGE_PREFIX + 'oliveCount');
+        const savedOil = localStorage.getItem(STORAGE_PREFIX + 'oilCount');
+        const savedFlorins = localStorage.getItem(STORAGE_PREFIX + 'florinCount');
+        const savedHarvesters = localStorage.getItem(STORAGE_PREFIX + 'harvesterCount');
+        const savedPressWorkers = localStorage.getItem(STORAGE_PREFIX + 'pressWorkerCount');
+        const savedBankingHouse = localStorage.getItem(STORAGE_PREFIX + 'bankingHouseEstablished');
+        const savedPressStrain = localStorage.getItem(STORAGE_PREFIX + 'pressStrain');
+        
+        if (savedOlives || savedOil || savedFlorins || savedHarvesters || savedPressWorkers || savedBankingHouse || savedPressStrain) {
+            // Migrate old data
+            if (savedOlives) oliveCount = parseInt(savedOlives, 10);
+            if (savedOil) oilCount = parseInt(savedOil, 10);
+            if (savedFlorins) florinCount = parseInt(savedFlorins, 10);
+            if (savedHarvesters) harvesterCount = parseInt(savedHarvesters, 10);
+            if (savedPressWorkers) pressWorkerCount = parseInt(savedPressWorkers, 10);
+            if (savedBankingHouse === 'true') bankingHouseEstablished = true;
+            if (savedPressStrain) pressStrain = parseFloat(savedPressStrain);
+            
+            // Save in new format and remove old keys
+            saveGame();
+            localStorage.removeItem(STORAGE_PREFIX + 'oliveCount');
+            localStorage.removeItem(STORAGE_PREFIX + 'oilCount');
+            localStorage.removeItem(STORAGE_PREFIX + 'florinCount');
+            localStorage.removeItem(STORAGE_PREFIX + 'harvesterCount');
+            localStorage.removeItem(STORAGE_PREFIX + 'pressWorkerCount');
+            localStorage.removeItem(STORAGE_PREFIX + 'bankingHouseEstablished');
+            localStorage.removeItem(STORAGE_PREFIX + 'pressStrain');
+        }
     }
-    if (savedOil) {
-        oilCount = parseInt(savedOil, 10);
-    }
-    if (savedFlorins) {
-        florinCount = parseInt(savedFlorins, 10);
-    }
-    if (savedHarvesters) {
-        harvesterCount = parseInt(savedHarvesters, 10);
-    }
-    if (savedPressWorkers) {
-        pressWorkerCount = parseInt(savedPressWorkers, 10);
-    }
-    if (savedBankingHouse === 'true') {
-        bankingHouseEstablished = true;
-    }
-    if (savedPressStrain) {
-        pressStrain = parseFloat(savedPressStrain);
-    }
+    
     updateDisplay();
 }
 
 // Save game state
 function saveGame() {
-    localStorage.setItem('oliveCount', oliveCount);
-    localStorage.setItem('oilCount', oilCount);
-    localStorage.setItem('florinCount', florinCount);
-    localStorage.setItem('harvesterCount', harvesterCount);
-    localStorage.setItem('pressWorkerCount', pressWorkerCount);
-    localStorage.setItem('bankingHouseEstablished', bankingHouseEstablished);
-    localStorage.setItem('pressStrain', pressStrain);
+    if (isResetting) return;
+    const state = {
+        oliveCount,
+        oilCount,
+        florinCount,
+        harvesterCount,
+        pressWorkerCount,
+        bankingHouseEstablished,
+        pressStrain
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 // Update displays
@@ -512,58 +543,12 @@ function closeDebugPanel() {
 }
 
 function resetGame() {
-    if (confirm('Are you sure you want to reset the game? All progress will be lost!')) {
-        // Clear localStorage
-        localStorage.clear();
-        
-        // Reset all game state
-        oliveCount = 0;
-        oilCount = 0;
-        florinCount = 0;
-        harvesterCount = 0;
-        pressWorkerCount = 0;
-        bankingHouseEstablished = false;
-        pressStrain = 0;
-        isHarvesting = false;
-        isPressing = false;
-        harvesterProgress = 0;
-        pressWorkerProgress = 0;
-        autoPressReserved = false;
-        
-        // Clear automation interval
-        if (automationInterval) {
-            clearInterval(automationInterval);
-            automationInterval = null;
-        }
-        
-        // Reset UI
-        oliveProgressContainer.classList.remove('active');
-        oliveCountdown.classList.remove('active');
-        oliveProgressBar.style.width = '0%';
-        
-        oilProgressContainer.classList.remove('active');
-        oilCountdown.classList.remove('active');
-        oilProgressBar.style.width = '0%';
-        
-        harvesterProgressContainer.classList.remove('active');
-        harvesterCountdown.classList.remove('active');
-        harvesterProgressBar.style.width = '0%';
-        
-        pressWorkerProgressContainer.classList.remove('active');
-        pressWorkerCountdown.classList.remove('active');
-        pressWorkerProgressBar.style.width = '0%';
-        
-        harvestButton.disabled = false;
-        
-        // Update display
-        updateDisplay();
-        
-        // Close debug panel
-        closeDebugPanel();
-        
-        // Restart automation
-        startAutomationLoop();
-    }
+    if (!confirm('Are you sure you want to reset the game? All progress will be lost!')) return;
+    
+    isResetting = true;
+    if (automationInterval) clearInterval(automationInterval);
+    localStorage.removeItem(STORAGE_KEY);
+    window.location.href = window.location.pathname + '?t=' + Date.now();
 }
 
 function addOlives() {

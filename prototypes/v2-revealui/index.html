@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olives - Idle Game</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <!-- Title Area -->
+    <div class="title-area">
+        <h1>Olives <span style="font-size: 0.5em; font-weight: normal;">(reveal ui - v0.0.7)</span></h1>
+        <button id="debug-btn" class="debug-button">debug</button>
+    </div>
+
+    <!-- Debug Modal -->
+    <div id="debug-modal" class="debug-modal">
+        <div class="debug-modal-content">
+            <div class="debug-header">
+                <h3>Debug Panel</h3>
+                <button id="close-debug" class="close-button">×</button>
+            </div>
+            <div class="debug-body">
+                <button id="reset-game-btn" class="debug-action-btn">Reset Game State</button>
+                <button id="add-olives-btn" class="debug-action-btn secondary">Add 100 Olives</button>
+                <button id="add-oil-btn" class="debug-action-btn secondary">Add 100 Oil</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Production Section -->
+        <h2 class="section-header">Production</h2>
+        <hr class="section-divider">
+        <div class="resource-row">
+            <span class="resource-label">Olives:</span>
+            <span id="olive-count">0</span>
+            <span style="margin-left:20px;">OPS:</span>
+            <span id="ops-count">0.0</span>
+            <button id="pick-olive-btn" class="action-button">Pick Olive</button>
+        </div>
+
+        <div id="market-section" style="display:none;">
+            <h2 class="section-header">Market</h2>
+            <hr class="section-divider">
+            <div class="resource-row">
+                <span class="resource-label">Florins:</span>
+                <span id="florin-count">0</span>
+            </div>
+            <div id="olive-market-section" style="display:none;">
+                <div class="market-label">Olive Market (Capacity: <span id="olive-market-capacity">0</span>)</div>
+                <div class="market-actions">
+                    <button id="sell-10-olives-btn" class="action-button">Sell 10</button>
+                    <button id="sell-25-olives-btn" class="action-button">Sell 25</button>
+                    <button id="sell-max-olives-btn" class="action-button">Sell Max</button>
+                </div>
+                <div id="olive-shipment-progress" class="progress-container" style="display:none;">
+                    <div class="progress-bar" id="olive-shipment-bar"></div>
+                </div>
+                <div id="olive-shipment-countdown" class="shipment-countdown"></div>
+            </div>
+        </div>
+
+        <div id="labor-section" style="display:none;">
+            <h2 class="section-header">Labor</h2>
+            <hr class="section-divider">
+            <div class="resource-row">
+                <span class="resource-label">Pickers:</span>
+                <span id="picker-count">0</span>
+                <button id="hire-picker-btn" class="action-button">Hire Picker (<span id="picker-cost">5</span> florins)</button>
+            </div>
+            <div class="ops-row passive">Passive OPS: <span id="passive-ops">0.0</span></div>
+        </div>
+
+        <div id="processing-section" style="display:none;">
+            <h2 class="section-header">Processing</h2>
+            <hr class="section-divider">
+            <div class="resource-row">
+                <span class="resource-label">Olive Oil:</span>
+                <span id="oil-count">0</span>
+            </div>
+            <div class="resource-row">
+                <span class="resource-label">Presses:</span>
+                <span id="press-count">0</span>
+                <button id="buy-press-btn" class="action-button">Buy Press (<span id="press-cost">25</span> florins)</button>
+            </div>
+            <button id="press-olives-btn" class="action-button">Press Olives</button>
+            <div id="press-progress-container" class="progress-container" style="display:none;">
+                <div class="progress-bar" id="press-progress-bar"></div>
+            </div>
+            <div id="press-countdown" class="shipment-countdown"></div>
+        </div>
+
+        <div id="oilmarket-section" style="display:none;">
+            <h2 class="section-header">Oil Market</h2>
+            <hr class="section-divider">
+            <div id="oil-market-section" style="display:none;">
+                <div class="market-label">Oil Market (Capacity: <span id="oil-market-capacity">0</span>)</div>
+                <div class="market-actions">
+                    <button id="sell-5-oil-btn" class="action-button">Sell 5</button>
+                    <button id="sell-10-oil-btn" class="action-button">Sell 10</button>
+                    <button id="sell-max-oil-btn" class="action-button">Sell Max</button>
+                </div>
+                <div id="oil-shipment-progress" class="progress-container" style="display:none;">
+                    <div class="progress-bar" id="oil-shipment-bar"></div>
+                </div>
+                <div id="oil-shipment-countdown" class="shipment-countdown"></div>
+            </div>
+        </div>
+
+        <div id="upgrades-section-wrapper" style="display:none;">
+            <h2 class="section-header">Upgrades</h2>
+            <hr class="section-divider">
+            <div id="upgrades-section" style="display:none;">
+                <button id="upgrade-hands-btn" class="action-button">Better Hands (10 florins) <span class="timing-info">+1 olive per click</span></button>
+                <button id="upgrade-baskets-btn" class="action-button">Better Baskets (15 florins) <span class="timing-info">+25% picker OPS</span></button>
+                <button id="upgrade-connections-btn" class="action-button">Market Connections (12 florins) <span class="timing-info">+10 olive market capacity</span></button>
+                <button id="upgrade-stalls-btn" class="action-button">Wider Stalls (20 florins) <span class="timing-info">+5 oil market capacity</span></button>
+                <button id="upgrade-spoilage-btn" class="action-button">Less Spoilage (18 florins) <span class="timing-info">+20% market efficiency</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/js/game.js"></script>
+</body>
+</html>
