@@ -3,6 +3,24 @@
 const STORAGE_PREFIX = "TEMPLATE_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 
+// Prefer time + outcomes over instant conversion.
+// Logs explain loss/delay/causality; they aren’t cosmetic.
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function rollWeighted(outcomes) {
+  const totalWeight = outcomes.reduce((sum, entry) => sum + (entry.weight || 0), 0);
+  if (totalWeight <= 0) return outcomes[0];
+
+  let roll = Math.random() * totalWeight;
+  for (const entry of outcomes) {
+    roll -= entry.weight || 0;
+    if (roll <= 0) return entry;
+  }
+  return outcomes[outcomes.length - 1];
+}
+
 // --- Reset safety ---
 // Prevents the "reset doesn't reset" bug where a still-running interval re-saves state.
 let isResetting = false;
