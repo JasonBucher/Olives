@@ -110,7 +110,10 @@ const harvestProgressBar = document.getElementById("harvest-progress-bar");
 const harvestCountdown = document.getElementById("harvest-countdown");
 
 const invOlivesQty = document.getElementById("inv-olives-qty");
+const invTransitPill = document.getElementById("inv-olives-transit");
+const invTransitCount = document.getElementById("inv-olives-transit-count");
 const shipProgressBar = document.getElementById("ship-progress-bar");
+const shipCountdown = document.getElementById("ship-countdown");
 const shipProgressContainer = document.querySelector(".inv-progress");
 const shipOlivesBtn = document.getElementById("ship-olives-btn");
 
@@ -254,7 +257,7 @@ function startHarvest() {
   harvestBtn.disabled = true;
   harvestProgressContainer.style.display = "block";
   harvestProgressBar.style.width = "0%";
-  harvestCountdown.style.display = "block";
+  harvestCountdown.style.display = "flex";
   
   logLine(`Starting harvest: attempting ${attempted} olives`);
 }
@@ -314,13 +317,23 @@ function updateHarvestProgress() {
 // Thin inline UI helpers
 function setShipUIIdle() {
   shipProgressBar.style.width = "0%";
+  shipCountdown.style.display = "none";
   shipProgressContainer.classList.remove("active");
+  invTransitPill.hidden = true;
   shipOlivesBtn.disabled = state.harvestedOlives === 0 || isShipping;
 }
 
 function setShipUIActive(percent) {
   shipProgressContainer.classList.add("active");
+  shipCountdown.style.display = "flex";
   shipProgressBar.style.width = percent + "%";
+  
+  // Show transit pill with current shipment amount
+  if (isShipping && shipJob.amount > 0) {
+    invTransitCount.textContent = shipJob.amount;
+    invTransitPill.hidden = false;
+  }
+  
   shipOlivesBtn.disabled = true;
 }
 
@@ -428,10 +441,12 @@ function updateShipProgress() {
   const now = Date.now();
   const elapsed = now - shipJob.startTimeMs;
   const progress = Math.min(1, elapsed / shipJob.durationMs);
+  const remaining = Math.max(0, (shipJob.durationMs - elapsed) / 1000);
   
-  // Update progress bar
+  // Update progress bar and countdown
   const progressPct = Math.floor(progress * 100);
   setShipUIActive(progressPct);
+  shipCountdown.textContent = Math.ceil(remaining) + "s";
   
   if (elapsed >= shipJob.durationMs) {
     completeShipping();

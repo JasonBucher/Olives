@@ -80,9 +80,9 @@
           </div>
 
           <div id="harvest-progress-container" class="progress-container" style="display: none;">
+            <div id="harvest-countdown" class="countdown"></div>
             <div id="harvest-progress-bar" class="progress-bar"></div>
           </div>
-          <div id="harvest-countdown" class="countdown"></div>
 
           <hr class="divider-light" />
 
@@ -91,18 +91,23 @@
           <div class="inventory-list">
             <div class="inventory-row" id="inv-olives-row">
               <div class="inv-name">Olives</div>
+              <div class="inv-qty" id="inv-olives-qty">0</div>
 
-              <!-- Progress bar inline -->
-              <div class="inv-progress">
-                <div class="inv-progress-bar">
-                  <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+              <div class="inv-middle">
+                <span id="inv-olives-transit" class="inv-transit-pill" aria-label="Olives in transit" hidden>
+                  <span id="inv-olives-transit-count">0</span>→
+                </span>
+                
+                <!-- Progress bar inline -->
+                <div class="inv-progress">
+                  <div class="inv-progress-bar">
+                    <div id="ship-countdown" class="ship-countdown"></div>
+                    <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                  </div>
                 </div>
               </div>
 
-              <div class="inv-right">
-                <div class="inv-qty" id="inv-olives-qty">0</div>
-                <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
-              </div>
+              <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
             </div>
           </div>
         </section>
