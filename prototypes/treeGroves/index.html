@@ -19,26 +19,57 @@
     <hr class="divider" />
 
     <div class="layout">
-      <!-- Left Column: Meta (Capital + Upgrades) -->
+      <!-- Left Column: Growth -->
       <div class="col col-left">
+        <div class="col-header">Growth</div>
+
         <section class="section">
           <div class="section-title">Capital</div>
-          <div class="florin-display">
-            <span id="florin-count">0</span>
+          
+          <div class="capital-row">
+            <div class="capital-label">Florins</div>
+            <div class="florin-display">
+              <span id="florin-count">0</span>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="label muted">Influence</div>
+            <div class="value muted">—</div>
+          </div>
+          <div class="row">
+            <div class="label muted">Indulgences</div>
+            <div class="value muted">—</div>
+          </div>
+          <div class="row">
+            <div class="label muted">Patronage</div>
+            <div class="value muted">—</div>
           </div>
         </section>
 
         <section class="section">
-          <div class="section-title">Upgrades</div>
-          <div class="muted" style="padding: 8px 0; font-size: 13px;">Coming soon</div>
+          <div class="section-title">Investments</div>
+          
+          <div class="placeholder-item locked">
+            <span class="item-name">Upgrade Olive Press</span>
+            <span class="badge locked-badge">Locked</span>
+          </div>
+          <div class="placeholder-item locked">
+            <span class="item-name">Expand Grove</span>
+            <span class="badge locked-badge">Locked</span>
+          </div>
         </section>
       </div>
 
-      <!-- Middle Column: Farm (Grove + Harvest + Inventory) -->
+      <!-- Middle Column: Estate -->
       <div class="col col-mid">
-        <section id="production-section" class="section">
-          <div class="section-title">Grove</div>
+        <div class="col-header">Estate</div>
 
+        <section class="section">
+          <div class="section-title">Farm</div>
+
+          <div class="subhead">Grove</div>
+          
           <div class="row">
             <div class="label">On Trees</div>
             <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
@@ -52,10 +83,10 @@
             <div id="harvest-progress-bar" class="progress-bar"></div>
           </div>
           <div id="harvest-countdown" class="countdown"></div>
-        </section>
 
-        <section class="section">
-          <div class="section-title">Farm Inventory</div>
+          <hr class="divider-light" />
+
+          <div class="subhead">Farm Inventory</div>
 
           <div class="row">
             <div class="label">Harvested Olives</div>
@@ -67,36 +98,77 @@
           </div>
         </section>
 
+        <section class="section">
+          <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
+          
+          <div class="placeholder-item locked">
+            <span class="item-name">Olive Press</span>
+          </div>
+          <div class="placeholder-item locked">
+            <span class="item-name">Grape Crush</span>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Workers <span class="badge locked-badge">Locked</span></div>
+          
+          <div class="placeholder-item locked">
+            <span class="item-name">Harvesters</span>
+          </div>
+          <div class="placeholder-item locked">
+            <span class="item-name">Processors</span>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">House <span class="badge locked-badge">Later</span></div>
+          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+        </section>
+
         <section id="log-section" class="section">
           <div class="section-title">Log</div>
           <div id="log" class="log"></div>
         </section>
       </div>
 
-      <!-- Right Column: Market (In Transit + Market Inventory + Market Log) -->
+      <!-- Right Column: Market -->
       <div class="col col-right">
+        <div class="col-header">Market</div>
+
         <section class="section">
-          <div class="section-title">In Transit</div>
+          <div class="section-title">Market</div>
+
+          <div class="subhead">In Transit</div>
           
           <div id="ship-progress-container" class="progress-container" style="display: none;">
             <div id="ship-progress-bar" class="progress-bar"></div>
           </div>
           <div id="ship-countdown" class="countdown"></div>
           <div id="ship-status" class="status-text"></div>
-        </section>
 
-        <section class="section">
-          <div class="section-title">Market Inventory</div>
+          <hr class="divider-light" />
+
+          <div class="subhead">Market Inventory</div>
           
           <div class="row">
             <div class="label">Olives at Market</div>
             <div class="value"><span id="market-olive-count">0</span></div>
           </div>
+
+          <hr class="divider-light" />
+
+          <div class="subhead">Market Log</div>
+          <div id="market-log" class="log market-log-compact"></div>
         </section>
 
         <section class="section">
-          <div class="section-title">Market Log</div>
-          <div id="market-log" class="log"></div>
+          <div class="section-title">Church <span class="badge locked-badge">Locked</span></div>
+          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Bank <span class="badge locked-badge">Locked</span></div>
+          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
         </section>
       </div>
     </div>
