@@ -128,10 +128,9 @@ const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
 
 // --- Logging ---
 function logLine(message) {
-  const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const div = document.createElement("div");
   div.className = "line";
-  div.textContent = `[${ts}] ${message}`;
+  div.textContent = message;
   logEl.prepend(div);
 
   // Cap lines
@@ -142,10 +141,9 @@ function logLine(message) {
 }
 
 function marketLogLine(message) {
-  const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const div = document.createElement("div");
   div.className = "line";
-  div.textContent = `[${ts}] ${message}`;
+  div.textContent = message;
   marketLogEl.prepend(div);
 
   // Cap lines
@@ -338,23 +336,21 @@ function setShipUIActive(percent) {
 }
 
 function setShipUIDone() {
-  shipProgressBar.style.width = "100%";
-  
-  // Reset after brief delay
+  // Reset after very brief delay (don't set to 100% to avoid flicker)
   setTimeout(() => {
     shipProgressContainer.classList.remove("active");
     shipProgressBar.style.width = "0%";
     setShipUIIdle();
-  }, 600);
+  }, 60);
 }
 
 function setShipUIFailed() {
-  // Reset after brief delay
+  // Reset after very brief delay
   setTimeout(() => {
     shipProgressContainer.classList.remove("active");
     shipProgressBar.style.width = "0%";
     setShipUIIdle();
-  }, 600);
+  }, 60);
 }
 
 function startShipping() {

@@ -26,11 +26,9 @@
         <section class="section">
           <div class="section-title">Capital</div>
           
-          <div class="capital-row">
-            <div class="capital-label">Florins</div>
-            <div class="florin-display">
-              <span id="florin-count">0</span>
-            </div>
+          <div class="row">
+            <div class="label">Florins</div>
+            <div class="value"><span id="florin-count">0</span></div>
           </div>
 
           <div class="row">
@@ -47,16 +45,14 @@
           </div>
         </section>
 
-        <section class="section">
-          <div class="section-title">Investments</div>
+        <section class="section section-locked">
+          <div class="section-title">Investments <span class="badge locked-badge">Locked</span></div>
           
           <div class="placeholder-item locked">
             <span class="item-name">Upgrade Olive Press</span>
-            <span class="badge locked-badge">Locked</span>
           </div>
           <div class="placeholder-item locked">
             <span class="item-name">Expand Grove</span>
-            <span class="badge locked-badge">Locked</span>
           </div>
         </section>
       </div>
@@ -152,25 +148,25 @@
         <section class="section">
           <div class="section-title">Market</div>
 
-          <div class="subhead">Market Inventory</div>
+          <div class="subhead">Inventory</div>
           
           <div class="row">
-            <div class="label">Olives at Market</div>
+            <div class="label">Olives</div>
             <div class="value"><span id="market-olive-count">0</span></div>
           </div>
 
           <hr class="divider-light" />
 
-          <div class="subhead">Market Log</div>
+          <div class="subhead">Log</div>
           <div id="market-log" class="log market-log-compact"></div>
         </section>
 
-        <section class="section">
+        <section class="section section-locked">
           <div class="section-title">Church <span class="badge locked-badge">Locked</span></div>
           <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
         </section>
 
-        <section class="section">
+        <section class="section section-locked">
           <div class="section-title">Bank <span class="badge locked-badge">Locked</span></div>
           <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
         </section>
