@@ -18,28 +18,65 @@
 
     <hr class="divider" />
 
-    <section id="production-section" class="section">
-      <div class="section-title">Production</div>
-
-      <div class="row">
-        <div class="label">Olives</div>
-        <div class="value"><span id="olive-count">0</span></div>
+    <div class="layout">
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Capital</div>
+          <div class="row">
+            <div class="label">Capital</div>
+            <div class="value">(placeholder)</div>
+          </div>
+          <div class="muted note">Meta resources live here</div>
+        </section>
       </div>
 
-      <div class="row">
-        <div class="label">OPS</div>
-        <div class="value"><span id="ops-count">0.0</span></div>
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Estate</div>
+
+          <div id="production-section" class="stack">
+            <div class="subsection-title">Production</div>
+
+            <div class="row">
+              <div class="label">Olives</div>
+              <div class="value"><span id="olive-count">0</span></div>
+            </div>
+
+            <div class="row">
+              <div class="label">OPS</div>
+              <div class="value"><span id="ops-count">0.0</span></div>
+            </div>
+
+            <div class="actions">
+              <button id="pick-olive-btn" class="btn btn-primary" type="button">Pick Olive</button>
+            </div>
+          </div>
+
+          <div id="log-section" class="stack">
+            <div class="subsection-title">Log</div>
+            <div id="log" class="log"></div>
+          </div>
+        </section>
       </div>
 
-      <div class="actions">
-        <button id="pick-olive-btn" class="btn btn-primary" type="button">Pick Olive</button>
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Institutions</div>
+          <div class="row">
+            <div class="label">Market</div>
+            <div class="value muted">Inactive</div>
+          </div>
+          <div class="row">
+            <div class="label">Church</div>
+            <div class="value muted">Inactive</div>
+          </div>
+          <div class="row">
+            <div class="label">Bank</div>
+            <div class="value muted">Inactive</div>
+          </div>
+        </section>
       </div>
-    </section>
-
-    <section id="log-section" class="section">
-      <div class="section-title">Log</div>
-      <div id="log" class="log"></div>
-    </section>
+    </div>
   </div>
 
   <!-- Debug Modal -->
