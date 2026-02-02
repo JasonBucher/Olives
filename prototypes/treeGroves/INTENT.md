@@ -1,13 +1,17 @@
-# treesMarket — INTENT
+# treeGroves — Intent
 
-This prototype explores **production, loss, and delayed conversion**.
+treeGroves is an early-era economic simulation focused on agricultural production,
+logistics, loss, and the slow accumulation of capital and influence.
 
-It is not about speed, infinite growth, or instant optimization.
+This prototype is not about speed or infinite growth.
 It is about building a fragile but profitable system and learning where value is lost.
+
+Money is not the goal.
+Money is the consequence of systems that are working — imperfectly.
 
 ---
 
-## Core Idea
+## Core Concept
 
 Olives do not appear in your inventory.
 
@@ -17,131 +21,163 @@ They must be processed.
 They must be transported.
 They may be lost at every step.
 
-Money only matters once you have something worth protecting.
+Waiting can be harmful.
+Overproducing can be wasteful.
+Efficiency is earned, not assumed.
 
 ---
 
-## What This Prototype Is About
+## Column Model
 
-### 1. Trees Accrue Value Slowly
-- Olive trees produce olives passively over time.
-- Trees have a **maximum capacity**.
-- When trees are full, growth stops and potential is wasted.
+The game is structured into three conceptual columns.
+These columns are design contracts, not merely UI layout.
 
-The player is pressured to act, not because they want to go faster, but because waiting has a cost.
-
-The player can expand their groves to hold more tree and therefore hold more capacity.
-
-Groves are under threat at all times from events that can destroy them, their fruit or impact their growth
+Each column represents a different relationship to time, risk, and control.
 
 ---
 
-### 2. Harvesting Is Separate and Imperfect
-- Olives on trees are not usable.
-- Harvesting moves olives from trees into inventory.
-- Harvesting:
-  - takes time
-  - can be done manually
-  - can be automated with workers
-  - is imperfect (inefficiency, delay, loss)
+### Left Column — Growth / Capital (Meta)
 
-This creates friction between *what exists* and *what you control*.
-
----
-
-### 3. Presses Convert — and Fail
-- Olive presses turn harvested olives into oil.
-- Pressing takes time.
-- Presses degrade, strain, or break.
-- Repairs cost resources or money.
-
-Failure is expected, not exceptional.
-
----
-
-### 4. Markets Are Risky, Not Instant
-- Goods are sent to market, not instantly sold.
-- Markets have limited capacity.
-- Outcomes include:
-  - partial sales
-  - rot / spoilage
-  - loss in transit
-  - (later) theft or disruption
-
-Selling is a gamble, not a button.
-
----
-
-### 5. Information Matters
-The player should not just see numbers go up or down.
-
-A log reports events such as:
-- “5 olives sold, 20 olives rotted”
-- “Olive press broke”
-- “Shipment partially lost”
-- “Transport robbed”
-
-Loss should be *felt* and *understood*, not hidden.
-
----
-
-## Upgrade Philosophy
-
-Upgrades primarily:
-- reduce loss
-- reduce friction
-- increase reliability
+This column represents accumulated power and abstraction.
 
 Examples:
-- Increase tree capacity
-- Reduce animal loss (scarecrows, guards)
-- Improve harvest efficiency
-- Improve press durability
-- Increase market capacity
-- Recover a percentage of unsold goods
-- Protect shipments
+- Florins
+- Influence
+- Indulgences
+- Patronage
 
-Upgrades are not just “more per second.”
-They are about **wasting less**.
+These resources are:
+- Persistent
+- Slow-moving
+- Compounding
+- Used to unlock upgrades, institutions, and new eras
 
----
+Upgrades, investments, and long-term decisions live here.
 
-## What This Prototype Is NOT
-
-- Not a traditional farm sim
-- Not a clicker focused on raw throughput
-- Not an instant-buy / instant-sell economy
-- Not about Florins as the main loop (yet)
-
-Money is a consequence, not the goal.
+Capital should feel elevated and separate from daily production.
+It binds systems together without being directly produced by them.
 
 ---
 
-## Long-Term Direction (Out of Scope for Now)
+### Middle Column — Estate / Fattoria (Production Engine)
 
-This prototype exists to establish:
-- a credible production economy
-- meaningful profit
-- accumulated capital
+This column represents the physical reality of the operation.
 
-Only after that does it make sense to explore:
-- institutions
-- banking
-- storage
-- political or religious influence
-- becoming someone who controls systems rather than runs a business
+Layers include:
+- **Farm**
+  - Grove
+  - Olive Trees
+  - (later) Vineyard, varietals
+- **Production**
+  - Olive Press
+  - Other conversion machinery
+- **Workers**
+  - Harvesters
+  - Processors
+- **House** (future)
+  - Living space
+  - Lineage
+  - Reputation
 
-That is a later era.
+This is where:
+- Time-based systems operate
+- Capacity, strain, inefficiency, and breakdown exist
+- Moment-to-moment play happens
+
+This column is tangible, fragile, and exposed to events.
+
+---
+
+### Right Column — External Institutions
+
+This column represents systems outside the player’s direct control.
+
+Examples:
+- Market
+- Church
+- Bank
+
+These systems:
+- Act on items sent to them
+- Introduce randomness, delay, and risk
+- Convert production into capital, legitimacy, or debt
+
+Markets buy, steal, rot, and fluctuate.
+Banks lend, entangle, and collapse.
+Churches forgive, legitimize, and demand.
+
+You interact with these systems, but you do not own them.
+
+---
+
+## Shipping vs Market (Important Distinction)
+
+Shipping is a **process**.
+Market is a **place**.
+
+- Shipping moves goods from the estate to the outside world.
+  - It takes time.
+  - It has outcomes.
+  - Goods may be lost, stolen, or delayed.
+
+- Market is where goods reside once they arrive.
+  - Buyers appear over time.
+  - Theft, rot, and events occur.
+  - Conversion to Florins happens here, not instantly.
+
+This separation is critical to pacing, tension, and meaning.
+
+---
+
+## Events Philosophy
+
+Events should:
+- Modify variables, not replace systems
+- Be readable in the log
+- Stack and interact
+- Create stories through loss and recovery
+
+Examples:
+- Storm reduces tree growth temporarily
+- Bandits increase shipping theft
+- Bountiful season increases tree capacity
+- Calm roads improve shipping speed
+
+---
+
+## Design Principles
+
+- Shipping is a process, not a button
+- Markets are places, not conversions
+- Capital is meta and elevated
+- Loss should be visible, logged, and understandable
+- Systems should interlock, not stack
+- Realism is not the goal; coherence is
+
+---
+
+## Non-Goals (For This Prototype)
+
+- No detailed land plots
+- No micromanaged workers
+- No full institutional simulation yet
+- No late-era politics or banking mechanics
+
+Those belong to later eras.
 
 ---
 
 ## Success Criteria
 
 This prototype is successful if:
-- loss feels inevitable but reducible
-- the player is forced to make tradeoffs
-- waiting can be harmful
-- money feels earned, not trivial
-- the system feels interconnected and fragile
+- Loss feels inevitable but reducible
+- Waiting can be a mistake
+- Tradeoffs are constant
+- Money feels earned, not trivial
+- Systems feel interconnected and fragile
 
-If it answers these questions, it has done its job.
+---
+
+## Reference Material
+
+See `ui-sketch.jpg` for the original hand-drawn UI and column concept.
