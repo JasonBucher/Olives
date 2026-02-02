@@ -57,7 +57,7 @@ const shippingConfig = {
 
 // --- Market Config ---
 const marketConfig = {
-  tickSeconds: 4,
+  tickSeconds: 12,
   olivePriceFlorins: 1,
   buyerOutcomes: [
     { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
@@ -100,7 +100,6 @@ let marketTickAcc = 0;
 const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
-const harvestedOliveCountEl = document.getElementById("harvested-olive-count");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const logEl = document.getElementById("log");
 const marketLogEl = document.getElementById("market-log");
@@ -110,11 +109,10 @@ const harvestProgressContainer = document.getElementById("harvest-progress-conta
 const harvestProgressBar = document.getElementById("harvest-progress-bar");
 const harvestCountdown = document.getElementById("harvest-countdown");
 
-const shipOlivesBtn = document.getElementById("ship-olives-btn");
-const shipProgressContainer = document.getElementById("ship-progress-container");
+const invOlivesQty = document.getElementById("inv-olives-qty");
 const shipProgressBar = document.getElementById("ship-progress-bar");
-const shipCountdown = document.getElementById("ship-countdown");
-const shipStatus = document.getElementById("ship-status");
+const shipProgressContainer = document.querySelector(".inv-progress");
+const shipOlivesBtn = document.getElementById("ship-olives-btn");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -203,8 +201,13 @@ function updateUI() {
   florinCountEl.textContent = state.florinCount;
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
-  harvestedOliveCountEl.textContent = state.harvestedOlives;
+  invOlivesQty.textContent = state.harvestedOlives;
   marketOliveCountEl.textContent = state.marketOlives;
+  
+  // Update ship button state based on inventory
+  if (!isShipping) {
+    shipOlivesBtn.disabled = state.harvestedOlives === 0;
+  }
 }
 
 // --- Weighted Random Helper ---
@@ -308,6 +311,39 @@ function updateHarvestProgress() {
 }
 
 // --- Shipping System ---
+// Thin inline UI helpers
+function setShipUIIdle() {
+  shipProgressBar.style.width = "0%";
+  shipProgressContainer.classList.remove("active");
+  shipOlivesBtn.disabled = state.harvestedOlives === 0 || isShipping;
+}
+
+function setShipUIActive(percent) {
+  shipProgressContainer.classList.add("active");
+  shipProgressBar.style.width = percent + "%";
+  shipOlivesBtn.disabled = true;
+}
+
+function setShipUIDone() {
+  shipProgressBar.style.width = "100%";
+  
+  // Reset after brief delay
+  setTimeout(() => {
+    shipProgressContainer.classList.remove("active");
+    shipProgressBar.style.width = "0%";
+    setShipUIIdle();
+  }, 600);
+}
+
+function setShipUIFailed() {
+  // Reset after brief delay
+  setTimeout(() => {
+    shipProgressContainer.classList.remove("active");
+    shipProgressBar.style.width = "0%";
+    setShipUIIdle();
+  }, 600);
+}
+
 function startShipping() {
   if (isShipping) return;
   
@@ -349,21 +385,9 @@ function startShipping() {
   };
   
   isShipping = true;
-  shipOlivesBtn.disabled = true;
   
-  // Show transit UI
-  shipProgressContainer.style.display = "block";
-  shipProgressBar.style.width = "0%";
-  shipCountdown.style.display = "block";
-  shipCountdown.textContent = Math.ceil(timeOutcome.durationMs / 1000) + "s";
-  
-  // Set status text based on time outcome
-  const statusMessages = {
-    fast: "Fresh horses — making great time.",
-    normal: "Rolling toward the market…",
-    slow: "Bad roads — moving slowly.",
-  };
-  shipStatus.textContent = statusMessages[timeOutcome.key] || "En route to market.";
+  // Update inline UI
+  setShipUIActive(0);
   
   logLine(`Loaded ${amount} olives onto cart for market`);
   saveGame();
@@ -384,18 +408,15 @@ function completeShipping() {
     `Shipment arrived (${timeKey}, ${incidentKey}): sent ${shipJob.amount}, arrived ${arrived}, lost ${shipJob.lostCount}, stolen ${shipJob.stolenCount}.`
   );
   
-  // Reset state
+  // Reset shipping state
   isShipping = false;
   
-  // Hide/clear UI after brief delay
-  setTimeout(() => {
-    shipProgressContainer.style.display = "none";
-    shipProgressBar.style.width = "0%";
-    shipCountdown.style.display = "none";
-    shipCountdown.textContent = "";
-    shipStatus.textContent = "";
-    shipOlivesBtn.disabled = false;
-  }, 150);
+  // Update UI based on outcome
+  if (arrived === 0) {
+    setShipUIFailed();
+  } else {
+    setShipUIDone();
+  }
   
   saveGame();
   updateUI();
@@ -407,10 +428,10 @@ function updateShipProgress() {
   const now = Date.now();
   const elapsed = now - shipJob.startTimeMs;
   const progress = Math.min(1, elapsed / shipJob.durationMs);
-  const remaining = Math.max(0, (shipJob.durationMs - elapsed) / 1000);
   
-  shipProgressBar.style.width = (progress * 100) + "%";
-  shipCountdown.textContent = Math.ceil(remaining) + "s";
+  // Update progress bar
+  const progressPct = Math.floor(progress * 100);
+  setShipUIActive(progressPct);
   
   if (elapsed >= shipJob.durationMs) {
     completeShipping();
@@ -548,5 +569,6 @@ debugModal.addEventListener("click", (e) => {
 // --- Init ---
 loadGame();
 updateUI();
+setShipUIIdle();
 startLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");

@@ -377,3 +377,72 @@ h1 {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* --- Thin Inventory Row + Inline Ship Progress (no-bounce) --- */
+
+.inventory-list {
+  display: grid;
+  gap: 10px;
+}
+
+.section-header {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.inventory-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.inv-name {
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.inv-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inv-qty {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+  opacity: 0.95;
+}
+
+.inv-progress {
+  min-width: 120px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.inv-progress.active {
+  opacity: 1;
+}
+
+.inv-progress-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.inv-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--primary, #3b82f6);
+  transition: width 0.18s linear;
+}

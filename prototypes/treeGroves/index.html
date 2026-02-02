@@ -71,7 +71,7 @@
           <div class="subhead">Grove</div>
           
           <div class="row">
-            <div class="label">On Trees</div>
+            <div class="label">Olive Trees</div>
             <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
           </div>
 
@@ -86,22 +86,25 @@
 
           <hr class="divider-light" />
 
-          <div class="subhead">Farm Inventory</div>
+          <div class="section-header">Inventory</div>
 
-          <div class="row">
-            <div class="label">Harvested Olives</div>
-            <div class="value"><span id="harvested-olive-count">0</span></div>
-          </div>
+          <div class="inventory-list">
+            <div class="inventory-row" id="inv-olives-row">
+              <div class="inv-name">Olives</div>
 
-          <div class="actions">
-            <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship Olives</button>
-          </div>
+              <!-- Progress bar inline -->
+              <div class="inv-progress">
+                <div class="inv-progress-bar">
+                  <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                </div>
+              </div>
 
-          <div id="ship-progress-container" class="progress-container" style="display: none;">
-            <div id="ship-progress-bar" class="progress-bar"></div>
+              <div class="inv-right">
+                <div class="inv-qty" id="inv-olives-qty">0</div>
+                <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
+              </div>
+            </div>
           </div>
-          <div id="ship-countdown" class="countdown"></div>
-          <div id="ship-status" class="status-text"></div>
         </section>
 
         <section class="section section-locked">
