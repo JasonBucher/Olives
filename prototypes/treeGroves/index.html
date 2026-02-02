@@ -61,13 +61,13 @@
       <div class="col col-mid">
         <div class="col-header">Estate</div>
 
-        <section class="section section-active">
+        <section class="section">
           <div class="section-title">Farm</div>
 
           <div class="subhead">Grove</div>
           
           <div class="row">
-            <div class="label">Olive Trees</div>
+            <div class="inv-name">Olive Trees</div>
             <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
           </div>
 
@@ -79,10 +79,10 @@
             <div id="harvest-countdown" class="countdown"></div>
             <div id="harvest-progress-bar" class="progress-bar"></div>
           </div>
+        </section>
 
-          <hr class="divider-light" />
-
-          <div class="section-header">Inventory</div>
+        <section class="section">
+          <div class="section-title">Inventory</div>
 
           <div class="inventory-list">
             <div class="inventory-row" id="inv-olives-row">
@@ -151,14 +151,9 @@
           <div class="subhead">Inventory</div>
           
           <div class="row">
-            <div class="label">Olives</div>
+            <div class="inv-name">Olives</div>
             <div class="value"><span id="market-olive-count">0</span></div>
           </div>
-
-          <hr class="divider-light" />
-
-          <div class="subhead">Log</div>
-          <div id="market-log" class="log market-log-compact"></div>
         </section>
 
         <section class="section section-locked">
@@ -169,6 +164,11 @@
         <section class="section section-locked">
           <div class="section-title">Bank <span class="badge locked-badge">Locked</span></div>
           <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Log</div>
+          <div id="market-log" class="log market-log-compact"></div>
         </section>
       </div>
     </div>
