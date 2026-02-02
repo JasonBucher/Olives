@@ -65,7 +65,7 @@
       <div class="col col-mid">
         <div class="col-header">Estate</div>
 
-        <section class="section">
+        <section class="section section-active">
           <div class="section-title">Farm</div>
 
           <div class="subhead">Grove</div>
@@ -96,9 +96,15 @@
           <div class="actions">
             <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship Olives</button>
           </div>
+
+          <div id="ship-progress-container" class="progress-container" style="display: none;">
+            <div id="ship-progress-bar" class="progress-bar"></div>
+          </div>
+          <div id="ship-countdown" class="countdown"></div>
+          <div id="ship-status" class="status-text"></div>
         </section>
 
-        <section class="section">
+        <section class="section section-locked">
           <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
           
           <div class="placeholder-item locked">
@@ -109,7 +115,7 @@
           </div>
         </section>
 
-        <section class="section">
+        <section class="section section-locked">
           <div class="section-title">Workers <span class="badge locked-badge">Locked</span></div>
           
           <div class="placeholder-item locked">
@@ -120,7 +126,7 @@
           </div>
         </section>
 
-        <section class="section">
+        <section class="section section-locked">
           <div class="section-title">House <span class="badge locked-badge">Later</span></div>
           <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
         </section>
@@ -137,16 +143,6 @@
 
         <section class="section">
           <div class="section-title">Market</div>
-
-          <div class="subhead">In Transit</div>
-          
-          <div id="ship-progress-container" class="progress-container" style="display: none;">
-            <div id="ship-progress-bar" class="progress-bar"></div>
-          </div>
-          <div id="ship-countdown" class="countdown"></div>
-          <div id="ship-status" class="status-text"></div>
-
-          <hr class="divider-light" />
 
           <div class="subhead">Market Inventory</div>
           

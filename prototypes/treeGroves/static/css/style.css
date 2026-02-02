@@ -40,7 +40,7 @@ html, body {
 
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr 280px;
+  grid-template-columns: 240px 1fr 340px;
   gap: 12px;
   margin-top: 12px;
 }
@@ -89,6 +89,26 @@ h1 {
   background: var(--panel);
   border-radius: var(--radius);
   padding: var(--pad);
+}
+
+.section-active {
+  background: rgba(43, 108, 255, 0.04);
+  border: 1px solid rgba(43, 108, 255, 0.15);
+  padding: 13px;
+  box-shadow: 0 2px 8px rgba(43, 108, 255, 0.08);
+}
+
+.section-locked {
+  opacity: 0.5;
+  background: rgba(21, 25, 35, 0.6);
+}
+
+.section-locked .section-title {
+  font-size: 11px;
+}
+
+.section-locked .placeholder-item {
+  font-size: 12px;
 }
 
 .layout .section {
@@ -279,11 +299,12 @@ h1 {
 .btn-danger:hover { background: var(--dangerHover); }
 
 .btn-quiet {
-  background: transparent;
+  background: var(--btn);
   color: var(--muted);
   padding: 8px 10px;
+  border: 1px solid var(--divider);
 }
-.btn-quiet:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.btn-quiet:hover { background: var(--btnHover); color: var(--text); }
 
 .divider {
   border: 0;
