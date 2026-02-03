@@ -180,6 +180,24 @@ const debugAddOlivesBtn = document.getElementById("debug-add-olives-btn");
 const debugAddFlorinsBtn = document.getElementById("debug-add-florins-btn");
 const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
 
+const harvestActionUI = createInlineActionController({
+  pillEl: harvestPill,
+  countEl: harvestAttemptingCount,
+  progressEl: harvestProgress,
+  barEl: harvestProgressBar,
+  countdownEl: harvestCountdown,
+  keepLayout: true,
+});
+
+const shipActionUI = createInlineActionController({
+  pillEl: invTransitPill,
+  countEl: invTransitCount,
+  progressEl: shipProgressContainer,
+  barEl: shipProgressBar,
+  countdownEl: shipCountdown,
+  keepLayout: false,
+});
+
 // --- Logging ---
 function logLine(message) {
   const div = document.createElement("div");
@@ -205,6 +223,95 @@ function marketLogLine(message) {
   while (marketLogEl.children.length > maxLines) {
     marketLogEl.removeChild(marketLogEl.lastChild);
   }
+}
+
+// --- Inline Action UI ---
+function createInlineActionController({ pillEl, countEl, progressEl, barEl, countdownEl, keepLayout }) {
+  const fadeClass = "inline-fade-out";
+  const invisibleClass = "is-invisible";
+
+  function setCount(value) {
+    if (!countEl || value === undefined || value === null) return;
+    countEl.textContent = value;
+  }
+
+  function showPill() {
+    if (keepLayout) {
+      pillEl.classList.remove(invisibleClass);
+      return;
+    }
+    pillEl.hidden = false;
+    pillEl.classList.remove(fadeClass);
+  }
+
+  function hidePill() {
+    if (keepLayout) {
+      pillEl.classList.add(invisibleClass);
+      return;
+    }
+    pillEl.classList.add(fadeClass);
+  }
+
+  function showProgress() {
+    progressEl.classList.add("active");
+    if (countdownEl) countdownEl.style.display = "flex";
+  }
+
+  function hideProgress() {
+    progressEl.classList.remove("active");
+    if (countdownEl) countdownEl.style.display = "none";
+  }
+
+  function setProgress(percent) {
+    if (!barEl || percent === undefined || percent === null) return;
+    barEl.style.width = percent + "%";
+  }
+
+  function setCountdown(text) {
+    if (!countdownEl || text === undefined || text === null) return;
+    countdownEl.textContent = text;
+  }
+
+  function start({ count, percent = 0 } = {}) {
+    setCount(count);
+    showPill();
+    showProgress();
+    setProgress(percent);
+  }
+
+  function update({ count, percent, countdownText } = {}) {
+    setCount(count);
+    setProgress(percent);
+    setCountdown(countdownText);
+  }
+
+  function setIdle({ resetBar = true } = {}) {
+    hideProgress();
+    if (resetBar) setProgress(0);
+
+    if (keepLayout) {
+      pillEl.classList.add(invisibleClass);
+      return;
+    }
+
+    pillEl.hidden = true;
+    pillEl.classList.remove(fadeClass);
+  }
+
+  function end() {
+    hideProgress();
+    hidePill();
+
+    window.setTimeout(() => {
+      if (!keepLayout) {
+        pillEl.hidden = true;
+        pillEl.classList.remove(fadeClass);
+      }
+      setProgress(0);
+    }, 160);
+  }
+
+  return { start, update, setIdle, end };
 }
 
 // --- Storage ---
@@ -267,7 +374,7 @@ function updateUI() {
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
     harvestBtn.disabled = false;
-    harvestPill.classList.add("is-invisible");
+    harvestActionUI.setIdle({ resetBar: false });
   }
 
   // Update harvester UI
@@ -368,13 +475,9 @@ function startHarvest(opts = {}) {
   
   // Update UI
   harvestBtn.disabled = true;
-  harvestProgress.classList.add("active");
-  harvestProgressBar.style.width = "0%";
-  harvestCountdown.style.display = "flex";
+  harvestActionUI.start({ count: attempted, percent: 0 });
   
   // Show harvest pill with attempting count
-  harvestAttemptingCount.textContent = attempted;
-  harvestPill.classList.remove("is-invisible");
   harvestPill.classList.remove("inline-fade-out");
   
   if (opts.source === "auto") {
@@ -409,13 +512,7 @@ function completeHarvest() {
   isHarvesting = false;
   
   // Use helper to fade out pill and progress without layout shift
-  endInlineAction({
-    pillEl: harvestPill,
-    progressEl: harvestProgress,
-    barEl: harvestProgressBar,
-    countdownEl: harvestCountdown,
-    useVisibility: true  // Keep harvest pill in layout during fade
-  });
+  harvestActionUI.end();
   
   // Re-enable harvest button after fade
   setTimeout(() => {
@@ -434,8 +531,10 @@ function updateHarvestProgress() {
   const progress = Math.min(1, elapsed / harvestJob.durationMs);
   const remaining = Math.max(0, (harvestJob.durationMs - elapsed) / 1000);
   
-  harvestProgressBar.style.width = (progress * 100) + "%";
-  harvestCountdown.textContent = remaining.toFixed(2) + "s";
+  harvestActionUI.update({
+    percent: progress * 100,
+    countdownText: remaining.toFixed(2) + "s"
+  });
   
   if (elapsed >= harvestJob.durationMs) {
     completeHarvest();
@@ -443,73 +542,20 @@ function updateHarvestProgress() {
 }
 
 // --- Shipping System ---
-// Helper to cleanly end an inline action without layout bounce
-function endInlineAction({ pillEl, progressEl, barEl, countdownEl, useVisibility }) {
-  // Fade both pieces while keeping layout stable
-  if (useVisibility) {
-    // For harvest pill: use visibility to keep layout space
-    pillEl.classList.add("is-invisible");
-  } else {
-    // For ship pill: use fade-out class
-    pillEl.classList.add("inline-fade-out");
-  }
-  progressEl.classList.remove("active"); // progress already fades via opacity transition
-
-  // If countdown uses display toggles, hide it now or after delay (either is fine)
-  if (countdownEl) countdownEl.style.display = "none";
-
-  // After fade completes, remove from layout and reset width
-  window.setTimeout(() => {
-    if (!useVisibility) {
-      pillEl.hidden = true;
-      pillEl.classList.remove("inline-fade-out");
-    }
-    if (barEl) barEl.style.width = "0%";
-  }, 160);
-}
-
-// Thin inline UI helpers
 function setShipUIIdle() {
-  endInlineAction({
-    pillEl: invTransitPill,
-    progressEl: shipProgressContainer,
-    barEl: shipProgressBar,
-    countdownEl: shipCountdown
-  });
-  
+  shipActionUI.setIdle();
   shipOlivesBtn.disabled = state.harvestedOlives === 0 || isShipping;
 }
 
-function setShipUIActive(percent) {
-  shipProgressContainer.classList.add("active");
-  shipCountdown.style.display = "flex";
-  shipProgressBar.style.width = percent + "%";
-  
-  // Show transit pill with current shipment amount
-  if (isShipping && shipJob.amount > 0) {
-    invTransitCount.textContent = shipJob.amount;
-    invTransitPill.hidden = false;
-    invTransitPill.classList.remove("inline-fade-out");
-  }
-  
+function setShipUIActive(percent, countdownText) {
+  shipActionUI.update({ percent, countdownText });
   shipOlivesBtn.disabled = true;
 }
 
-function setShipUIDone() {
+function setShipUIComplete() {
   // Reset after very brief delay (don't set to 100% to avoid flicker)
   setTimeout(() => {
-    shipProgressContainer.classList.remove("active");
-    shipProgressBar.style.width = "0%";
-    setShipUIIdle();
-  }, 60);
-}
-
-function setShipUIFailed() {
-  // Reset after very brief delay
-  setTimeout(() => {
-    shipProgressContainer.classList.remove("active");
-    shipProgressBar.style.width = "0%";
-    setShipUIIdle();
+    shipActionUI.end();
   }, 60);
 }
 
@@ -556,7 +602,8 @@ function startShipping() {
   isShipping = true;
   
   // Update inline UI
-  setShipUIActive(0);
+  shipActionUI.start({ count: amount, percent: 0 });
+  shipOlivesBtn.disabled = true;
   
   logLine(`Loaded ${amount} olives onto cart for market`);
   saveGame();
@@ -581,11 +628,7 @@ function completeShipping() {
   isShipping = false;
   
   // Update UI based on outcome
-  if (arrived === 0) {
-    setShipUIFailed();
-  } else {
-    setShipUIDone();
-  }
+  setShipUIComplete();
   
   saveGame();
   updateUI();
@@ -601,8 +644,7 @@ function updateShipProgress() {
   
   // Update progress bar and countdown
   const progressPct = Math.floor(progress * 100);
-  setShipUIActive(progressPct);
-  shipCountdown.textContent = Math.ceil(remaining) + "s";
+  setShipUIActive(progressPct, Math.ceil(remaining) + "s");
   
   if (elapsed >= shipJob.durationMs) {
     completeShipping();
