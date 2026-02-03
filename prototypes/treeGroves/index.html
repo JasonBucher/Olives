@@ -23,191 +23,227 @@
       <div class="col col-left">
         <div class="col-header">Growth</div>
 
-        <section class="section">
-          <div class="section-title">Capital</div>
-          
-          <div class="row">
-            <div class="label">Florins</div>
-            <div class="value"><span id="florin-count">0</span></div>
-          </div>
-
-          <hr class="divider-light" />
-
-          <div class="row">
-            <div class="label muted">Influence</div>
-            <div class="value muted">—</div>
-          </div>
-          <div class="row">
-            <div class="label muted">Indulgences</div>
-            <div class="value muted">—</div>
-          </div>
-          <div class="row">
-            <div class="label muted">Patronage</div>
-            <div class="value muted">—</div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title">Managers</div>
-          
-          <div id="managers-empty" class="muted" style="padding: 7px 0; font-size: 13px;">No managers hired</div>
-          
-          <div id="managers-arborist" hidden>
-            <div class="row">
-              <div class="label">Arborist</div>
-              <div class="value"><span id="arborist-status">Not hired</span></div>
+        <div class="col-body">
+          <section class="section">
+            <div class="section-title">Capital</div>
+            
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Florins</div>
+                <div class="value"><span id="florin-count">0</span></div>
+              </div>
             </div>
-            <div class="muted" id="arborist-salary" style="font-size: 12px; padding-top: 4px;">Salary: 0.2 florins / min</div>
-          </div>
-        </section>
 
-        <section class="section">
-          <div class="section-title">Upgrades</div>
-          
-          <div class="upgrade-list">
-            <div id="upgrade-arborist">
-              <button id="upgrade-arborist-btn" class="upgrade-pill" type="button">Hire an Arborist for 50 florins</button>
+            <hr class="divider-light" />
+
+            <div class="subsection">
+              <div class="row">
+                <div class="label muted">Influence</div>
+                <div class="value muted">—</div>
+              </div>
+              <div class="row">
+                <div class="label muted">Indulgences</div>
+                <div class="value muted">—</div>
+              </div>
+              <div class="row">
+                <div class="label muted">Patronage</div>
+                <div class="value muted">—</div>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="section section-locked">
-          <div class="section-title">Investments <span class="badge locked-badge">Locked</span></div>
-          
-          <div class="placeholder-item locked">
-            <span class="item-name">Upgrade Olive Press</span>
-          </div>
-          <div class="placeholder-item locked">
-            <span class="item-name">Expand Grove</span>
-          </div>
-        </section>
+          <section class="section">
+            <div class="section-title">Managers</div>
+            
+            <div class="subsection">
+              <div id="managers-empty" class="muted" style="padding: 7px 0; font-size: 13px;">No managers hired</div>
+              
+              <div id="managers-arborist" hidden>
+                <div class="row">
+                  <div class="label">Arborist</div>
+                  <div class="value"><span id="arborist-status">Not hired</span></div>
+                </div>
+                <div class="muted" id="arborist-salary" style="font-size: 12px; padding-top: 4px;">Salary: 0.2 florins / min</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-title">Upgrades</div>
+            
+            <div class="subsection">
+              <div class="upgrade-list">
+                <div id="upgrade-arborist">
+                  <button id="upgrade-arborist-btn" class="upgrade-pill" type="button">Hire an Arborist for 50 florins</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section section-locked">
+            <div class="section-title">Investments <span class="badge locked-badge">Locked</span></div>
+            
+            <div class="subsection">
+              <div class="placeholder-item locked">
+                <span class="item-name">Upgrade Olive Press</span>
+              </div>
+              <div class="placeholder-item locked">
+                <span class="item-name">Expand Grove</span>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
 
       <!-- Middle Column: Estate -->
       <div class="col col-mid">
         <div class="col-header">Estate</div>
 
-        <section class="section">
-          <div class="section-title">Farm</div>
+        <div class="col-body">
+          <section class="section">
+            <div class="section-title">Farm</div>
 
-          <div class="subhead">Grove</div>
-          
-          <div class="inventory-row">
-            <div class="inv-name">Olive Trees</div>
-            <div class="inv-qty"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
-
-            <div class="inv-middle">
-              <span id="harvest-pill" class="inv-transit-pill pill--fade is-invisible">
-                <span id="harvest-attempting-count">0</span>→
-              </span>
+            <div class="subsection">
+              <div class="subhead">Grove</div>
               
-              <!-- Progress bar inline -->
-              <div class="inv-progress" id="harvest-progress">
-                <div class="inv-progress-bar">
-                  <div id="harvest-countdown" class="action-countdown"></div>
-                  <div id="harvest-progress-bar" class="inv-progress-fill" style="width:0%"></div>
-                </div>
-              </div>
-            </div>
+              <div class="inventory-row">
+                <div class="inv-name">Olive Trees</div>
+                <div class="inv-qty"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
 
-            <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title">Inventory</div>
-
-          <div class="inventory-list">
-            <div class="inventory-row" id="inv-olives-row">
-              <div class="inv-name">Olives</div>
-              <div class="inv-qty" id="inv-olives-qty">0</div>
-
-              <div class="inv-middle">
-                <span id="inv-olives-transit" class="inv-transit-pill" aria-label="Olives in transit" hidden>
-                  <span id="inv-olives-transit-count">0</span>→
-                </span>
-                
-                <!-- Progress bar inline -->
-                <div id="ship-progress" class="inv-progress">
-                  <div class="inv-progress-bar">
-                    <div id="ship-countdown" class="action-countdown"></div>
-                    <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                <div class="inv-middle">
+                  <span id="harvest-pill" class="inv-transit-pill pill--fade is-invisible">
+                    <span id="harvest-attempting-count">0</span>→
+                  </span>
+                  
+                  <!-- Progress bar inline -->
+                  <div class="inv-progress" id="harvest-progress">
+                    <div class="inv-progress-bar">
+                      <div id="harvest-countdown" class="action-countdown"></div>
+                      <div id="harvest-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                    </div>
                   </div>
                 </div>
+
+                <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-title">Inventory</div>
+
+            <div class="subsection">
+              <div class="inventory-list">
+                <div class="inventory-row" id="inv-olives-row">
+                  <div class="inv-name">Olives</div>
+                  <div class="inv-qty" id="inv-olives-qty">0</div>
+
+                  <div class="inv-middle">
+                    <span id="inv-olives-transit" class="inv-transit-pill" aria-label="Olives in transit" hidden>
+                      <span id="inv-olives-transit-count">0</span>→
+                    </span>
+                    
+                    <!-- Progress bar inline -->
+                    <div id="ship-progress" class="inv-progress">
+                      <div class="inv-progress-bar">
+                        <div id="ship-countdown" class="action-countdown"></div>
+                        <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-title">Workers</div>
+            
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Harvesters</div>
+                <div class="value"><span id="harvester-count">0</span></div>
               </div>
 
-              <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
+              <div class="muted worker-description">Improves harvest haul and speed; can increase mistakes without supervision.</div>
+
+              <div class="actions">
+                <button id="hire-harvester-btn" class="btn btn-primary" type="button">Hire Harvester</button>
+              </div>
+              <div class="muted" id="hire-harvester-cost">Cost: 0 florins</div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="section">
-          <div class="section-title">Workers</div>
-          
-          <div class="row">
-            <div class="label">Harvesters</div>
-            <div class="value"><span id="harvester-count">0</span></div>
-          </div>
+          <section id="production-section" class="section section-locked">
+            <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
+            
+            <div class="subsection">
+              <div class="placeholder-item locked">
+                <span class="item-name">Olive Press</span>
+              </div>
+              <div class="placeholder-item locked">
+                <span class="item-name">Grape Crush</span>
+              </div>
+            </div>
+          </section>
 
-          <div class="muted worker-description">Improves harvest haul and speed; can increase mistakes without supervision.</div>
+          <section class="section section-locked">
+            <div class="section-title">House <span class="badge locked-badge">Locked</span></div>
+            <div class="subsection">
+              <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+            </div>
+          </section>
 
-          <div class="actions">
-            <button id="hire-harvester-btn" class="btn btn-primary" type="button">Hire Harvester</button>
-          </div>
-          <div class="muted" id="hire-harvester-cost">Cost: 0 florins</div>
-        </section>
-
-        <section id="production-section" class="section section-locked">
-          <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
-          
-          <div class="placeholder-item locked">
-            <span class="item-name">Olive Press</span>
-          </div>
-          <div class="placeholder-item locked">
-            <span class="item-name">Grape Crush</span>
-          </div>
-        </section>
-
-        <section class="section section-locked">
-          <div class="section-title">House <span class="badge locked-badge">Locked</span></div>
-          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
-        </section>
-
-        <section id="log-section" class="section">
-          <div class="section-title">Log</div>
-          <div id="log" class="log"></div>
-        </section>
+          <section id="log-section" class="section">
+            <div class="section-title">Log</div>
+            <div class="subsection">
+              <div id="log" class="log"></div>
+            </div>
+          </section>
+        </div>
       </div>
 
       <!-- Right Column: Market -->
       <div class="col col-right">
         <div class="col-header">Market</div>
 
-        <section class="section">
-          <div class="section-title">Market</div>
+        <div class="col-body">
+          <section class="section">
+            <div class="section-title">Market</div>
 
-          <div class="subhead">Inventory</div>
-          
-          <div class="row">
-            <div class="inv-name">Olives</div>
-            <div class="value"><span id="market-olive-count">0</span></div>
-          </div>
-        </section>
+            <div class="subsection">
+              <div class="subhead">Inventory</div>
+              
+              <div class="row row--inventory">
+                <div class="label">Olives</div>
+                <div class="value"><span id="market-olive-count">0</span></div>
+              </div>
+            </div>
+          </section>
 
-        <section class="section section-locked">
-          <div class="section-title">Church <span class="badge locked-badge">Locked</span></div>
-          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
-        </section>
+          <section class="section section-locked">
+            <div class="section-title">Church <span class="badge locked-badge">Locked</span></div>
+            <div class="subsection">
+              <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+            </div>
+          </section>
 
-        <section class="section section-locked">
-          <div class="section-title">Bank <span class="badge locked-badge">Locked</span></div>
-          <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
-        </section>
+          <section class="section section-locked">
+            <div class="section-title">Bank <span class="badge locked-badge">Locked</span></div>
+            <div class="subsection">
+              <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
+            </div>
+          </section>
 
-        <section class="section">
-          <div class="section-title">Log</div>
-          <div id="market-log" class="log market-log-compact"></div>
-        </section>
+          <section class="section">
+            <div class="section-title">Log</div>
+            <div class="subsection">
+              <div id="market-log" class="log market-log-compact"></div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </div>
