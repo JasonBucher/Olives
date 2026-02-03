@@ -24,8 +24,8 @@
 
 * { box-sizing: border-box; }
 
-.hidden {
-  display: none;
+[hidden] {
+  display: none !important;
 }
 
 html, body {
@@ -432,7 +432,7 @@ h1 {
   transition: opacity 0.15s ease;
 }
 
-.pill--invisible {
+.is-invisible {
   opacity: 0;
   visibility: hidden;  /* keeps layout space */
   pointer-events: none;

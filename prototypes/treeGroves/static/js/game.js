@@ -267,7 +267,7 @@ function updateUI() {
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
     harvestBtn.disabled = false;
-    harvestPill.classList.add("pill--invisible");
+    harvestPill.classList.add("is-invisible");
   }
 
   // Update harvester UI
@@ -278,29 +278,29 @@ function updateUI() {
 
   // Toggle Managers section
   if (state.arboristHired) {
-    managersEmptyEl.classList.add("hidden");
-    managersArboristWrap.classList.remove("hidden");
+    managersEmptyEl.hidden = true;
+    managersArboristWrap.hidden = false;
     arboristStatusEl.textContent = arboristIsActive ? "Active" : "Inactive (Unpaid)";
   } else {
-    managersEmptyEl.classList.remove("hidden");
-    managersArboristWrap.classList.add("hidden");
+    managersEmptyEl.hidden = false;
+    managersArboristWrap.hidden = true;
   }
 
   // Toggle Upgrades - Hire Arborist
   const upgradeArborist = document.getElementById("upgrade-arborist");
   if (state.arboristHired) {
-    upgradeArborist.classList.add("hidden");
+    upgradeArborist.hidden = true;
   } else {
-    upgradeArborist.classList.remove("hidden");
+    upgradeArborist.hidden = false;
     upgradeArboristBtn.disabled = state.florinCount < 50;
   }
 
   // Toggle Production section visibility
   if (productionSection) {
     if (state.arboristHired) {
-      productionSection.classList.remove("hidden");
+      productionSection.hidden = false;
     } else {
-      productionSection.classList.add("hidden");
+      productionSection.hidden = true;
     }
   }
 }
@@ -374,7 +374,7 @@ function startHarvest(opts = {}) {
   
   // Show harvest pill with attempting count
   harvestAttemptingCount.textContent = attempted;
-  harvestPill.classList.remove("pill--invisible");
+  harvestPill.classList.remove("is-invisible");
   harvestPill.classList.remove("inline-fade-out");
   
   if (opts.source === "auto") {
@@ -448,7 +448,7 @@ function endInlineAction({ pillEl, progressEl, barEl, countdownEl, useVisibility
   // Fade both pieces while keeping layout stable
   if (useVisibility) {
     // For harvest pill: use visibility to keep layout space
-    pillEl.classList.add("pill--invisible");
+    pillEl.classList.add("is-invisible");
   } else {
     // For ship pill: use fade-out class
     pillEl.classList.add("inline-fade-out");
