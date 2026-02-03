@@ -517,6 +517,21 @@ h1 {
   display: none !important;
 }
 
+.inline-fade-out {
+  opacity: 0 !important;
+  transition: opacity 0.15s ease;
+}
+
+.pill--invisible {
+  opacity: 0;
+  visibility: hidden;  /* keeps layout space */
+  pointer-events: none;
+}
+
+.pill--fade {
+  transition: opacity 0.15s ease;
+}
+
 .inv-progress {
   flex: 1;
   height: 16px;

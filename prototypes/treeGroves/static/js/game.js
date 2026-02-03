@@ -146,17 +146,19 @@ const logEl = document.getElementById("log");
 const marketLogEl = document.getElementById("market-log");
 
 const harvestBtn = document.getElementById("harvest-btn");
-const harvestProgressContainer = document.getElementById("harvest-progress-container");
+const harvestProgress = document.getElementById("harvest-progress");
 const harvestProgressBar = document.getElementById("harvest-progress-bar");
-const productionSection = document.getElementById("production-section");
 const harvestCountdown = document.getElementById("harvest-countdown");
+const harvestPill = document.getElementById("harvest-pill");
+const harvestAttemptingCount = document.getElementById("harvest-attempting-count");
+const productionSection = document.getElementById("production-section");
 
 const invOlivesQty = document.getElementById("inv-olives-qty");
 const invTransitPill = document.getElementById("inv-olives-transit");
 const invTransitCount = document.getElementById("inv-olives-transit-count");
 const shipProgressBar = document.getElementById("ship-progress-bar");
 const shipCountdown = document.getElementById("ship-countdown");
-const shipProgressContainer = document.querySelector(".inv-progress");
+const shipProgressContainer = document.getElementById("ship-progress");
 const shipOlivesBtn = document.getElementById("ship-olives-btn");
 
 const harvesterCountEl = document.getElementById("harvester-count");
@@ -262,6 +264,12 @@ function updateUI() {
     shipOlivesBtn.disabled = state.harvestedOlives === 0;
   }
 
+  // Update harvest button state and pill visibility
+  if (!isHarvesting) {
+    harvestBtn.disabled = false;
+    harvestPill.classList.add("pill--invisible");
+  }
+
   // Update harvester UI
   harvesterCountEl.textContent = state.harvesterCount;
   const harvesterCost = getHarvesterHireCost();
@@ -288,10 +296,12 @@ function updateUI() {
   }
 
   // Toggle Production section visibility
-  if (state.arboristHired) {
-    productionSection.classList.remove("hidden");
-  } else {
-    productionSection.classList.add("hidden");
+  if (productionSection) {
+    if (state.arboristHired) {
+      productionSection.classList.remove("hidden");
+    } else {
+      productionSection.classList.add("hidden");
+    }
   }
 }
 
@@ -358,9 +368,14 @@ function startHarvest(opts = {}) {
   
   // Update UI
   harvestBtn.disabled = true;
-  harvestProgressContainer.style.display = "block";
+  harvestProgress.classList.add("active");
   harvestProgressBar.style.width = "0%";
   harvestCountdown.style.display = "flex";
+  
+  // Show harvest pill with attempting count
+  harvestAttemptingCount.textContent = attempted;
+  harvestPill.classList.remove("pill--invisible");
+  harvestPill.classList.remove("inline-fade-out");
   
   if (opts.source === "auto") {
     logLine("Arborist ordered harvest (trees at capacity).");
@@ -393,13 +408,19 @@ function completeHarvest() {
   // Reset state
   isHarvesting = false;
   
-  // Hide progress UI after brief delay
+  // Use helper to fade out pill and progress without layout shift
+  endInlineAction({
+    pillEl: harvestPill,
+    progressEl: harvestProgress,
+    barEl: harvestProgressBar,
+    countdownEl: harvestCountdown,
+    useVisibility: true  // Keep harvest pill in layout during fade
+  });
+  
+  // Re-enable harvest button after fade
   setTimeout(() => {
-    harvestProgressContainer.style.display = "none";
-    harvestProgressBar.style.width = "0%";
-    harvestCountdown.style.display = "none";
     harvestBtn.disabled = false;
-  }, 150);
+  }, 160);
   
   saveGame();
   updateUI();
@@ -422,12 +443,40 @@ function updateHarvestProgress() {
 }
 
 // --- Shipping System ---
+// Helper to cleanly end an inline action without layout bounce
+function endInlineAction({ pillEl, progressEl, barEl, countdownEl, useVisibility }) {
+  // Fade both pieces while keeping layout stable
+  if (useVisibility) {
+    // For harvest pill: use visibility to keep layout space
+    pillEl.classList.add("pill--invisible");
+  } else {
+    // For ship pill: use fade-out class
+    pillEl.classList.add("inline-fade-out");
+  }
+  progressEl.classList.remove("active"); // progress already fades via opacity transition
+
+  // If countdown uses display toggles, hide it now or after delay (either is fine)
+  if (countdownEl) countdownEl.style.display = "none";
+
+  // After fade completes, remove from layout and reset width
+  window.setTimeout(() => {
+    if (!useVisibility) {
+      pillEl.hidden = true;
+      pillEl.classList.remove("inline-fade-out");
+    }
+    if (barEl) barEl.style.width = "0%";
+  }, 160);
+}
+
 // Thin inline UI helpers
 function setShipUIIdle() {
-  shipProgressBar.style.width = "0%";
-  shipCountdown.style.display = "none";
-  shipProgressContainer.classList.remove("active");
-  invTransitPill.hidden = true;
+  endInlineAction({
+    pillEl: invTransitPill,
+    progressEl: shipProgressContainer,
+    barEl: shipProgressBar,
+    countdownEl: shipCountdown
+  });
+  
   shipOlivesBtn.disabled = state.harvestedOlives === 0 || isShipping;
 }
 
@@ -440,6 +489,7 @@ function setShipUIActive(percent) {
   if (isShipping && shipJob.amount > 0) {
     invTransitCount.textContent = shipJob.amount;
     invTransitPill.hidden = false;
+    invTransitPill.classList.remove("inline-fade-out");
   }
   
   shipOlivesBtn.disabled = true;

@@ -92,18 +92,25 @@
 
           <div class="subhead">Grove</div>
           
-          <div class="row">
+          <div class="inventory-row">
             <div class="inv-name">Olive Trees</div>
-            <div class="value"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
-          </div>
+            <div class="inv-qty"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
 
-          <div class="actions">
+            <div class="inv-middle">
+              <span id="harvest-pill" class="inv-transit-pill pill--fade pill--invisible">
+                <span id="harvest-attempting-count">0</span>→
+              </span>
+              
+              <!-- Progress bar inline -->
+              <div class="inv-progress" id="harvest-progress">
+                <div class="inv-progress-bar">
+                  <div id="harvest-countdown" class="ship-countdown"></div>
+                  <div id="harvest-progress-bar" class="inv-progress-fill" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+
             <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
-          </div>
-
-          <div id="harvest-progress-container" class="progress-container" style="display: none;">
-            <div id="harvest-countdown" class="countdown"></div>
-            <div id="harvest-progress-bar" class="progress-bar"></div>
           </div>
         </section>
 
@@ -121,7 +128,7 @@
                 </span>
                 
                 <!-- Progress bar inline -->
-                <div class="inv-progress">
+                <div id="ship-progress" class="inv-progress">
                   <div class="inv-progress-bar">
                     <div id="ship-countdown" class="ship-countdown"></div>
                     <div id="ship-progress-bar" class="inv-progress-fill" style="width:0%"></div>
@@ -150,7 +157,7 @@
           <div class="muted" id="hire-harvester-cost">Cost: 0 florins</div>
         </section>
 
-        <section class="section section-locked">
+        <section id="production-section" class="section section-locked">
           <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
           
           <div class="placeholder-item locked">
