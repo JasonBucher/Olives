@@ -24,6 +24,10 @@
 
 * { box-sizing: border-box; }
 
+.hidden {
+  display: none;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -164,6 +168,13 @@ h1 {
 
 .subhead:first-child {
   margin-top: 0;
+}
+
+.worker-description {
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 6px;
+  margin-bottom: 8px;
 }
 
 .divider-light {
@@ -327,6 +338,40 @@ h1 {
   border: 1px solid var(--divider);
 }
 .btn-quiet:hover { background: var(--btnHover); color: var(--text); }
+
+.upgrade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upgrade-pill {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background: var(--btn);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.upgrade-pill:hover:not(:disabled) {
+  background: var(--btnHover);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.upgrade-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .divider {
   border: 0;

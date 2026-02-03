@@ -31,6 +31,8 @@
             <div class="value"><span id="florin-count">0</span></div>
           </div>
 
+          <hr class="divider-light" />
+
           <div class="row">
             <div class="label muted">Influence</div>
             <div class="value muted">—</div>
@@ -42,6 +44,30 @@
           <div class="row">
             <div class="label muted">Patronage</div>
             <div class="value muted">—</div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Managers</div>
+          
+          <div id="managers-empty" class="muted" style="padding: 7px 0; font-size: 13px;">No managers hired</div>
+          
+          <div id="managers-arborist" class="hidden">
+            <div class="row">
+              <div class="label">Arborist</div>
+              <div class="value"><span id="arborist-status">Not hired</span></div>
+            </div>
+            <div class="muted" id="arborist-salary" style="font-size: 12px; padding-top: 4px;">Salary: 0.2 florins / min</div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Upgrades</div>
+          
+          <div class="upgrade-list">
+            <div id="upgrade-arborist">
+              <button id="upgrade-arborist-btn" class="upgrade-pill" type="button">Hire an Arborist for 50 florins</button>
+            </div>
           </div>
         </section>
 
@@ -108,6 +134,22 @@
           </div>
         </section>
 
+        <section class="section">
+          <div class="section-title">Workers</div>
+          
+          <div class="row">
+            <div class="label">Harvesters</div>
+            <div class="value"><span id="harvester-count">0</span></div>
+          </div>
+
+          <div class="muted worker-description">Improves harvest haul and speed; can increase mistakes without supervision.</div>
+
+          <div class="actions">
+            <button id="hire-harvester-btn" class="btn btn-primary" type="button">Hire Harvester</button>
+          </div>
+          <div class="muted" id="hire-harvester-cost">Cost: 0 florins</div>
+        </section>
+
         <section class="section section-locked">
           <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
           
@@ -120,18 +162,7 @@
         </section>
 
         <section class="section section-locked">
-          <div class="section-title">Workers <span class="badge locked-badge">Locked</span></div>
-          
-          <div class="placeholder-item locked">
-            <span class="item-name">Harvesters</span>
-          </div>
-          <div class="placeholder-item locked">
-            <span class="item-name">Processors</span>
-          </div>
-        </section>
-
-        <section class="section section-locked">
-          <div class="section-title">House <span class="badge locked-badge">Later</span></div>
+          <div class="section-title">House <span class="badge locked-badge">Locked</span></div>
           <div class="muted" style="padding: 4px 0; font-size: 12px;">Coming soon</div>
         </section>
 

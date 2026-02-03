@@ -13,13 +13,17 @@ let state = {
   // Grove mechanics
   treeOlives: 0,
   treeCapacity: 25,
-  treeGrowthPerSec: 0.25,
+  treeGrowthPerSec: 1.0,
   
   // Player inventory
   harvestedOlives: 0,
   marketOlives: 0,
   oilCount: 0,
   florinCount: 0,
+
+  // Workers
+  harvesterCount: 0,
+  arboristHired: false,
 
   // For future expansion
   meta: {
@@ -38,6 +42,40 @@ const harvestConfig = {
     { key: "efficient", weight: 0.10, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
   ],
 };
+
+// --- Harvester Hire Cost ---
+function getHarvesterHireCost() {
+  // Escalating linear cost (tweakable later)
+  return 10 + (state.harvesterCount * 5);
+}
+
+// --- Harvester Effects ---
+function getHarvesterAttemptBonus() {
+  const count = state.harvesterCount;
+  if (count === 0) return 0;
+  
+  let bonus = 0;
+  // 1-5: +1 each
+  bonus += Math.min(count, 5) * 1;
+  // 6-10: +0.5 each
+  if (count > 5) bonus += Math.min(count - 5, 5) * 0.5;
+  // 11+: +0.25 each
+  if (count > 10) bonus += (count - 10) * 0.25;
+  
+  return Math.floor(bonus);
+}
+
+function getHarvesterDurationMultiplier() {
+  // Each harvester reduces duration by 4%, capped at 25% total reduction
+  const reductionPct = Math.min(state.harvesterCount * 0.04, 0.25);
+  return 1 - reductionPct;
+}
+
+function getHarvesterPoorWeightDelta() {
+  // +0.01 per harvester, reduced by 50% if arborist is active
+  const multiplier = arboristIsActive ? 0.5 : 1;
+  return state.harvesterCount * 0.01 * multiplier;
+}
 
 // --- Shipping Config ---
 const shippingConfig = {
@@ -96,6 +134,9 @@ let shipJob = {
 // --- Market Timer (not persisted) ---
 let marketTickAcc = 0;
 
+// --- Arborist Active State (computed each tick) ---
+let arboristIsActive = false;
+
 // --- DOM ---
 const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
@@ -107,6 +148,7 @@ const marketLogEl = document.getElementById("market-log");
 const harvestBtn = document.getElementById("harvest-btn");
 const harvestProgressContainer = document.getElementById("harvest-progress-container");
 const harvestProgressBar = document.getElementById("harvest-progress-bar");
+const productionSection = document.getElementById("production-section");
 const harvestCountdown = document.getElementById("harvest-countdown");
 
 const invOlivesQty = document.getElementById("inv-olives-qty");
@@ -116,6 +158,16 @@ const shipProgressBar = document.getElementById("ship-progress-bar");
 const shipCountdown = document.getElementById("ship-countdown");
 const shipProgressContainer = document.querySelector(".inv-progress");
 const shipOlivesBtn = document.getElementById("ship-olives-btn");
+
+const harvesterCountEl = document.getElementById("harvester-count");
+const hireHarvesterBtn = document.getElementById("hire-harvester-btn");
+const hireHarvesterCostEl = document.getElementById("hire-harvester-cost");
+
+const arboristStatusEl = document.getElementById("arborist-status");
+const upgradeArboristBtn = document.getElementById("upgrade-arborist-btn");
+const upgradeArboristCostEl = document.getElementById("upgrade-arborist-cost");
+const managersEmptyEl = document.getElementById("managers-empty");
+const managersArboristWrap = document.getElementById("managers-arborist");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -199,7 +251,7 @@ function growTrees(dt) {
 
 // --- UI ---
 function updateUI() {
-  florinCountEl.textContent = state.florinCount;
+  florinCountEl.textContent = state.florinCount.toFixed(2);
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
   invOlivesQty.textContent = state.harvestedOlives;
@@ -208,6 +260,38 @@ function updateUI() {
   // Update ship button state based on inventory
   if (!isShipping) {
     shipOlivesBtn.disabled = state.harvestedOlives === 0;
+  }
+
+  // Update harvester UI
+  harvesterCountEl.textContent = state.harvesterCount;
+  const harvesterCost = getHarvesterHireCost();
+  hireHarvesterCostEl.textContent = `Cost: ${harvesterCost} florins`;
+  hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
+
+  // Toggle Managers section
+  if (state.arboristHired) {
+    managersEmptyEl.classList.add("hidden");
+    managersArboristWrap.classList.remove("hidden");
+    arboristStatusEl.textContent = arboristIsActive ? "Active" : "Inactive (Unpaid)";
+  } else {
+    managersEmptyEl.classList.remove("hidden");
+    managersArboristWrap.classList.add("hidden");
+  }
+
+  // Toggle Upgrades - Hire Arborist
+  const upgradeArborist = document.getElementById("upgrade-arborist");
+  if (state.arboristHired) {
+    upgradeArborist.classList.add("hidden");
+  } else {
+    upgradeArborist.classList.remove("hidden");
+    upgradeArboristBtn.disabled = state.florinCount < 50;
+  }
+
+  // Toggle Production section visibility
+  if (state.arboristHired) {
+    productionSection.classList.remove("hidden");
+  } else {
+    productionSection.classList.add("hidden");
   }
 }
 
@@ -229,24 +313,45 @@ function selectWeightedOutcome() {
   return rollWeighted(harvestConfig.outcomes);
 }
 
-function startHarvest() {
+function startHarvest(opts = {}) {
   if (isHarvesting) return;
   if (state.treeOlives < 1) {
     logLine("No olives to harvest");
     return;
   }
   
-  // Determine batch
-  const attempted = Math.min(Math.floor(state.treeOlives), harvestConfig.batchSize);
+  // Determine batch with harvester bonus
+  const effectiveBatchSize = harvestConfig.batchSize + getHarvesterAttemptBonus();
+  const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
-  // Select outcome
-  const outcome = selectWeightedOutcome();
+  // Create adjusted outcome weights for harvester mistakes and arborist bonuses
+  const poorWeightDelta = getHarvesterPoorWeightDelta();
+  const efficientWeightBonus = arboristIsActive ? 0.05 : 0;
+  
+  const adjustedOutcomes = harvestConfig.outcomes.map(o => {
+    if (o.key === "poor") {
+      return { ...o, weight: o.weight + poorWeightDelta };
+    } else if (o.key === "efficient") {
+      return { ...o, weight: o.weight + efficientWeightBonus };
+    } else if (o.key === "normal") {
+      // Reduce normal weight to compensate for both poor increase and efficient increase
+      return { ...o, weight: Math.max(0, o.weight - poorWeightDelta - efficientWeightBonus) };
+    } else {
+      return { ...o };
+    }
+  });
+  
+  // Select outcome with adjusted weights
+  const outcome = rollWeighted(adjustedOutcomes);
+  
+  // Apply harvester speed bonus to duration
+  const effectiveDurationMs = Math.floor(outcome.durationMs * getHarvesterDurationMultiplier());
   
   // Start job
   isHarvesting = true;
   harvestJob = {
     startTimeMs: Date.now(),
-    durationMs: outcome.durationMs,
+    durationMs: effectiveDurationMs,
     attempted,
     outcome,
   };
@@ -257,11 +362,15 @@ function startHarvest() {
   harvestProgressBar.style.width = "0%";
   harvestCountdown.style.display = "flex";
   
-  logLine(`Starting harvest: attempting ${attempted} olives`);
+  if (opts.source === "auto") {
+    logLine("Arborist ordered harvest (trees at capacity).");
+  } else {
+    logLine(`Starting harvest (H: ${state.harvesterCount}): attempting ${attempted} olives`);
+  }
 }
 
 function completeHarvest() {
-  const { attempted, outcome } = harvestJob;
+  const { attempted, outcome, durationMs } = harvestJob;
   
   // Calculate results
   const collected = Math.floor(attempted * outcome.collectedPct);
@@ -274,10 +383,11 @@ function completeHarvest() {
   
   // Log outcome
   const outcomeLabel = outcome.key.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+  const durationSec = (durationMs / 1000).toFixed(2);
   if (remaining > 0) {
-    logLine(`Harvest (${outcomeLabel}): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`);
   } else {
-    logLine(`Harvest (${outcomeLabel}): attempted ${attempted}, collected ${collected}, lost ${lost}`);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost}`);
   }
   
   // Reset state
@@ -304,7 +414,7 @@ function updateHarvestProgress() {
   const remaining = Math.max(0, (harvestJob.durationMs - elapsed) / 1000);
   
   harvestProgressBar.style.width = (progress * 100) + "%";
-  harvestCountdown.textContent = Math.ceil(remaining) + "s";
+  harvestCountdown.textContent = remaining.toFixed(2) + "s";
   
   if (elapsed >= harvestJob.durationMs) {
     completeHarvest();
@@ -511,8 +621,27 @@ function startLoop() {
     const dt = (now - last) / 1000;
     last = now;
 
+    // Arborist salary drain
+    if (state.arboristHired) {
+      const salaryPerSec = 0.2 / 60;
+      const costThisTick = salaryPerSec * dt;
+      if (state.florinCount >= costThisTick) {
+        state.florinCount -= costThisTick;
+        arboristIsActive = true;
+      } else {
+        arboristIsActive = false;
+      }
+    } else {
+      arboristIsActive = false;
+    }
+
     // Trees grow olives automatically
     growTrees(dt);
+    
+    // Auto-harvest if Arborist is active and trees are at capacity
+    if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= state.treeCapacity) {
+      startHarvest({ source: "auto" });
+    }
     
     // Update harvest progress
     updateHarvestProgress();
@@ -548,6 +677,27 @@ function closeDebug() {
 // --- Wire Events ---
 harvestBtn.addEventListener("click", startHarvest);
 shipOlivesBtn.addEventListener("click", startShipping);
+
+hireHarvesterBtn.addEventListener("click", () => {
+  const cost = getHarvesterHireCost();
+  if (state.florinCount < cost) return;
+  state.florinCount -= cost;
+  state.harvesterCount += 1;
+  saveGame();
+  updateUI();
+  logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
+});
+
+upgradeArboristBtn.addEventListener("click", () => {
+  const cost = 50;
+  if (state.arboristHired) return;
+  if (state.florinCount < cost) return;
+  state.florinCount -= cost;
+  state.arboristHired = true;
+  saveGame();
+  updateUI();
+  logLine("Hired Arborist (salary 0.2 florins/min).");
+});
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
