@@ -163,6 +163,54 @@ function getEfficientBonusWeight() {
   return bonus;
 }
 
+// --- Pure Function: Compute Harvest Outcome Weights ---
+// Extract weight adjustment logic for testability
+// No DOM, no global state reads - all inputs passed explicitly
+function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActive, upgrades }) {
+  // Calculate deltas
+  let multiplier = arboristIsActive ? 0.5 : 1;
+  if (upgrades.training_program) {
+    multiplier *= 0.5;
+  }
+  const poorWeightDelta = harvesterCount * 0.01 * multiplier;
+  
+  const poorFlatReduction = upgrades.standardized_tools ? 0.08 : 0;
+  const deltaPoor = poorWeightDelta - poorFlatReduction;
+  
+  let efficientBonus = 0;
+  if (arboristIsActive) {
+    efficientBonus += 0.05;
+  }
+  if (upgrades.selective_picking) {
+    efficientBonus += 0.06;
+  }
+  if (upgrades.ladders_nets) {
+    const scaledBonus = Math.min(harvesterCount * 0.01, 0.08);
+    efficientBonus += scaledBonus;
+  }
+  if (upgrades.quality_inspector && arboristIsActive) {
+    efficientBonus += 0.08;
+  }
+  const deltaEff = efficientBonus;
+  
+  // Apply deltas to outcome weights
+  const adjustedOutcomes = outcomes.map(o => {
+    if (o.key === "poor") {
+      return { ...o, weight: Math.max(0, o.weight + deltaPoor) };
+    } else if (o.key === "efficient") {
+      return { ...o, weight: Math.max(0, o.weight + deltaEff) };
+    } else if (o.key === "normal") {
+      // Normal compensates to conserve probability mass
+      return { ...o, weight: Math.max(0, o.weight - deltaPoor - deltaEff) };
+    } else {
+      // interrupted_short and others remain unchanged
+      return { ...o };
+    }
+  });
+  
+  return adjustedOutcomes;
+}
+
 // --- Shipping Config ---
 const shippingConfig = {
   batchSize: 10,
@@ -561,28 +609,12 @@ function startHarvest(opts = {}) {
   const effectiveBatchSize = harvestConfig.batchSize + getHarvesterAttemptBonus();
   const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
-  // Create adjusted outcome weights for harvester mistakes and upgrades
-  // Compute explicit deltas relative to base weights
-  const poorWeightDelta = getHarvesterPoorWeightDelta();
-  const poorFlatReduction = getPoorFlatReductionWeight();
-  const deltaPoor = poorWeightDelta - poorFlatReduction;
-  const deltaEff = getEfficientBonusWeight();
-  
-  const adjustedOutcomes = harvestConfig.outcomes.map(o => {
-    if (o.key === "poor") {
-      // Apply delta to Poor
-      return { ...o, weight: Math.max(0, o.weight + deltaPoor) };
-    } else if (o.key === "efficient") {
-      // Apply delta to Efficient
-      return { ...o, weight: Math.max(0, o.weight + deltaEff) };
-    } else if (o.key === "normal") {
-      // Normal compensates to conserve probability mass
-      // If poor increases by X and efficient by Y, normal must decrease by (X + Y)
-      return { ...o, weight: Math.max(0, o.weight - deltaPoor - deltaEff) };
-    } else {
-      // interrupted_short and others remain unchanged
-      return { ...o };
-    }
+  // Use pure function to compute adjusted outcome weights
+  const adjustedOutcomes = computeHarvestOutcomeWeights({
+    outcomes: harvestConfig.outcomes,
+    harvesterCount: state.harvesterCount,
+    arboristIsActive: arboristIsActive,
+    upgrades: state.upgrades,
   });
   
   // Select outcome with adjusted weights

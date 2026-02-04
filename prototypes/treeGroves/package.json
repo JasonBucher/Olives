@@ -1,0 +1,13 @@
+{
+  "name": "treegroves-prototype",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tree Groves Idle Game Prototype",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^1.2.0"
+  }
+}
