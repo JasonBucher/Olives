@@ -419,6 +419,10 @@ function loadGame() {
     const parsed = JSON.parse(raw);
     // Shallow merge so missing fields get defaults
     state = { ...state, ...parsed, meta: { ...state.meta, ...(parsed.meta || {}) } };
+    
+    // Always refresh tuning-dependent values from TUNING (handles updates to tuning constants)
+    state.treeCapacity = TUNING.grove.treeCapacity;
+    state.treeGrowthPerSec = TUNING.grove.treeGrowthPerSec;
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state.meta.createdAt = new Date().toISOString();

@@ -6,6 +6,11 @@ coverage/
 *.lcov
 .nyc_output/
 
+# Tooling caches (optional)
+.vite/
+.vitest/
+test-results/
+
 # macOS
 .DS_Store
 .AppleDouble
@@ -24,6 +29,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# macOS (zip artifacts)
+__MACOSX/
 
 # Editor directories and files
 .vscode/*
