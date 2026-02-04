@@ -42,3 +42,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+__MACOSX/
+
+# Node
+node_modules/
