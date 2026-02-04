@@ -1,5 +1,7 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
+import { BASE_HARVEST_OUTCOMES, computeHarvestOutcomeWeights } from './harvestWeights.js';
+
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 
@@ -43,12 +45,7 @@ let state = {
 // --- Harvest Config (upgrade-tweakable) ---
 const harvestConfig = {
   batchSize: 10,
-  outcomes: [
-    { key: "interrupted_short", weight: 0.10, durationMs: 2000, collectedPct: 0.30, lostPct: 0.00 },
-    { key: "poor", weight: 0.25, durationMs: 5500, collectedPct: 0.50, lostPct: 0.50 },
-    { key: "normal", weight: 0.55, durationMs: 4500, collectedPct: 0.80, lostPct: 0.20 },
-    { key: "efficient", weight: 0.10, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
-  ],
+  outcomes: BASE_HARVEST_OUTCOMES,
 };
 
 // --- Upgrades Registry ---
@@ -161,54 +158,6 @@ function getEfficientBonusWeight() {
   }
   
   return bonus;
-}
-
-// --- Pure Function: Compute Harvest Outcome Weights ---
-// Extract weight adjustment logic for testability
-// No DOM, no global state reads - all inputs passed explicitly
-function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActive, upgrades }) {
-  // Calculate deltas
-  let multiplier = arboristIsActive ? 0.5 : 1;
-  if (upgrades.training_program) {
-    multiplier *= 0.5;
-  }
-  const poorWeightDelta = harvesterCount * 0.01 * multiplier;
-  
-  const poorFlatReduction = upgrades.standardized_tools ? 0.08 : 0;
-  const deltaPoor = poorWeightDelta - poorFlatReduction;
-  
-  let efficientBonus = 0;
-  if (arboristIsActive) {
-    efficientBonus += 0.05;
-  }
-  if (upgrades.selective_picking) {
-    efficientBonus += 0.06;
-  }
-  if (upgrades.ladders_nets) {
-    const scaledBonus = Math.min(harvesterCount * 0.01, 0.08);
-    efficientBonus += scaledBonus;
-  }
-  if (upgrades.quality_inspector && arboristIsActive) {
-    efficientBonus += 0.08;
-  }
-  const deltaEff = efficientBonus;
-  
-  // Apply deltas to outcome weights
-  const adjustedOutcomes = outcomes.map(o => {
-    if (o.key === "poor") {
-      return { ...o, weight: Math.max(0, o.weight + deltaPoor) };
-    } else if (o.key === "efficient") {
-      return { ...o, weight: Math.max(0, o.weight + deltaEff) };
-    } else if (o.key === "normal") {
-      // Normal compensates to conserve probability mass
-      return { ...o, weight: Math.max(0, o.weight - deltaPoor - deltaEff) };
-    } else {
-      // interrupted_short and others remain unchanged
-      return { ...o };
-    }
-  });
-  
-  return adjustedOutcomes;
 }
 
 // --- Shipping Config ---

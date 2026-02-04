@@ -66,12 +66,26 @@ This runs tests continuously, re-running them whenever you save changes to test 
 ### New Files:
 - **package.json** - Defines test scripts and Vitest dependency
 - **vitest.config.js** - Vitest configuration
-- **test-utils.js** - Exports pure function for testing
+- **static/js/harvestWeights.js** - Shared pure module for harvest weight logic
+- **test-utils.js** - Re-exports shared functions for tests
 - **harvest-weights.test.js** - Unit tests for harvest weight math
 - **.gitignore** - Excludes node_modules and coverage from git
 
 ### Modified Files:
-- **static/js/game.js** - Added `computeHarvestOutcomeWeights()` pure function, refactored `startHarvest()` to use it
+- **static/js/game.js** - Imports and uses shared `computeHarvestOutcomeWeights()` function
+- **index.html** - Loads game.js as ES module (`type="module"`)
+
+## Architecture
+
+The harvest weight calculation logic is now **shared** between the game and tests:
+
+```
+static/js/harvestWeights.js  (source of truth)
+       ↓                ↓
+   game.js          test-utils.js → harvest-weights.test.js
+```
+
+This ensures tests always exercise the **exact same implementation** the game uses, eliminating the risk of false confidence from divergent implementations.
 
 ## Test Coverage
 
@@ -106,9 +120,11 @@ Validate expected behavior:
 
 ## Understanding the Pure Function
 
-The refactored code extracts harvest weight logic into `computeHarvestOutcomeWeights()`:
+The harvest weight logic is now centralized in [static/js/harvestWeights.js](static/js/harvestWeights.js):
 
 ```javascript
+import { BASE_HARVEST_OUTCOMES, computeHarvestOutcomeWeights } from './harvestWeights.js';
+
 computeHarvestOutcomeWeights({ 
   outcomes,        // Base harvest outcomes
   harvesterCount,  // Number of harvesters
@@ -118,22 +134,24 @@ computeHarvestOutcomeWeights({
 ```
 
 **Benefits:**
+- **Single source of truth** - one implementation used by both game and tests
 - No DOM access or global state reads
 - Easy to test in isolation
 - Clear input/output contract
-- Same logic used by game and tests
+- Tests verify the actual game logic, not a copy
 
 ## Development Workflow
 
-1. Make changes to the harvest weight logic in `test-utils.js`
-2. Update the same logic in `game.js` (keep them in sync)
-3. Run `npm run test:watch` to see if tests pass
-4. Add new tests for new scenarios
-5. Game remains playable as a static prototype (tests are dev-only)
+1. Edit harvest weight logic in **static/js/harvestWeights.js** (single source of truth)
+2. Run `npm run test:watch` to see if tests pass
+3. Add new tests for new scenarios in **harvest-weights.test.js**
+4. Both game and tests automatically use the updated logic
+5. Game remains playable as a static prototype (ES modules work natively in modern browsers)
 
 ## Notes
 
 - Tests run in Node.js environment (no browser needed)
-- The game itself still runs as a static HTML page
-- No bundler or build step required for the game
-- Tests use the same logic as the game through the exported pure function
+- The game runs as ES modules in the browser (no bundler required)
+- Modern browsers natively support ES modules with `type="module"`
+- Tests use the same logic as the game through the shared module
+- **No risk of test/game divergence** - both import from harvestWeights.js
