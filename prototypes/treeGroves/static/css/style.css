@@ -24,8 +24,8 @@
 
 * { box-sizing: border-box; }
 
-.hidden {
-  display: none;
+[hidden] {
+  display: none !important;
 }
 
 html, body {
@@ -95,13 +95,6 @@ h1 {
   padding: var(--pad);
 }
 
-.section-active {
-  background: rgba(43, 108, 255, 0.04);
-  border: 1px solid rgba(43, 108, 255, 0.15);
-  padding: 13px;
-  box-shadow: 0 2px 8px rgba(43, 108, 255, 0.08);
-}
-
 .section-locked {
   opacity: 0.5;
   background: rgba(21, 25, 35, 0.6);
@@ -121,31 +114,6 @@ h1 {
 
 .col .section + .section {
   margin-top: 8px;
-}
-
-.capital-row {
-  margin-bottom: 12px;
-}
-
-.capital-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.florin-display {
-  text-align: center;
-  padding: 16px 0;
-  font-family: var(--mono);
-  font-size: 34px;
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: -0.02em;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--divider);
-  border-radius: 8px;
 }
 
 .section-title {
@@ -242,61 +210,8 @@ h1 {
   flex-wrap: wrap;
 }
 
-.progress-container {
-  width: 100%;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--divider);
-  border-radius: 6px;
-  margin-top: 8px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-bar {
-  height: 100%;
-  background: var(--primary);
-  width: 0%;
-  transition: width 0.2s linear;
-}
-
-.countdown {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-weight: 500;
-  z-index: 1;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-
-.status-text {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--muted);
-  font-style: italic;
-  min-height: 18px;
-}
-
-.col .section + .section {
-  margin-top: 8px;
-}
-
 .market-log-compact {
   max-height: 150px;
-}
-
-.footer {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .btn {
@@ -400,6 +315,26 @@ h1 {
   line-height: 1.4;
 }
 
+.u-text-12 {
+  font-size: 12px;
+}
+
+.u-text-13 {
+  font-size: 13px;
+}
+
+.u-pad-top-4 {
+  padding-top: 4px;
+}
+
+.u-pad-y-4 {
+  padding: 4px 0;
+}
+
+.u-pad-y-7 {
+  padding: 7px 0;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -450,11 +385,6 @@ h1 {
 .inventory-list {
   display: grid;
   gap: 10px;
-}
-
-.section-header {
-  font-weight: 600;
-  letter-spacing: 0.02em;
 }
 
 .inventory-row {
@@ -522,7 +452,7 @@ h1 {
   transition: opacity 0.15s ease;
 }
 
-.pill--invisible {
+.is-invisible {
   opacity: 0;
   visibility: hidden;  /* keeps layout space */
   pointer-events: none;
@@ -554,7 +484,7 @@ h1 {
   position: relative;
 }
 
-.ship-countdown {
+.action-countdown {
   position: absolute;
   top: 0;
   left: 0;
