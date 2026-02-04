@@ -203,6 +203,15 @@ h1 {
   font-size: 14px;
 }
 
+.u-label-compact {
+  color: var(--text);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transform: translateY(-1px);
+}
+
 .actions {
   margin-top: 8px;
   display: flex;
@@ -313,6 +322,26 @@ h1 {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.u-text-12 {
+  font-size: 12px;
+}
+
+.u-text-13 {
+  font-size: 13px;
+}
+
+.u-pad-top-4 {
+  padding-top: 4px;
+}
+
+.u-pad-y-4 {
+  padding: 4px 0;
+}
+
+.u-pad-y-7 {
+  padding: 7px 0;
 }
 
 /* Modal */
