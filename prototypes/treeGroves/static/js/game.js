@@ -8,6 +8,11 @@ const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 let isResetting = false;
 let mainLoopInterval = null;
 
+// --- Pause state ---
+// Pauses simulation completely when tab loses focus
+let isSimPaused = false;
+let pausedAtMs = 0;
+
 // --- Game State ---
 let state = {
   // Grove mechanics
@@ -734,8 +739,46 @@ function runMarketTick() {
   }
 }
 
+// --- Pause/Resume Logic ---
+function pauseSim() {
+  if (isSimPaused) return;
+  isSimPaused = true;
+  pausedAtMs = Date.now();
+  
+  // Stop the main loop
+  if (mainLoopInterval) {
+    clearInterval(mainLoopInterval);
+    mainLoopInterval = null;
+  }
+}
+
+function resumeSim() {
+  if (!isSimPaused) return;
+  
+  const pauseDuration = Date.now() - pausedAtMs;
+  
+  // Shift active job timers forward by pause duration
+  // so they don't "catch up" for time spent paused
+  if (isHarvesting && harvestJob.startTimeMs) {
+    harvestJob.startTimeMs += pauseDuration;
+  }
+  
+  if (isShipping && shipJob.startTimeMs) {
+    shipJob.startTimeMs += pauseDuration;
+  }
+  
+  isSimPaused = false;
+  pausedAtMs = 0;
+  
+  // Restart the loop
+  startLoop();
+}
+
 // --- Main Loop ---
 function startLoop() {
+  // Prevent multiple intervals
+  if (mainLoopInterval) return;
+  
   const tickMs = 200;
 
   let last = Date.now();
@@ -848,6 +891,24 @@ debugAddOilBtn.addEventListener("click", () => {
 // Close modal on outside click
 debugModal.addEventListener("click", (e) => {
   if (e.target === debugModal) closeDebug();
+});
+
+// --- Visibility/Focus Event Listeners ---
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    pauseSim();
+  } else {
+    resumeSim();
+  }
+});
+
+window.addEventListener("blur", () => {
+  pauseSim();
+});
+
+window.addEventListener("focus", () => {
+  if (document.hidden) return; // Let visibilitychange handle it
+  resumeSim();
 });
 
 // --- Init ---
