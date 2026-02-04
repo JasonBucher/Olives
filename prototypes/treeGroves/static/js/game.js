@@ -562,21 +562,25 @@ function startHarvest(opts = {}) {
   const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
   // Create adjusted outcome weights for harvester mistakes and upgrades
+  // Compute explicit deltas relative to base weights
   const poorWeightDelta = getHarvesterPoorWeightDelta();
   const poorFlatReduction = getPoorFlatReductionWeight();
-  const efficientWeightBonus = getEfficientBonusWeight();
+  const deltaPoor = poorWeightDelta - poorFlatReduction;
+  const deltaEff = getEfficientBonusWeight();
   
   const adjustedOutcomes = harvestConfig.outcomes.map(o => {
     if (o.key === "poor") {
-      // Harvesters increase Poor, but upgrades reduce it
-      return { ...o, weight: Math.max(0, o.weight + poorWeightDelta - poorFlatReduction) };
+      // Apply delta to Poor
+      return { ...o, weight: Math.max(0, o.weight + deltaPoor) };
     } else if (o.key === "efficient") {
-      return { ...o, weight: o.weight + efficientWeightBonus };
+      // Apply delta to Efficient
+      return { ...o, weight: Math.max(0, o.weight + deltaEff) };
     } else if (o.key === "normal") {
-      // Normal compensates for both poor and efficient changes
-      const normalAdjustment = poorWeightDelta - poorFlatReduction - efficientWeightBonus;
-      return { ...o, weight: Math.max(0, o.weight + normalAdjustment) };
+      // Normal compensates to conserve probability mass
+      // If poor increases by X and efficient by Y, normal must decrease by (X + Y)
+      return { ...o, weight: Math.max(0, o.weight - deltaPoor - deltaEff) };
     } else {
+      // interrupted_short and others remain unchanged
       return { ...o };
     }
   });
