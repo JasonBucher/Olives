@@ -17,34 +17,55 @@ let pausedAtMs = 0;
 
 // --- Tuning Constants ---
 // Centralized location for all game balance values
+// Organized by domain for scalability as we add processors and goods
 const TUNING = {
-  // Grove
-  treeCapacity: 25,
-  treeGrowthPerSec: 1.0,
+  // Grove: tree growth and capacity
+  grove: {
+    treeCapacity: 25,
+    treeGrowthPerSec: 1.0,
+  },
   
-  // Harvesters
-  harvesterBaseCost: 10,
-  harvesterCostPerHired: 5,
-  harvesterAttemptBonus_1to5: 1,    // +1 per harvester for first 5
-  harvesterAttemptBonus_6to10: 0.5, // +0.5 per harvester for 6-10
-  harvesterAttemptBonus_11plus: 0.25, // +0.25 per harvester for 11+
-  harvesterDurationReductionPct: 0.04, // 4% per harvester
-  harvesterDurationReductionCap: 0.25, // Max 25% reduction
+  // Harvest: batch sizes, outcome probabilities, and modifiers
+  harvest: {
+    baseBatchSize: 10,
+  },
   
-  // Arborist
-  arboristCost: 50,
+  // Workers: hiring costs and production effects
+  workers: {
+    harvester: {
+      baseCost: 10,
+      costScale: 5,              // Cost increase per harvester hired
+      attemptBonusTiers: {       // Harvest batch size bonuses by count
+        tier1: { max: 5, bonus: 1 },     // First 5: +1 each
+        tier2: { max: 10, bonus: 0.5 },  // 6-10: +0.5 each
+        tier3: { bonus: 0.25 },          // 11+: +0.25 each
+      },
+      durationReductionPct: 0.04, // 4% speed per harvester
+      durationReductionCap: 0.25,  // Max 25% total speed boost
+    },
+  },
   
-  // Market
-  marketTickSeconds: 12,
-  olivePriceFlorins: 1,
+  // Managers: hiring costs, salaries, and supervision effects
+  managers: {
+    arborist: {
+      hireCost: 50,
+      salaryPerMin: 0.2,         // Florins per minute
+    },
+  },
+  
+  // Market: timing and pricing
+  market: {
+    tickSeconds: 12,
+    olivePriceFlorins: 1,
+  },
 };
 
 // --- Game State ---
 let state = {
   // Grove mechanics
   treeOlives: 0,
-  treeCapacity: TUNING.treeCapacity,
-  treeGrowthPerSec: TUNING.treeGrowthPerSec,
+  treeCapacity: TUNING.grove.treeCapacity,
+  treeGrowthPerSec: TUNING.grove.treeGrowthPerSec,
   
   // Player inventory
   harvestedOlives: 0,
@@ -68,7 +89,7 @@ let state = {
 
 // --- Harvest Config (upgrade-tweakable) ---
 const harvestConfig = {
-  batchSize: 10,
+  batchSize: TUNING.harvest.baseBatchSize,
   outcomes: BASE_HARVEST_OUTCOMES,
 };
 
@@ -113,7 +134,7 @@ const UPGRADES = [
 
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
-  return TUNING.harvesterBaseCost + (state.harvesterCount * TUNING.harvesterCostPerHired);
+  return TUNING.workers.harvester.baseCost + (state.harvesterCount * TUNING.workers.harvester.costScale);
 }
 
 // --- Harvester Effects ---
@@ -121,21 +142,24 @@ function getHarvesterAttemptBonus() {
   const count = state.harvesterCount;
   if (count === 0) return 0;
   
+  const tiers = TUNING.workers.harvester.attemptBonusTiers;
   let bonus = 0;
-  // 1-5: from TUNING
-  bonus += Math.min(count, 5) * TUNING.harvesterAttemptBonus_1to5;
-  // 6-10: from TUNING
-  if (count > 5) bonus += Math.min(count - 5, 5) * TUNING.harvesterAttemptBonus_6to10;
-  // 11+: from TUNING
-  if (count > 10) bonus += (count - 10) * TUNING.harvesterAttemptBonus_11plus;
+  // Tier 1: 1-5
+  bonus += Math.min(count, tiers.tier1.max) * tiers.tier1.bonus;
+  // Tier 2: 6-10
+  if (count > tiers.tier1.max) {
+    bonus += Math.min(count - tiers.tier1.max, tiers.tier2.max - tiers.tier1.max) * tiers.tier2.bonus;
+  }
+  // Tier 3: 11+
+  if (count > tiers.tier2.max) bonus += (count - tiers.tier2.max) * tiers.tier3.bonus;
   
   return Math.floor(bonus);
 }
 
 function getHarvesterDurationMultiplier() {
   const reductionPct = Math.min(
-    state.harvesterCount * TUNING.harvesterDurationReductionPct,
-    TUNING.harvesterDurationReductionCap
+    state.harvesterCount * TUNING.workers.harvester.durationReductionPct,
+    TUNING.workers.harvester.durationReductionCap
   );
   return 1 - reductionPct;
 }
@@ -158,8 +182,8 @@ const shippingConfig = {
 
 // --- Market Config ---
 const marketConfig = {
-  tickSeconds: TUNING.marketTickSeconds,
-  olivePriceFlorins: TUNING.olivePriceFlorins,
+  tickSeconds: TUNING.market.tickSeconds,
+  olivePriceFlorins: TUNING.market.olivePriceFlorins,
   buyerOutcomes: [
     { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
     { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
@@ -493,7 +517,7 @@ function updateUI() {
     upgradeArborist.hidden = true;
   } else {
     upgradeArborist.hidden = false;
-    upgradeArboristBtn.disabled = state.florinCount < TUNING.arboristCost;
+    upgradeArboristBtn.disabled = state.florinCount < TUNING.managers.arborist.hireCost;
   }
   
   // Update upgrade button states (not full re-render)
@@ -927,7 +951,7 @@ function startLoop() {
 
     // Arborist salary drain
     if (state.arboristHired) {
-      const salaryPerSec = 0.2 / 60;
+      const salaryPerSec = TUNING.managers.arborist.salaryPerMin / 60;
       const costThisTick = salaryPerSec * dt;
       if (state.florinCount >= costThisTick) {
         state.florinCount -= costThisTick;
@@ -993,14 +1017,14 @@ hireHarvesterBtn.addEventListener("click", () => {
 });
 
 upgradeArboristBtn.addEventListener("click", () => {
-  const cost = TUNING.arboristCost;
+  const cost = TUNING.managers.arborist.hireCost;
   if (state.arboristHired) return;
   if (state.florinCount < cost) return;
   state.florinCount -= cost;
   state.arboristHired = true;
   saveGame();
   updateUI();
-  logLine("Hired Arborist (salary 0.2 florins/min).");
+  logLine(`Hired Arborist (salary ${TUNING.managers.arborist.salaryPerMin} florins/min).`);
 });
 
 debugBtn.addEventListener("click", openDebug);
