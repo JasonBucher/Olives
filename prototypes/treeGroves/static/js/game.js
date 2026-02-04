@@ -164,6 +164,10 @@ const shipOlivesBtn = document.getElementById("ship-olives-btn");
 const harvesterCountEl = document.getElementById("harvester-count");
 const hireHarvesterBtn = document.getElementById("hire-harvester-btn");
 const hireHarvesterCostEl = document.getElementById("hire-harvester-cost");
+const harvesterImpactEl = document.getElementById("harvester-impact");
+const harvesterBadgeManager = document.getElementById("harvester-badge-manager");
+const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
+const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
 
 const arboristStatusEl = document.getElementById("arborist-status");
 const upgradeArboristBtn = document.getElementById("upgrade-arborist-btn");
@@ -378,10 +382,37 @@ function updateUI() {
   }
 
   // Update harvester UI
-  harvesterCountEl.textContent = state.harvesterCount;
+  harvesterCountEl.textContent = `x${state.harvesterCount}`;
   const harvesterCost = getHarvesterHireCost();
-  hireHarvesterCostEl.textContent = `Cost: ${harvesterCost} florins`;
+  hireHarvesterCostEl.textContent = harvesterCost;
   hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
+  
+  // Update harvester impact (show harvest rate bonus)
+  if (state.harvesterCount > 0) {
+    const attemptBonus = getHarvesterAttemptBonus();
+    const speedBonus = Math.round((1 - getHarvesterDurationMultiplier()) * 100);
+    harvesterImpactEl.textContent = `+${attemptBonus} olives / harvest`;
+  } else {
+    harvesterImpactEl.textContent = "—";
+  }
+  
+  // Update badges
+  // Badge slot 1: Manager coverage
+  if (arboristIsActive) {
+    harvesterBadgeManager.textContent = "Mgr";
+    harvesterBadgeManager.style.visibility = "visible";
+  } else {
+    harvesterBadgeManager.textContent = "";
+    harvesterBadgeManager.style.visibility = "hidden";
+  }
+  
+  // Badge slot 2: Status modifier (for future use - Auto/Idle/etc)
+  harvesterBadgeStatus.textContent = "";
+  harvesterBadgeStatus.style.visibility = "hidden";
+  
+  // Badge slot 3: Extra modifier (for future use)
+  harvesterBadgeExtra.textContent = "";
+  harvesterBadgeExtra.style.visibility = "hidden";
 
   // Toggle Managers section
   if (state.arboristHired) {
@@ -644,7 +675,7 @@ function updateShipProgress() {
   
   // Update progress bar and countdown
   const progressPct = Math.floor(progress * 100);
-  setShipUIActive(progressPct, Math.ceil(remaining) + "s");
+  setShipUIActive(progressPct, remaining.toFixed(2) + "s");
   
   if (elapsed >= shipJob.durationMs) {
     completeShipping();

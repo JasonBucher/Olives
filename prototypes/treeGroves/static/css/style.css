@@ -509,3 +509,104 @@ h1 {
   background: var(--primary, #3b82f6);
   transition: width 0.18s linear;
 }
+/* --- Worker Row (Compact Horizontal Layout) --- */
+
+.worker-list {
+  display: grid;
+  gap: 10px;
+}
+
+.worker-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(100px, auto) minmax(80px, auto) 80px auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+}
+
+.worker-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.worker-name {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.worker-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.worker-middle {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.worker-impact {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.worker-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 80px;
+  min-height: 20px;
+}
+
+.worker-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.worker-badge:empty {
+  /* Keep space reserved but invisible */
+  visibility: hidden;
+  width: 0;
+  padding: 0;
+}
+
+.worker-badge--manager {
+  background: rgba(43, 108, 255, 0.2);
+  color: #6b9fff;
+  border: 1px solid rgba(43, 108, 255, 0.3);
+}
+
+.worker-badge--status {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.worker-badge--extra {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.worker-hire-btn {
+  justify-self: end;
+  min-width: 90px;
+  white-space: nowrap;
+}

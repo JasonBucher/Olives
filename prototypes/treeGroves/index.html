@@ -67,26 +67,13 @@
           </section>
 
           <section class="section">
-            <div class="section-title">Upgrades</div>
+            <div class="section-title">Investments</div>
             
             <div class="subsection">
               <div class="upgrade-list">
                 <div id="upgrade-arborist">
                   <button id="upgrade-arborist-btn" class="upgrade-pill" type="button">Hire an Arborist for 50 florins</button>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="section section-locked">
-            <div class="section-title">Investments <span class="badge locked-badge">Locked</span></div>
-            
-            <div class="subsection">
-              <div class="placeholder-item locked">
-                <span class="item-name">Upgrade Olive Press</span>
-              </div>
-              <div class="placeholder-item locked">
-                <span class="item-name">Expand Grove</span>
               </div>
             </div>
           </section>
@@ -160,17 +147,29 @@
             <div class="section-title">Workers</div>
             
             <div class="subsection">
-              <div class="row">
-                <div class="label">Harvesters</div>
-                <div class="value"><span id="harvester-count">0</span></div>
+              <div class="worker-list">
+                <!-- Worker rows will be rendered here by JS -->
+                <div class="worker-row" id="worker-harvester-row">
+                  <div class="worker-left">
+                    <span class="worker-name">Harvester</span>
+                    <span class="worker-count" id="harvester-count">x0</span>
+                  </div>
+                  
+                  <div class="worker-middle">
+                    <span class="worker-impact" id="harvester-impact">—</span>
+                  </div>
+                  
+                  <div class="worker-badges">
+                    <span class="worker-badge worker-badge--manager" id="harvester-badge-manager"></span>
+                    <span class="worker-badge worker-badge--status" id="harvester-badge-status"></span>
+                    <span class="worker-badge worker-badge--extra" id="harvester-badge-extra"></span>
+                  </div>
+                  
+                  <button id="hire-harvester-btn" class="btn btn-primary worker-hire-btn" type="button">
+                    Hire (<span id="hire-harvester-cost">25</span>)
+                  </button>
+                </div>
               </div>
-
-              <div class="muted worker-description">Improves harvest haul and speed; can increase mistakes without supervision.</div>
-
-              <div class="actions">
-                <button id="hire-harvester-btn" class="btn btn-primary" type="button">Hire Harvester</button>
-              </div>
-              <div class="muted" id="hire-harvester-cost">Cost: 0 florins</div>
             </div>
           </section>
 
