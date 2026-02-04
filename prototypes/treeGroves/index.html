@@ -62,6 +62,7 @@
                   <div class="value"><span id="arborist-status">Not hired</span></div>
                 </div>
                 <div class="muted u-text-12 u-pad-top-4" id="arborist-salary">Salary: 0.2 florins / min</div>
+                <div class="muted u-text-11 u-pad-top-4">When active: reduces harvester mistakes, boosts Efficient outcomes, and auto-harvests at capacity.</div>
               </div>
             </div>
           </section>
@@ -74,6 +75,9 @@
                 <div id="upgrade-arborist">
                   <button id="upgrade-arborist-btn" class="upgrade-pill" type="button">Hire an Arborist for 50 florins</button>
                 </div>
+                
+                <!-- Upgrades rendered dynamically here -->
+                <div id="upgrades-container"></div>
               </div>
             </div>
           </section>
@@ -168,6 +172,10 @@
                   <button id="hire-harvester-btn" class="btn btn-primary worker-hire-btn" type="button">
                     Hire (<span id="hire-harvester-cost">25</span>)
                   </button>
+                </div>
+                
+                <div class="worker-note muted u-text-11 u-pad-top-6">
+                  Improves harvest haul and speed, but more harvesters increase Poor harvest chance. Arborist supervision helps mitigate mistakes.
                 </div>
               </div>
             </div>

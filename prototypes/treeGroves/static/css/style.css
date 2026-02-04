@@ -288,6 +288,20 @@ h1 {
   cursor: not-allowed;
 }
 
+.upgrade-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upgrade-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.3;
+  padding: 0 8px 4px;
+  text-align: center;
+}
+
 .divider {
   border: 0;
   border-top: 1px solid var(--divider);
@@ -319,12 +333,20 @@ h1 {
   font-size: 12px;
 }
 
+.u-text-11 {
+  font-size: 11px;
+}
+
 .u-text-13 {
   font-size: 13px;
 }
 
 .u-pad-top-4 {
   padding-top: 4px;
+}
+
+.u-pad-top-6 {
+  padding-top: 6px;
 }
 
 .u-pad-y-4 {
@@ -609,4 +631,7 @@ h1 {
   justify-self: end;
   min-width: 90px;
   white-space: nowrap;
+}.worker-note {
+  margin-top: 8px;
+  line-height: 1.35;
 }

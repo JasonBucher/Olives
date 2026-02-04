@@ -30,6 +30,9 @@ let state = {
   harvesterCount: 0,
   arboristHired: false,
 
+  // Upgrades
+  upgrades: {},
+
   // For future expansion
   meta: {
     createdAt: null,
@@ -47,6 +50,45 @@ const harvestConfig = {
     { key: "efficient", weight: 0.10, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
   ],
 };
+
+// --- Upgrades Registry ---
+const UPGRADES = [
+  {
+    id: "standardized_tools",
+    title: "Standardized Tools",
+    desc: "Quality tools reduce Poor harvests.",
+    cost: 75,
+    prereqs: [],
+  },
+  {
+    id: "training_program",
+    title: "Training Program",
+    desc: "Trained harvesters make fewer mistakes.",
+    cost: 150,
+    prereqs: [],
+  },
+  {
+    id: "selective_picking",
+    title: "Selective Picking",
+    desc: "Better technique improves Efficient harvests.",
+    cost: 200,
+    prereqs: [],
+  },
+  {
+    id: "ladders_nets",
+    title: "Ladders & Nets",
+    desc: "Equipment scales efficiency with team size.",
+    cost: 300,
+    prereqs: [],
+  },
+  {
+    id: "quality_inspector",
+    title: "Quality Inspector",
+    desc: "Expert oversight maximizes Arborist benefits.",
+    cost: 500,
+    prereqs: ["arborist"],
+  },
+];
 
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
@@ -78,8 +120,47 @@ function getHarvesterDurationMultiplier() {
 
 function getHarvesterPoorWeightDelta() {
   // +0.01 per harvester, reduced by 50% if arborist is active
-  const multiplier = arboristIsActive ? 0.5 : 1;
+  let multiplier = arboristIsActive ? 0.5 : 1;
+  
+  // training_program reduces the per-harvester poor delta
+  if (state.upgrades.training_program) {
+    multiplier *= 0.5;
+  }
+  
   return state.harvesterCount * 0.01 * multiplier;
+}
+
+// --- Upgrade Effect Helpers ---
+function getPoorFlatReductionWeight() {
+  // standardized_tools reduces Poor weight by flat amount
+  return state.upgrades.standardized_tools ? 0.08 : 0;
+}
+
+function getEfficientBonusWeight() {
+  let bonus = 0;
+  
+  // Arborist base bonus
+  if (arboristIsActive) {
+    bonus += 0.05;
+  }
+  
+  // selective_picking adds flat Efficient bonus
+  if (state.upgrades.selective_picking) {
+    bonus += 0.06;
+  }
+  
+  // ladders_nets adds Efficient bonus scaling with harvesters (capped)
+  if (state.upgrades.ladders_nets) {
+    const scaledBonus = Math.min(state.harvesterCount * 0.01, 0.08);
+    bonus += scaledBonus;
+  }
+  
+  // quality_inspector amplifies Arborist benefits
+  if (state.upgrades.quality_inspector && arboristIsActive) {
+    bonus += 0.08;
+  }
+  
+  return bonus;
 }
 
 // --- Shipping Config ---
@@ -437,6 +518,9 @@ function updateUI() {
     upgradeArborist.hidden = false;
     upgradeArboristBtn.disabled = state.florinCount < 50;
   }
+  
+  // Update upgrade button states (not full re-render)
+  updateUpgradeButtons();
 
   // Toggle Production section visibility
   if (productionSection) {
@@ -477,18 +561,21 @@ function startHarvest(opts = {}) {
   const effectiveBatchSize = harvestConfig.batchSize + getHarvesterAttemptBonus();
   const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
-  // Create adjusted outcome weights for harvester mistakes and arborist bonuses
+  // Create adjusted outcome weights for harvester mistakes and upgrades
   const poorWeightDelta = getHarvesterPoorWeightDelta();
-  const efficientWeightBonus = arboristIsActive ? 0.05 : 0;
+  const poorFlatReduction = getPoorFlatReductionWeight();
+  const efficientWeightBonus = getEfficientBonusWeight();
   
   const adjustedOutcomes = harvestConfig.outcomes.map(o => {
     if (o.key === "poor") {
-      return { ...o, weight: o.weight + poorWeightDelta };
+      // Harvesters increase Poor, but upgrades reduce it
+      return { ...o, weight: Math.max(0, o.weight + poorWeightDelta - poorFlatReduction) };
     } else if (o.key === "efficient") {
       return { ...o, weight: o.weight + efficientWeightBonus };
     } else if (o.key === "normal") {
-      // Reduce normal weight to compensate for both poor increase and efficient increase
-      return { ...o, weight: Math.max(0, o.weight - poorWeightDelta - efficientWeightBonus) };
+      // Normal compensates for both poor and efficient changes
+      const normalAdjustment = poorWeightDelta - poorFlatReduction - efficientWeightBonus;
+      return { ...o, weight: Math.max(0, o.weight + normalAdjustment) };
     } else {
       return { ...o };
     }
@@ -739,6 +826,92 @@ function runMarketTick() {
   }
 }
 
+// --- Upgrade System ---
+function canBuyUpgrade(id) {
+  const upgrade = UPGRADES.find(u => u.id === id);
+  if (!upgrade) return false;
+  
+  // Already owned
+  if (state.upgrades[id]) return false;
+  
+  // Can't afford
+  if (state.florinCount < upgrade.cost) return false;
+  
+  // Check prerequisites
+  for (const prereq of upgrade.prereqs) {
+    if (prereq === "arborist" && !state.arboristHired) return false;
+    if (prereq !== "arborist" && !state.upgrades[prereq]) return false;
+  }
+  
+  return true;
+}
+
+function buyUpgrade(id) {
+  if (!canBuyUpgrade(id)) return false;
+  
+  const upgrade = UPGRADES.find(u => u.id === id);
+  state.florinCount -= upgrade.cost;
+  state.upgrades[id] = true;
+  
+  saveGame();
+  updateUI();
+  logLine(`Purchased upgrade: ${upgrade.title}`);
+  return true;
+}
+
+function initUpgrades() {
+  const container = document.getElementById("upgrades-container");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  UPGRADES.forEach(upgrade => {
+    const div = document.createElement("div");
+    div.className = "upgrade-item";
+    div.id = `upgrade-${upgrade.id}-item`;
+    
+    const btn = document.createElement("button");
+    btn.className = "upgrade-pill";
+    btn.type = "button";
+    btn.id = `upgrade-${upgrade.id}-btn`;
+    btn.textContent = `${upgrade.title} — ${upgrade.cost} florins`;
+    
+    // Add click handler
+    btn.addEventListener("click", () => {
+      buyUpgrade(upgrade.id);
+    });
+    
+    div.appendChild(btn);
+    
+    // Add description below button
+    const desc = document.createElement("div");
+    desc.className = "upgrade-desc";
+    desc.textContent = upgrade.desc;
+    div.appendChild(desc);
+    
+    container.appendChild(div);
+  });
+}
+
+function updateUpgradeButtons() {
+  UPGRADES.forEach(upgrade => {
+    const item = document.getElementById(`upgrade-${upgrade.id}-item`);
+    const btn = document.getElementById(`upgrade-${upgrade.id}-btn`);
+    
+    if (!item || !btn) return;
+    
+    // Hide if already owned
+    if (state.upgrades[upgrade.id]) {
+      item.style.display = "none";
+      return;
+    }
+    
+    // Show and update disabled state
+    item.style.display = "";
+    btn.disabled = !canBuyUpgrade(upgrade.id);
+  });
+}
+
 // --- Pause/Resume Logic ---
 function pauseSim() {
   if (isSimPaused) return;
@@ -913,6 +1086,7 @@ window.addEventListener("focus", () => {
 
 // --- Init ---
 loadGame();
+initUpgrades();
 updateUI();
 setShipUIIdle();
 startLoop();
