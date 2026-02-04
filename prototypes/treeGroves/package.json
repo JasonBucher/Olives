@@ -5,7 +5,8 @@
   "description": "Tree Groves Idle Game Prototype",
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "serve": "python3 -m http.server 8000"
   },
   "devDependencies": {
     "vitest": "^1.2.0"
