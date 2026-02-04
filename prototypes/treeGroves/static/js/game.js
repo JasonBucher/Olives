@@ -15,12 +15,36 @@ let mainLoopInterval = null;
 let isSimPaused = false;
 let pausedAtMs = 0;
 
+// --- Tuning Constants ---
+// Centralized location for all game balance values
+const TUNING = {
+  // Grove
+  treeCapacity: 25,
+  treeGrowthPerSec: 1.0,
+  
+  // Harvesters
+  harvesterBaseCost: 10,
+  harvesterCostPerHired: 5,
+  harvesterAttemptBonus_1to5: 1,    // +1 per harvester for first 5
+  harvesterAttemptBonus_6to10: 0.5, // +0.5 per harvester for 6-10
+  harvesterAttemptBonus_11plus: 0.25, // +0.25 per harvester for 11+
+  harvesterDurationReductionPct: 0.04, // 4% per harvester
+  harvesterDurationReductionCap: 0.25, // Max 25% reduction
+  
+  // Arborist
+  arboristCost: 50,
+  
+  // Market
+  marketTickSeconds: 12,
+  olivePriceFlorins: 1,
+};
+
 // --- Game State ---
 let state = {
   // Grove mechanics
   treeOlives: 0,
-  treeCapacity: 25,
-  treeGrowthPerSec: 1.0,
+  treeCapacity: TUNING.treeCapacity,
+  treeGrowthPerSec: TUNING.treeGrowthPerSec,
   
   // Player inventory
   harvestedOlives: 0,
@@ -89,8 +113,7 @@ const UPGRADES = [
 
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
-  // Escalating linear cost (tweakable later)
-  return 10 + (state.harvesterCount * 5);
+  return TUNING.harvesterBaseCost + (state.harvesterCount * TUNING.harvesterCostPerHired);
 }
 
 // --- Harvester Effects ---
@@ -99,65 +122,22 @@ function getHarvesterAttemptBonus() {
   if (count === 0) return 0;
   
   let bonus = 0;
-  // 1-5: +1 each
-  bonus += Math.min(count, 5) * 1;
-  // 6-10: +0.5 each
-  if (count > 5) bonus += Math.min(count - 5, 5) * 0.5;
-  // 11+: +0.25 each
-  if (count > 10) bonus += (count - 10) * 0.25;
+  // 1-5: from TUNING
+  bonus += Math.min(count, 5) * TUNING.harvesterAttemptBonus_1to5;
+  // 6-10: from TUNING
+  if (count > 5) bonus += Math.min(count - 5, 5) * TUNING.harvesterAttemptBonus_6to10;
+  // 11+: from TUNING
+  if (count > 10) bonus += (count - 10) * TUNING.harvesterAttemptBonus_11plus;
   
   return Math.floor(bonus);
 }
 
 function getHarvesterDurationMultiplier() {
-  // Each harvester reduces duration by 4%, capped at 25% total reduction
-  const reductionPct = Math.min(state.harvesterCount * 0.04, 0.25);
+  const reductionPct = Math.min(
+    state.harvesterCount * TUNING.harvesterDurationReductionPct,
+    TUNING.harvesterDurationReductionCap
+  );
   return 1 - reductionPct;
-}
-
-function getHarvesterPoorWeightDelta() {
-  // +0.01 per harvester, reduced by 50% if arborist is active
-  let multiplier = arboristIsActive ? 0.5 : 1;
-  
-  // training_program reduces the per-harvester poor delta
-  if (state.upgrades.training_program) {
-    multiplier *= 0.5;
-  }
-  
-  return state.harvesterCount * 0.01 * multiplier;
-}
-
-// --- Upgrade Effect Helpers ---
-function getPoorFlatReductionWeight() {
-  // standardized_tools reduces Poor weight by flat amount
-  return state.upgrades.standardized_tools ? 0.08 : 0;
-}
-
-function getEfficientBonusWeight() {
-  let bonus = 0;
-  
-  // Arborist base bonus
-  if (arboristIsActive) {
-    bonus += 0.05;
-  }
-  
-  // selective_picking adds flat Efficient bonus
-  if (state.upgrades.selective_picking) {
-    bonus += 0.06;
-  }
-  
-  // ladders_nets adds Efficient bonus scaling with harvesters (capped)
-  if (state.upgrades.ladders_nets) {
-    const scaledBonus = Math.min(state.harvesterCount * 0.01, 0.08);
-    bonus += scaledBonus;
-  }
-  
-  // quality_inspector amplifies Arborist benefits
-  if (state.upgrades.quality_inspector && arboristIsActive) {
-    bonus += 0.08;
-  }
-  
-  return bonus;
 }
 
 // --- Shipping Config ---
@@ -178,8 +158,8 @@ const shippingConfig = {
 
 // --- Market Config ---
 const marketConfig = {
-  tickSeconds: 12,
-  olivePriceFlorins: 1,
+  tickSeconds: TUNING.marketTickSeconds,
+  olivePriceFlorins: TUNING.olivePriceFlorins,
   buyerOutcomes: [
     { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
     { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
@@ -513,7 +493,7 @@ function updateUI() {
     upgradeArborist.hidden = true;
   } else {
     upgradeArborist.hidden = false;
-    upgradeArboristBtn.disabled = state.florinCount < 50;
+    upgradeArboristBtn.disabled = state.florinCount < TUNING.arboristCost;
   }
   
   // Update upgrade button states (not full re-render)
@@ -1013,7 +993,7 @@ hireHarvesterBtn.addEventListener("click", () => {
 });
 
 upgradeArboristBtn.addEventListener("click", () => {
-  const cost = 50;
+  const cost = TUNING.arboristCost;
   if (state.arboristHired) return;
   if (state.florinCount < cost) return;
   state.florinCount -= cost;
