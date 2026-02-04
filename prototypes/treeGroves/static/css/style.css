@@ -203,15 +203,6 @@ h1 {
   font-size: 14px;
 }
 
-.u-label-compact {
-  color: var(--text);
-  letter-spacing: 0.02em;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  transform: translateY(-1px);
-}
-
 .actions {
   margin-top: 8px;
   display: flex;
