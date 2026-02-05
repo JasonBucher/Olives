@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { computeHarvestOutcomeWeights, TUNING } from './test-utils.js';
+import { computeHarvestOutcomeChances, TUNING } from './test-utils.js';
 
 /**
  * Unit tests for harvester hire preview calculations
  * 
- * These tests ensure the preview computation never produces NaN values
- * and that the poor chance probability is always finite and valid.
+ * These tests ensure the preview computation uses normalized chances
+ * and never produces NaN values for the poor chance probability.
  * 
- * Regression prevention: The preview previously showed "NaN → NaN" 
- * because it was displaying raw weights instead of normalized probabilities.
+ * Note: Core invariant tests are in harvest-invariants.test.js
+ * These tests focus on preview-specific behavior.
  */
 
 describe('Harvester Hire Preview', () => {
-  // Helper to extract poor outcome weight
-  const getPoorWeight = (outcomes) => {
+  // Helper to extract poor outcome chance (normalized probability 0..1)
+  const getPoorChance = (outcomes) => {
     const poor = outcomes.find(o => o.key === 'poor');
     return poor?.weight ?? 0;
   };
@@ -22,8 +22,8 @@ describe('Harvester Hire Preview', () => {
   const sumWeights = (outcomes) => outcomes.reduce((sum, o) => sum + o.weight, 0);
 
   describe('Poor chance computation safety', () => {
-    it('should return finite poor weight with 0 harvesters', () => {
-      const weights = computeHarvestOutcomeWeights({
+    it('should return finite poor chance with 0 harvesters', () => {
+      const chances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
@@ -31,14 +31,14 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
-      expect(Number.isFinite(poorWeight)).toBe(true);
-      expect(poorWeight).toBeGreaterThanOrEqual(0);
-      expect(poorWeight).toBeLessThanOrEqual(1);
+      const poorChance = getPoorChance(chances);
+      expect(Number.isFinite(poorChance)).toBe(true);
+      expect(poorChance).toBeGreaterThanOrEqual(0);
+      expect(poorChance).toBeLessThanOrEqual(1);
     });
 
-    it('should return finite poor weight with 5 harvesters, no arborist', () => {
-      const weights = computeHarvestOutcomeWeights({
+    it('should return finite poor chance with 5 harvesters, no arborist', () => {
+      const chances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
@@ -46,14 +46,14 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
-      expect(Number.isFinite(poorWeight)).toBe(true);
-      expect(poorWeight).toBeGreaterThanOrEqual(0);
-      expect(poorWeight).toBeLessThanOrEqual(1);
+      const poorChance = getPoorChance(chances);
+      expect(Number.isFinite(poorChance)).toBe(true);
+      expect(poorChance).toBeGreaterThanOrEqual(0);
+      expect(poorChance).toBeLessThanOrEqual(1);
     });
 
-    it('should return finite poor weight with 10 harvesters and arborist', () => {
-      const weights = computeHarvestOutcomeWeights({
+    it('should return finite poor chance with 10 harvesters and arborist', () => {
+      const chances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: true,
@@ -61,14 +61,14 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
-      expect(Number.isFinite(poorWeight)).toBe(true);
-      expect(poorWeight).toBeGreaterThanOrEqual(0);
-      expect(poorWeight).toBeLessThanOrEqual(1);
+      const poorChance = getPoorChance(chances);
+      expect(Number.isFinite(poorChance)).toBe(true);
+      expect(poorChance).toBeGreaterThanOrEqual(0);
+      expect(poorChance).toBeLessThanOrEqual(1);
     });
 
-    it('should return finite poor weight with all upgrades active', () => {
-      const weights = computeHarvestOutcomeWeights({
+    it('should return finite poor chance with all upgrades active', () => {
+      const chances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 8,
         arboristIsActive: true,
@@ -82,16 +82,16 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
-      expect(Number.isFinite(poorWeight)).toBe(true);
-      expect(poorWeight).toBeGreaterThanOrEqual(0);
-      expect(poorWeight).toBeLessThanOrEqual(1);
+      const poorChance = getPoorChance(chances);
+      expect(Number.isFinite(poorChance)).toBe(true);
+      expect(poorChance).toBeGreaterThanOrEqual(0);
+      expect(poorChance).toBeLessThanOrEqual(1);
     });
   });
 
   describe('Before → After preview calculations', () => {
     it('should show valid poor chance transition from 0 to 1 harvester', () => {
-      const currentWeights = computeHarvestOutcomeWeights({
+      const currentChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
@@ -99,7 +99,7 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const nextWeights = computeHarvestOutcomeWeights({
+      const nextChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 1,
         arboristIsActive: false,
@@ -107,8 +107,8 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const currentPoor = getPoorWeight(currentWeights);
-      const nextPoor = getPoorWeight(nextWeights);
+      const currentPoor = getPoorChance(currentChances);
+      const nextPoor = getPoorChance(nextChances);
 
       // Both should be finite
       expect(Number.isFinite(currentPoor)).toBe(true);
@@ -119,7 +119,7 @@ describe('Harvester Hire Preview', () => {
     });
 
     it('should show valid poor chance transition from 5 to 6 harvesters', () => {
-      const currentWeights = computeHarvestOutcomeWeights({
+      const currentChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
@@ -127,7 +127,7 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const nextWeights = computeHarvestOutcomeWeights({
+      const nextChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 6,
         arboristIsActive: false,
@@ -135,8 +135,8 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const currentPoor = getPoorWeight(currentWeights);
-      const nextPoor = getPoorWeight(nextWeights);
+      const currentPoor = getPoorChance(currentChances);
+      const nextPoor = getPoorChance(nextChances);
 
       expect(Number.isFinite(currentPoor)).toBe(true);
       expect(Number.isFinite(nextPoor)).toBe(true);
@@ -144,7 +144,7 @@ describe('Harvester Hire Preview', () => {
     });
 
     it('should show mitigated poor increase with arborist active', () => {
-      const currentWeights = computeHarvestOutcomeWeights({
+      const currentChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 3,
         arboristIsActive: true,
@@ -152,7 +152,7 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const nextWeights = computeHarvestOutcomeWeights({
+      const nextChances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 4,
         arboristIsActive: true,
@@ -160,8 +160,8 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const currentPoor = getPoorWeight(currentWeights);
-      const nextPoor = getPoorWeight(nextWeights);
+      const currentPoor = getPoorChance(currentChances);
+      const nextPoor = getPoorChance(nextChances);
 
       expect(Number.isFinite(currentPoor)).toBe(true);
       expect(Number.isFinite(nextPoor)).toBe(true);
@@ -170,7 +170,7 @@ describe('Harvester Hire Preview', () => {
       const arboristDelta = nextPoor - currentPoor;
 
       // Compare to no-arborist case
-      const noArboristCurrent = getPoorWeight(computeHarvestOutcomeWeights({
+      const noArboristCurrent = getPoorChance(computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 3,
         arboristIsActive: false,
@@ -178,7 +178,7 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       }));
 
-      const noArboristNext = getPoorWeight(computeHarvestOutcomeWeights({
+      const noArboristNext = getPoorChance(computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 4,
         arboristIsActive: false,
@@ -210,7 +210,7 @@ describe('Harvester Hire Preview', () => {
       ];
 
       scenarios.forEach(({ count, arborist, upgrades }) => {
-        const weights = computeHarvestOutcomeWeights({
+        const chances = computeHarvestOutcomeChances({
           outcomes: TUNING.harvest.outcomes,
           harvesterCount: count,
           arboristIsActive: arborist,
@@ -218,14 +218,14 @@ describe('Harvester Hire Preview', () => {
           tuning: TUNING.harvest,
         });
 
-        const total = sumWeights(weights);
+        const total = sumWeights(chances);
         
         // Total weight should always be positive and close to 1.0
         expect(total).toBeGreaterThan(0);
         expect(total).toBeCloseTo(1.0, 5);
         
         // All individual weights should be finite
-        weights.forEach(outcome => {
+        chances.forEach(outcome => {
           expect(Number.isFinite(outcome.weight)).toBe(true);
           expect(outcome.weight).toBeGreaterThanOrEqual(0);
         });
@@ -235,7 +235,7 @@ describe('Harvester Hire Preview', () => {
 
   describe('Edge cases and defensive checks', () => {
     it('should handle extreme harvester counts without NaN', () => {
-      const weights = computeHarvestOutcomeWeights({
+      const chances = computeHarvestOutcomeChances({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 100,
         arboristIsActive: true,
@@ -246,12 +246,12 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
-      expect(Number.isFinite(poorWeight)).toBe(true);
+      const poorChance = getPoorChance(chances);
+      expect(Number.isFinite(poorChance)).toBe(true);
       
-      // Even with 100 harvesters, poor weight should be clamped
-      expect(poorWeight).toBeGreaterThanOrEqual(0);
-      expect(poorWeight).toBeLessThanOrEqual(1);
+      // Even with 100 harvesters, poor weight should be valid probability
+      expect(poorChance).toBeGreaterThanOrEqual(0);
+      expect(poorChance).toBeLessThanOrEqual(1);
     });
 
     it('should handle missing poor outcome gracefully', () => {
@@ -261,7 +261,7 @@ describe('Harvester Hire Preview', () => {
         { key: "efficient", weight: 0.20, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
       ];
 
-      const weights = computeHarvestOutcomeWeights({
+      const chances = computeHarvestOutcomeChances({
         outcomes: customOutcomes,
         harvesterCount: 5,
         arboristIsActive: false,
@@ -269,11 +269,11 @@ describe('Harvester Hire Preview', () => {
         tuning: TUNING.harvest,
       });
 
-      const poorWeight = getPoorWeight(weights);
+      const poorChance = getPoorChance(chances);
       
       // Should return 0 (fallback value) not NaN
-      expect(poorWeight).toBe(0);
-      expect(Number.isFinite(poorWeight)).toBe(true);
+      expect(poorChance).toBe(0);
+      expect(Number.isFinite(poorChance)).toBe(true);
     });
   });
 
@@ -282,7 +282,7 @@ describe('Harvester Hire Preview', () => {
       const testCounts = [0, 1, 5, 10, 15, 20];
       
       testCounts.forEach(count => {
-        const weights = computeHarvestOutcomeWeights({
+        const chances = computeHarvestOutcomeChances({
           outcomes: TUNING.harvest.outcomes,
           harvesterCount: count,
           arboristIsActive: false,
@@ -290,8 +290,8 @@ describe('Harvester Hire Preview', () => {
           tuning: TUNING.harvest,
         });
 
-        const poorWeight = getPoorWeight(weights);
-        const percentage = poorWeight * 100;
+        const poorChance = getPoorChance(chances);
+        const percentage = poorChance * 100;
 
         expect(Number.isFinite(percentage)).toBe(true);
         expect(percentage).toBeGreaterThanOrEqual(0);

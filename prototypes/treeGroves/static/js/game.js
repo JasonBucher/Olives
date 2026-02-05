@@ -1,6 +1,6 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
-import { computeHarvestOutcomeWeights } from './harvestWeights.js';
+import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 
@@ -136,8 +136,8 @@ function calculateHarvesterHirePreview() {
   const nextSpeed = baseHarvestMs * nextMultiplier;
   
   // Poor chance (actual probability, not just weight)
-  // Use the same weight computation as actual harvest
-  const currentWeights = computeHarvestOutcomeWeights({
+  // Use the normalized chance computation as single source of truth
+  const currentChances = computeHarvestOutcomeChances({
     outcomes: harvestConfig.outcomes,
     harvesterCount: currentCount,
     arboristIsActive: arboristIsActive,
@@ -145,7 +145,7 @@ function calculateHarvesterHirePreview() {
     tuning: TUNING.harvest,
   });
   
-  const nextWeights = computeHarvestOutcomeWeights({
+  const nextChances = computeHarvestOutcomeChances({
     outcomes: harvestConfig.outcomes,
     harvesterCount: nextCount,
     arboristIsActive: arboristIsActive,
@@ -153,13 +153,13 @@ function calculateHarvesterHirePreview() {
     tuning: TUNING.harvest,
   });
   
-  // Find poor outcome and extract weight (safe fallback to 0)
-  const currentPoorOutcome = currentWeights.find(o => o.key === "poor");
-  const nextPoorOutcome = nextWeights.find(o => o.key === "poor");
+  // Find poor outcome and extract normalized chance (already 0..1)
+  const currentPoorOutcome = currentChances.find(o => o.key === "poor");
+  const nextPoorOutcome = nextChances.find(o => o.key === "poor");
   const currentPoorChance = currentPoorOutcome?.weight ?? 0;
   const nextPoorChance = nextPoorOutcome?.weight ?? 0;
   
-  // Guard against NaN (defensive check)
+  // These should always be finite due to normalization, but keep defensive check
   const safeCurrentPoor = Number.isFinite(currentPoorChance) ? currentPoorChance : 0;
   const safeNextPoor = Number.isFinite(nextPoorChance) ? nextPoorChance : 0;
   
@@ -509,7 +509,7 @@ function updateUI() {
   }
   
   // Combine into single line with bullet separators
-  harvesterDelta.textContent = `Δ ${haulText} • ${speedText} • ${poorText}`;
+  harvesterDelta.textContent = ` ${haulText} • ${speedText} • ${poorText}`;
   
   // Update harvester impact (show harvest rate bonus)
   if (state.harvesterCount > 0) {
@@ -590,8 +590,8 @@ function startHarvest(opts = {}) {
   const effectiveBatchSize = harvestConfig.batchSize + getHarvesterAttemptBonus();
   const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
-  // Use pure function to compute adjusted outcome weights
-  const adjustedOutcomes = computeHarvestOutcomeWeights({
+  // Use normalized chances from single source of truth
+  const adjustedOutcomes = computeHarvestOutcomeChances({
     outcomes: harvestConfig.outcomes,
     harvesterCount: state.harvesterCount,
     arboristIsActive: arboristIsActive,
@@ -599,7 +599,7 @@ function startHarvest(opts = {}) {
     tuning: TUNING.harvest,
   });
   
-  // Select outcome with adjusted weights
+  // Select outcome with normalized chances (weights now represent probabilities 0..1)
   const outcome = rollWeighted(adjustedOutcomes);
   
   // Apply harvester speed bonus to duration
