@@ -123,13 +123,15 @@ Validate expected behavior:
 The harvest weight logic is now centralized in [static/js/harvestWeights.js](static/js/harvestWeights.js):
 
 ```javascript
-import { BASE_HARVEST_OUTCOMES, computeHarvestOutcomeWeights } from './harvestWeights.js';
+import { computeHarvestOutcomeWeights } from './harvestWeights.js';
+import { TUNING } from './static/js/tuning.js';
 
 computeHarvestOutcomeWeights({ 
-  outcomes,        // Base harvest outcomes
+  outcomes: TUNING.harvest.outcomes, // Base harvest outcomes
   harvesterCount,  // Number of harvesters
   arboristIsActive, // Whether arborist is hired
-  upgrades         // Object with upgrade flags
+  upgrades,        // Object with upgrade flags
+  tuning: TUNING.harvest, // Shared tuning constants
 })
 ```
 

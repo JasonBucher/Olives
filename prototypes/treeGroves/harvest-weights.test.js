@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeHarvestOutcomeWeights, BASE_HARVEST_OUTCOMES } from './test-utils.js';
+import { computeHarvestOutcomeWeights, TUNING } from './test-utils.js';
 
 describe('computeHarvestOutcomeWeights', () => {
   // Helper to sum weights
@@ -11,10 +11,11 @@ describe('computeHarvestOutcomeWeights', () => {
   describe('Conservation: weight sum remains ~1.0 when no clamping occurs', () => {
     it('should conserve weight sum with 0 harvesters, no upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -23,10 +24,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should conserve weight sum with 5 harvesters, no upgrades, no arborist', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -35,10 +37,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should conserve weight sum with 10 harvesters, arborist active, no upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: true,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -47,7 +50,7 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should conserve weight sum with 5 harvesters, all safe upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: true,
         upgrades: {
@@ -55,6 +58,7 @@ describe('computeHarvestOutcomeWeights', () => {
           training_program: true,
           selective_picking: true,
         },
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -63,7 +67,7 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should conserve weight sum with 8 harvesters, ladders_nets active', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 8,
         arboristIsActive: true,
         upgrades: {
@@ -72,6 +76,7 @@ describe('computeHarvestOutcomeWeights', () => {
           selective_picking: true,
           ladders_nets: true,
         },
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -80,13 +85,14 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should conserve weight sum with quality_inspector and arborist', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 3,
         arboristIsActive: true,
         upgrades: {
           quality_inspector: true,
           selective_picking: true,
         },
+        tuning: TUNING.harvest,
       });
       
       const sum = sumWeights(result);
@@ -97,10 +103,11 @@ describe('computeHarvestOutcomeWeights', () => {
   describe('Interrupted stability: interrupted_short weight remains unchanged', () => {
     it('should keep interrupted_short at base weight with 0 harvesters', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const interrupted = findOutcome(result, 'interrupted_short');
@@ -109,10 +116,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should keep interrupted_short at base weight with 5 harvesters', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const interrupted = findOutcome(result, 'interrupted_short');
@@ -121,10 +129,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should keep interrupted_short at base weight with 10 harvesters and arborist', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: true,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const interrupted = findOutcome(result, 'interrupted_short');
@@ -133,7 +142,7 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should keep interrupted_short at base weight with all upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 8,
         arboristIsActive: true,
         upgrades: {
@@ -143,6 +152,7 @@ describe('computeHarvestOutcomeWeights', () => {
           ladders_nets: true,
           quality_inspector: true,
         },
+        tuning: TUNING.harvest,
       });
       
       const interrupted = findOutcome(result, 'interrupted_short');
@@ -153,10 +163,11 @@ describe('computeHarvestOutcomeWeights', () => {
   describe('Non-negative weights: all weights >= 0', () => {
     it('should have non-negative weights with 0 harvesters', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       result.forEach(outcome => {
@@ -166,10 +177,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should have non-negative weights with 5 harvesters, no upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       result.forEach(outcome => {
@@ -179,10 +191,11 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should have non-negative weights with 10 harvesters, arborist active', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: true,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       result.forEach(outcome => {
@@ -192,7 +205,7 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should have non-negative weights with all upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 8,
         arboristIsActive: true,
         upgrades: {
@@ -202,6 +215,7 @@ describe('computeHarvestOutcomeWeights', () => {
           ladders_nets: true,
           quality_inspector: true,
         },
+        tuning: TUNING.harvest,
       });
       
       result.forEach(outcome => {
@@ -211,7 +225,7 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should have non-negative weights in extreme case: 20 harvesters, all upgrades', () => {
       const result = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 20,
         arboristIsActive: true,
         upgrades: {
@@ -221,6 +235,7 @@ describe('computeHarvestOutcomeWeights', () => {
           ladders_nets: true,
           quality_inspector: true,
         },
+        tuning: TUNING.harvest,
       });
       
       result.forEach(outcome => {
@@ -232,17 +247,19 @@ describe('computeHarvestOutcomeWeights', () => {
   describe('Specific weight adjustments', () => {
     it('should increase poor weight with more harvesters (no arborist, no upgrades)', () => {
       const baseline = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 0,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const withHarvesters = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const baselinePoor = findOutcome(baseline, 'poor').weight;
@@ -253,17 +270,19 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should reduce poor weight increase when arborist is active', () => {
       const noArborist = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const withArborist = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 10,
         arboristIsActive: true,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const noArboristPoor = findOutcome(noArborist, 'poor').weight;
@@ -274,17 +293,19 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should increase efficient weight when arborist is active', () => {
       const noArborist = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const withArborist = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: true,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const noArboristEfficient = findOutcome(noArborist, 'efficient').weight;
@@ -295,17 +316,19 @@ describe('computeHarvestOutcomeWeights', () => {
 
     it('should reduce poor weight with standardized_tools upgrade', () => {
       const noUpgrade = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: {},
+        tuning: TUNING.harvest,
       });
       
       const withUpgrade = computeHarvestOutcomeWeights({
-        outcomes: BASE_HARVEST_OUTCOMES,
+        outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
         upgrades: { standardized_tools: true },
+        tuning: TUNING.harvest,
       });
       
       const noUpgradePoor = findOutcome(noUpgrade, 'poor').weight;

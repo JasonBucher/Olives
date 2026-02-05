@@ -1,6 +1,7 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
-import { BASE_HARVEST_OUTCOMES, computeHarvestOutcomeWeights } from './harvestWeights.js';
+import { computeHarvestOutcomeWeights } from './harvestWeights.js';
+import { TUNING } from './tuning.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -15,82 +16,65 @@ let mainLoopInterval = null;
 let isSimPaused = false;
 let pausedAtMs = 0;
 
-// --- Tuning Constants ---
-// Centralized location for all game balance values
-// Organized by domain for scalability as we add processors and goods
-const TUNING = {
-  // Grove: tree growth and capacity
-  grove: {
-    treeCapacity: 25,
-    treeGrowthPerSec: 1.0,
-  },
-  
-  // Harvest: batch sizes, outcome probabilities, and modifiers
-  harvest: {
-    baseBatchSize: 10,
-  },
-  
-  // Workers: hiring costs and production effects
-  workers: {
-    harvester: {
-      baseCost: 10,
-      costScale: 5,              // Cost increase per harvester hired
-      attemptBonusTiers: {       // Harvest batch size bonuses by count
-        tier1: { max: 5, bonus: 1 },     // First 5: +1 each
-        tier2: { max: 10, bonus: 0.5 },  // 6-10: +0.5 each
-        tier3: { bonus: 0.25 },          // 11+: +0.25 each
-      },
-      durationReductionPct: 0.04, // 4% speed per harvester
-      durationReductionCap: 0.25,  // Max 25% total speed boost
-    },
-  },
-  
-  // Managers: hiring costs, salaries, and supervision effects
-  managers: {
-    arborist: {
-      hireCost: 50,
-      salaryPerMin: 0.2,         // Florins per minute
-    },
-  },
-  
-  // Market: timing and pricing
-  market: {
-    tickSeconds: 12,
-    olivePriceFlorins: 1,
-  },
-};
-
 // --- Game State ---
-let state = {
-  // Grove mechanics
-  treeOlives: 0,
-  treeCapacity: TUNING.grove.treeCapacity,
-  treeGrowthPerSec: TUNING.grove.treeGrowthPerSec,
-  
-  // Player inventory
-  harvestedOlives: 0,
-  marketOlives: 0,
-  oilCount: 0,
-  florinCount: 0,
+const PERSISTED_STATE_KEYS = [
+  "treeOlives",
+  "harvestedOlives",
+  "marketOlives",
+  "oilCount",
+  "florinCount",
+  "harvesterCount",
+  "arboristHired",
+  "upgrades",
+  "meta",
+];
 
-  // Workers
-  harvesterCount: 0,
-  arboristHired: false,
+function createDefaultState() {
+  return {
+    // Grove mechanics
+    treeOlives: 0,
+    treeCapacity: TUNING.grove.treeCapacity,
+    treeGrowthPerSec: TUNING.grove.treeGrowthPerSec,
 
-  // Upgrades
-  upgrades: {},
+    // Player inventory
+    harvestedOlives: 0,
+    marketOlives: 0,
+    oilCount: 0,
+    florinCount: 0,
 
-  // For future expansion
-  meta: {
-    createdAt: null,
-    version: "treeGroves",
-  },
-};
+    // Workers
+    harvesterCount: 0,
+    arboristHired: false,
+
+    // Upgrades
+    upgrades: {},
+
+    // For future expansion
+    meta: {
+      createdAt: null,
+      version: "treeGroves",
+    },
+  };
+}
+
+function pickPersistedState(parsed) {
+  if (!parsed || typeof parsed !== "object") return {};
+  return PERSISTED_STATE_KEYS.reduce((acc, key) => {
+    if (key in parsed) acc[key] = parsed[key];
+    return acc;
+  }, {});
+}
+
+function buildPersistedState(currentState) {
+  return pickPersistedState(currentState);
+}
+
+let state = createDefaultState();
 
 // --- Harvest Config (upgrade-tweakable) ---
 const harvestConfig = {
   batchSize: TUNING.harvest.baseBatchSize,
-  outcomes: BASE_HARVEST_OUTCOMES,
+  outcomes: TUNING.harvest.outcomes,
 };
 
 // --- Upgrades Registry ---
@@ -408,8 +392,10 @@ function createInlineActionController({ pillEl, countEl, progressEl, barEl, coun
 // --- Storage ---
 function loadGame() {
   const raw = localStorage.getItem(STORAGE_KEY);
+  const defaults = createDefaultState();
   if (!raw) {
     // Fresh start
+    state = defaults;
     state.meta.createdAt = new Date().toISOString();
     saveGame(); // create key immediately so it's easy to see in DevTools
     return;
@@ -417,14 +403,16 @@ function loadGame() {
 
   try {
     const parsed = JSON.parse(raw);
+    const persisted = pickPersistedState(parsed);
     // Shallow merge so missing fields get defaults
-    state = { ...state, ...parsed, meta: { ...state.meta, ...(parsed.meta || {}) } };
-    
-    // Always refresh tuning-dependent values from TUNING (handles updates to tuning constants)
-    state.treeCapacity = TUNING.grove.treeCapacity;
-    state.treeGrowthPerSec = TUNING.grove.treeGrowthPerSec;
+    state = { ...defaults, ...persisted, meta: { ...defaults.meta, ...(persisted.meta || {}) } };
+
+    if (!state.meta.createdAt) {
+      state.meta.createdAt = new Date().toISOString();
+    }
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
+    state = defaults;
     state.meta.createdAt = new Date().toISOString();
     saveGame();
   }
@@ -432,7 +420,7 @@ function loadGame() {
 
 function saveGame() {
   if (isResetting) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
 }
 
 function resetGame() {
@@ -572,6 +560,7 @@ function startHarvest(opts = {}) {
     harvesterCount: state.harvesterCount,
     arboristIsActive: arboristIsActive,
     upgrades: state.upgrades,
+    tuning: TUNING.harvest,
   });
   
   // Select outcome with adjusted weights
