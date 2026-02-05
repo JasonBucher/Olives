@@ -2,6 +2,10 @@
 // Used by both the game and unit tests
 // This is a pure module with no DOM or global state dependencies
 
+// Re-export BASE_HARVEST_OUTCOMES for backwards compatibility
+// (In actual use, outcomes should come from TUNING.harvest.outcomes)
+export { BASE_HARVEST_OUTCOMES } from './tuning.js';
+
 /**
  * Pure function: Compute adjusted harvest outcome weights
  * 
@@ -18,17 +22,16 @@
  * @returns {Array} Adjusted outcomes with modified weights (always sums to ~1.0)
  */
 export function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActive, upgrades, tuning }) {
-  const {
-    poorWeightPerHarvester,
-    poorArboristMultiplier,
-    poorTrainingMultiplier,
-    poorStandardizedToolsReduction,
-    efficientArboristBonus,
-    efficientSelectivePickingBonus,
-    efficientLaddersNetsPerHarvester,
-    efficientLaddersNetsCap,
-    efficientQualityInspectorBonus,
-  } = tuning;
+  // Extract values from new nested structure
+  const poorWeightPerHarvester = tuning.poorWeightPerHarvester;
+  const poorArboristMultiplier = tuning.arborist?.poorReductionMult ?? 0.5;
+  const poorTrainingMultiplier = tuning.upgrades?.training_program?.poorMultiplierReduction ?? 0.5;
+  const poorStandardizedToolsReduction = tuning.upgrades?.standardized_tools?.poorFlatReduction ?? 0.08;
+  const efficientArboristBonus = tuning.arborist?.efficientBonus ?? 0.05;
+  const efficientSelectivePickingBonus = tuning.upgrades?.selective_picking?.efficientBonus ?? 0.06;
+  const efficientLaddersNetsPerHarvester = tuning.upgrades?.ladders_nets?.efficientPerHarvester ?? 0.01;
+  const efficientLaddersNetsCap = tuning.upgrades?.ladders_nets?.efficientCap ?? 0.08;
+  const efficientQualityInspectorBonus = tuning.upgrades?.quality_inspector?.efficientBonusWithArborist ?? 0.08;
 
   // Calculate deltas for poor weight
   // Base: +per harvester

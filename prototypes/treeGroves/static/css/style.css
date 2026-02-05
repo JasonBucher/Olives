@@ -254,6 +254,77 @@ h1 {
 }
 .btn-quiet:hover { background: var(--btnHover); color: var(--text); }
 
+/* --- Investment Cards --- */
+.investment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  font-size: 13px;
+  background: var(--btn);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.inv:hover:not(:disabled) {
+  background: var(--btnHover);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.inv:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inv__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.inv__title {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+}
+
+.inv__cost {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.inv__effects {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inv__effect {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.8);
+}
+
+.inv__effect--muted {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* --- Old Upgrade Styles (deprecated, kept for backwards compatibility) --- */
 .upgrade-list {
   display: flex;
   flex-direction: column;

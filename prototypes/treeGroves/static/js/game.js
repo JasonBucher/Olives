@@ -2,6 +2,7 @@
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
 import { computeHarvestOutcomeWeights } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
+import { INVESTMENTS } from './investments.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -76,45 +77,6 @@ const harvestConfig = {
   batchSize: TUNING.harvest.baseBatchSize,
   outcomes: TUNING.harvest.outcomes,
 };
-
-// --- Upgrades Registry ---
-const UPGRADES = [
-  {
-    id: "standardized_tools",
-    title: "Standardized Tools",
-    desc: "Quality tools reduce Poor harvests.",
-    cost: 75,
-    prereqs: [],
-  },
-  {
-    id: "training_program",
-    title: "Training Program",
-    desc: "Trained harvesters make fewer mistakes.",
-    cost: 150,
-    prereqs: [],
-  },
-  {
-    id: "selective_picking",
-    title: "Selective Picking",
-    desc: "Better technique improves Efficient harvests.",
-    cost: 200,
-    prereqs: [],
-  },
-  {
-    id: "ladders_nets",
-    title: "Ladders & Nets",
-    desc: "Equipment scales efficiency with team size.",
-    cost: 300,
-    prereqs: [],
-  },
-  {
-    id: "quality_inspector",
-    title: "Quality Inspector",
-    desc: "Expert oversight maximizes Arborist benefits.",
-    cost: 500,
-    prereqs: ["arborist"],
-  },
-];
 
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
@@ -241,8 +203,6 @@ const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
 const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
 
 const arboristStatusEl = document.getElementById("arborist-status");
-const upgradeArboristBtn = document.getElementById("upgrade-arborist-btn");
-const upgradeArboristCostEl = document.getElementById("upgrade-arborist-cost");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
 
@@ -502,18 +462,9 @@ function updateUI() {
     managersEmptyEl.hidden = false;
     managersArboristWrap.hidden = true;
   }
-
-  // Toggle Upgrades - Hire Arborist
-  const upgradeArborist = document.getElementById("upgrade-arborist");
-  if (state.arboristHired) {
-    upgradeArborist.hidden = true;
-  } else {
-    upgradeArborist.hidden = false;
-    upgradeArboristBtn.disabled = state.florinCount < TUNING.managers.arborist.hireCost;
-  }
   
-  // Update upgrade button states (not full re-render)
-  updateUpgradeButtons();
+  // Update investment button states (state-aware previews)
+  updateInvestmentButtons();
 
   // Toggle Production section visibility
   if (productionSection) {
@@ -808,89 +759,112 @@ function runMarketTick() {
   }
 }
 
-// --- Upgrade System ---
-function canBuyUpgrade(id) {
-  const upgrade = UPGRADES.find(u => u.id === id);
-  if (!upgrade) return false;
+// --- Investment System ---
+function buyInvestment(id) {
+  const investment = INVESTMENTS.find(i => i.id === id);
+  if (!investment) return false;
   
-  // Already owned
-  if (state.upgrades[id]) return false;
-  
-  // Can't afford
-  if (state.florinCount < upgrade.cost) return false;
-  
-  // Check prerequisites
-  for (const prereq of upgrade.prereqs) {
-    if (prereq === "arborist" && !state.arboristHired) return false;
-    if (prereq !== "arborist" && !state.upgrades[prereq]) return false;
+  const success = investment.purchase(state, TUNING);
+  if (success) {
+    saveGame();
+    updateUI();
+    logLine(`Purchased: ${investment.title}`);
   }
-  
-  return true;
+  return success;
 }
 
-function buyUpgrade(id) {
-  if (!canBuyUpgrade(id)) return false;
-  
-  const upgrade = UPGRADES.find(u => u.id === id);
-  state.florinCount -= upgrade.cost;
-  state.upgrades[id] = true;
-  
-  saveGame();
-  updateUI();
-  logLine(`Purchased upgrade: ${upgrade.title}`);
-  return true;
-}
-
-function initUpgrades() {
-  const container = document.getElementById("upgrades-container");
+function initInvestments() {
+  const container = document.getElementById("investments-container");
   if (!container) return;
   
   container.innerHTML = "";
   
-  UPGRADES.forEach(upgrade => {
-    const div = document.createElement("div");
-    div.className = "upgrade-item";
-    div.id = `upgrade-${upgrade.id}-item`;
-    
+  INVESTMENTS.forEach(investment => {
     const btn = document.createElement("button");
-    btn.className = "upgrade-pill";
+    btn.className = "inv";
     btn.type = "button";
-    btn.id = `upgrade-${upgrade.id}-btn`;
-    btn.textContent = `${upgrade.title} — ${upgrade.cost} florins`;
+    btn.id = `inv-${investment.id}`;
     
-    // Add click handler
-    btn.addEventListener("click", () => {
-      buyUpgrade(upgrade.id);
+    // Top section: title and cost
+    const top = document.createElement("div");
+    top.className = "inv__top";
+    
+    const title = document.createElement("div");
+    title.className = "inv__title";
+    title.textContent = investment.title;
+    
+    const cost = document.createElement("div");
+    cost.className = "inv__cost";
+    const costValue = investment.cost(TUNING, state);
+    cost.textContent = `${costValue} florins`;
+    
+    top.appendChild(title);
+    top.appendChild(cost);
+    
+    // Effects section
+    const effects = document.createElement("div");
+    effects.className = "inv__effects";
+    
+    const effectLines = investment.effectLines(state, TUNING);
+    effectLines.forEach((line, idx) => {
+      const effectEl = document.createElement("div");
+      effectEl.className = "inv__effect";
+      
+      // Mark "Requires:" lines as muted
+      if (line.startsWith("Requires:") || line.startsWith("Ongoing:")) {
+        effectEl.classList.add("inv__effect--muted");
+      }
+      
+      effectEl.textContent = line;
+      effects.appendChild(effectEl);
     });
     
-    div.appendChild(btn);
+    btn.appendChild(top);
+    btn.appendChild(effects);
     
-    // Add description below button
-    const desc = document.createElement("div");
-    desc.className = "upgrade-desc";
-    desc.textContent = upgrade.desc;
-    div.appendChild(desc);
+    // Click handler
+    btn.addEventListener("click", () => {
+      buyInvestment(investment.id);
+    });
     
-    container.appendChild(div);
+    container.appendChild(btn);
   });
 }
 
-function updateUpgradeButtons() {
-  UPGRADES.forEach(upgrade => {
-    const item = document.getElementById(`upgrade-${upgrade.id}-item`);
-    const btn = document.getElementById(`upgrade-${upgrade.id}-btn`);
+function updateInvestmentButtons() {
+  INVESTMENTS.forEach(investment => {
+    const btn = document.getElementById(`inv-${investment.id}`);
+    if (!btn) return;
     
-    if (!item || !btn) return;
+    // Hide if owned
+    const isOwned = investment.id === "arborist" 
+      ? state.arboristHired 
+      : state.upgrades[investment.id];
     
-    // Hide if already owned
-    if (state.upgrades[upgrade.id]) {
-      item.style.display = "none";
+    if (isOwned) {
+      btn.style.display = "none";
       return;
     }
     
     // Show and update disabled state
-    item.style.display = "";
-    btn.disabled = !canBuyUpgrade(upgrade.id);
+    btn.style.display = "";
+    btn.disabled = !investment.canPurchase(state, TUNING);
+    
+    // Update effect lines for state-aware previews
+    const effectsEl = btn.querySelector(".inv__effects");
+    if (effectsEl) {
+      effectsEl.innerHTML = "";
+      const effectLines = investment.effectLines(state, TUNING);
+      effectLines.forEach(line => {
+        const effectEl = document.createElement("div");
+        effectEl.className = "inv__effect";
+        if (line.startsWith("Requires:") || line.startsWith("Ongoing:")) {
+          effectEl.classList.add("inv__effect--muted");
+        }
+        effectEl.textContent = line;
+        effectsEl.appendChild(effectEl);
+      });
+    }
   });
 }
 
@@ -1009,17 +983,6 @@ hireHarvesterBtn.addEventListener("click", () => {
   logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
 });
 
-upgradeArboristBtn.addEventListener("click", () => {
-  const cost = TUNING.managers.arborist.hireCost;
-  if (state.arboristHired) return;
-  if (state.florinCount < cost) return;
-  state.florinCount -= cost;
-  state.arboristHired = true;
-  saveGame();
-  updateUI();
-  logLine(`Hired Arborist (salary ${TUNING.managers.arborist.salaryPerMin} florins/min).`);
-});
-
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
@@ -1068,7 +1031,7 @@ window.addEventListener("focus", () => {
 
 // --- Init ---
 loadGame();
-initUpgrades();
+initInvestments();
 updateUI();
 setShipUIIdle();
 startLoop();
