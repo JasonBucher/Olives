@@ -135,16 +135,38 @@ function calculateHarvesterHirePreview() {
   const currentSpeed = baseHarvestMs * currentMultiplier;
   const nextSpeed = baseHarvestMs * nextMultiplier;
   
-  // Poor chance (weight contribution)
-  const poorWeightPerHarvester = TUNING.harvest.poorWeightPerHarvester;
-  const arboristMult = arboristIsActive ? TUNING.harvest.arborist.poorWeightReduction : 1;
-  const currentPoorWeight = currentCount * poorWeightPerHarvester * arboristMult;
-  const nextPoorWeight = nextCount * poorWeightPerHarvester * arboristMult;
+  // Poor chance (actual probability, not just weight)
+  // Use the same weight computation as actual harvest
+  const currentWeights = computeHarvestOutcomeWeights({
+    outcomes: harvestConfig.outcomes,
+    harvesterCount: currentCount,
+    arboristIsActive: arboristIsActive,
+    upgrades: state.upgrades,
+    tuning: TUNING.harvest,
+  });
+  
+  const nextWeights = computeHarvestOutcomeWeights({
+    outcomes: harvestConfig.outcomes,
+    harvesterCount: nextCount,
+    arboristIsActive: arboristIsActive,
+    upgrades: state.upgrades,
+    tuning: TUNING.harvest,
+  });
+  
+  // Find poor outcome and extract weight (safe fallback to 0)
+  const currentPoorOutcome = currentWeights.find(o => o.key === "poor");
+  const nextPoorOutcome = nextWeights.find(o => o.key === "poor");
+  const currentPoorChance = currentPoorOutcome?.weight ?? 0;
+  const nextPoorChance = nextPoorOutcome?.weight ?? 0;
+  
+  // Guard against NaN (defensive check)
+  const safeCurrentPoor = Number.isFinite(currentPoorChance) ? currentPoorChance : 0;
+  const safeNextPoor = Number.isFinite(nextPoorChance) ? nextPoorChance : 0;
   
   return {
     haul: { current: currentHaul, next: nextHaul },
     speed: { current: currentSpeed, next: nextSpeed },
-    poor: { current: currentPoorWeight, next: nextPoorWeight }
+    poor: { current: safeCurrentPoor, next: safeNextPoor }
   };
 }
 
@@ -473,7 +495,17 @@ function updateUI() {
     const preview = calculateHarvesterHirePreview();
     harvesterPreviewHaul.textContent = `Haul: +${preview.haul.current} → +${preview.haul.next} olives`;
     harvesterPreviewSpeed.textContent = `Speed: ${(preview.speed.current / 1000).toFixed(1)}s → ${(preview.speed.next / 1000).toFixed(1)}s`;
-    harvesterPreviewPoor.textContent = `Poor: ${preview.poor.current.toFixed(2)} → ${preview.poor.next.toFixed(2)}`;
+    
+    // Display poor chance as percentage (0.25 → 25%)
+    // Guard against invalid values
+    if (Number.isFinite(preview.poor.current) && Number.isFinite(preview.poor.next)) {
+      const currentPct = (preview.poor.current * 100).toFixed(0);
+      const nextPct = (preview.poor.next * 100).toFixed(0);
+      harvesterPreviewPoor.textContent = `Poor: ${currentPct}% → ${nextPct}%`;
+    } else {
+      harvesterPreviewPoor.textContent = `Poor: —`;
+    }
+    
     harvesterHirePreview.hidden = false;
   } else {
     harvesterHirePreview.hidden = true;
