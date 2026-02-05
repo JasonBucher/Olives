@@ -110,6 +110,44 @@ function getHarvesterDurationMultiplier() {
   return 1 - reductionPct;
 }
 
+function calculateHarvesterHirePreview() {
+  const currentCount = state.harvesterCount;
+  const nextCount = currentCount + 1;
+  
+  // Haul (attempt bonus)
+  const currentHaul = getHarvesterAttemptBonus();
+  // Temporarily increment count to calculate next bonus
+  const prevCount = state.harvesterCount;
+  state.harvesterCount = nextCount;
+  const nextHaul = getHarvesterAttemptBonus();
+  state.harvesterCount = prevCount; // Restore
+  
+  // Speed (use "normal" harvest as baseline: 4500ms)
+  const baseHarvestMs = 4500;
+  const currentMultiplier = 1 - Math.min(
+    currentCount * TUNING.workers.harvester.durationReductionPct,
+    TUNING.workers.harvester.durationReductionCap
+  );
+  const nextMultiplier = 1 - Math.min(
+    nextCount * TUNING.workers.harvester.durationReductionPct,
+    TUNING.workers.harvester.durationReductionCap
+  );
+  const currentSpeed = baseHarvestMs * currentMultiplier;
+  const nextSpeed = baseHarvestMs * nextMultiplier;
+  
+  // Poor chance (weight contribution)
+  const poorWeightPerHarvester = TUNING.harvest.poorWeightPerHarvester;
+  const arboristMult = arboristIsActive ? TUNING.harvest.arborist.poorWeightReduction : 1;
+  const currentPoorWeight = currentCount * poorWeightPerHarvester * arboristMult;
+  const nextPoorWeight = nextCount * poorWeightPerHarvester * arboristMult;
+  
+  return {
+    haul: { current: currentHaul, next: nextHaul },
+    speed: { current: currentSpeed, next: nextSpeed },
+    poor: { current: currentPoorWeight, next: nextPoorWeight }
+  };
+}
+
 // --- Shipping Config ---
 const shippingConfig = {
   batchSize: 10,
@@ -201,6 +239,10 @@ const harvesterImpactEl = document.getElementById("harvester-impact");
 const harvesterBadgeManager = document.getElementById("harvester-badge-manager");
 const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
 const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
+const harvesterHirePreview = document.getElementById("harvester-hire-preview");
+const harvesterPreviewHaul = document.getElementById("harvester-preview-haul");
+const harvesterPreviewSpeed = document.getElementById("harvester-preview-speed");
+const harvesterPreviewPoor = document.getElementById("harvester-preview-poor");
 
 const arboristStatusEl = document.getElementById("arborist-status");
 const managersEmptyEl = document.getElementById("managers-empty");
@@ -425,6 +467,17 @@ function updateUI() {
   const harvesterCost = getHarvesterHireCost();
   hireHarvesterCostEl.textContent = harvesterCost;
   hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
+  
+  // Show/hide harvester hire preview
+  if (state.florinCount >= harvesterCost) {
+    const preview = calculateHarvesterHirePreview();
+    harvesterPreviewHaul.textContent = `Haul: +${preview.haul.current} → +${preview.haul.next} olives`;
+    harvesterPreviewSpeed.textContent = `Speed: ${(preview.speed.current / 1000).toFixed(1)}s → ${(preview.speed.next / 1000).toFixed(1)}s`;
+    harvesterPreviewPoor.textContent = `Poor: ${preview.poor.current.toFixed(2)} → ${preview.poor.next.toFixed(2)}`;
+    harvesterHirePreview.hidden = false;
+  } else {
+    harvesterHirePreview.hidden = true;
+  }
   
   // Update harvester impact (show harvest rate bonus)
   if (state.harvesterCount > 0) {
