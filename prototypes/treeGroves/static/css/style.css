@@ -707,20 +707,10 @@ h1 {
   line-height: 1.35;
 }
 
-.worker-hire-preview {
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: var(--sectionBg);
-  border-radius: 6px;
+.worker-delta {
+  margin-top: 4px;
   font-size: 11px;
   color: var(--muted);
-  line-height: 1.4;
-}
-
-.worker-hire-preview .preview-line {
-  margin-bottom: 2px;
-}
-
-.worker-hire-preview .preview-line:last-child {
-  margin-bottom: 0;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }

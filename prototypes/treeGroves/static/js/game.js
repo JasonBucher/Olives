@@ -261,10 +261,7 @@ const harvesterImpactEl = document.getElementById("harvester-impact");
 const harvesterBadgeManager = document.getElementById("harvester-badge-manager");
 const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
 const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
-const harvesterHirePreview = document.getElementById("harvester-hire-preview");
-const harvesterPreviewHaul = document.getElementById("harvester-preview-haul");
-const harvesterPreviewSpeed = document.getElementById("harvester-preview-speed");
-const harvesterPreviewPoor = document.getElementById("harvester-preview-poor");
+const harvesterDelta = document.getElementById("harvester-delta");
 
 const arboristStatusEl = document.getElementById("arborist-status");
 const managersEmptyEl = document.getElementById("managers-empty");
@@ -490,26 +487,29 @@ function updateUI() {
   hireHarvesterCostEl.textContent = harvesterCost;
   hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
   
-  // Show/hide harvester hire preview
-  if (state.florinCount >= harvesterCost) {
-    const preview = calculateHarvesterHirePreview();
-    harvesterPreviewHaul.textContent = `Haul: +${preview.haul.current} → +${preview.haul.next} olives`;
-    harvesterPreviewSpeed.textContent = `Speed: ${(preview.speed.current / 1000).toFixed(1)}s → ${(preview.speed.next / 1000).toFixed(1)}s`;
-    
-    // Display poor chance as percentage (0.25 → 25%)
-    // Guard against invalid values
-    if (Number.isFinite(preview.poor.current) && Number.isFinite(preview.poor.next)) {
-      const currentPct = (preview.poor.current * 100).toFixed(0);
-      const nextPct = (preview.poor.next * 100).toFixed(0);
-      harvesterPreviewPoor.textContent = `Poor: ${currentPct}% → ${nextPct}%`;
-    } else {
-      harvesterPreviewPoor.textContent = `Poor: —`;
-    }
-    
-    harvesterHirePreview.hidden = false;
+  // Update harvester hire delta (always visible, single line)
+  const preview = calculateHarvesterHirePreview();
+  
+  // Format haul (integers)
+  const haulText = `Haul +${preview.haul.current}→+${preview.haul.next}`;
+  
+  // Format speed (seconds with 1 decimal)
+  const currentSpeedSec = (preview.speed.current / 1000).toFixed(1);
+  const nextSpeedSec = (preview.speed.next / 1000).toFixed(1);
+  const speedText = `Speed ${currentSpeedSec}s→${nextSpeedSec}s`;
+  
+  // Format poor (percentage, with NaN guard)
+  let poorText;
+  if (Number.isFinite(preview.poor.current) && Number.isFinite(preview.poor.next)) {
+    const currentPct = (preview.poor.current * 100).toFixed(0);
+    const nextPct = (preview.poor.next * 100).toFixed(0);
+    poorText = `Poor ${currentPct}%→${nextPct}%`;
   } else {
-    harvesterHirePreview.hidden = true;
+    poorText = `Poor —→—`;
   }
+  
+  // Combine into single line with bullet separators
+  harvesterDelta.textContent = `Δ ${haulText} • ${speedText} • ${poorText}`;
   
   // Update harvester impact (show harvest rate bonus)
   if (state.harvesterCount > 0) {
