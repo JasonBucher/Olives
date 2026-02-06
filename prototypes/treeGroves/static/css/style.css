@@ -679,18 +679,36 @@ h1 {
   gap: 10px;
 }
 
-.worker-row {
-  position: relative;
+.worker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.worker-top {
   display: grid;
-  grid-template-columns: minmax(100px, auto) minmax(80px, auto) 80px auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 34px;
+  grid-template-columns: 220px 1fr auto auto;
+  column-gap: 18px;
+  align-items: baseline;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Legacy .worker-row support (if any JS references it) */
+.worker-row {
+  display: grid;
+  grid-template-columns: 220px 1fr auto auto;
+  column-gap: 18px;
+  align-items: baseline;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .worker-left {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   font-size: 13px;
   line-height: 1.2;
@@ -709,22 +727,26 @@ h1 {
 
 .worker-middle {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   font-size: 12px;
   line-height: 1.2;
   color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .worker-impact {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .worker-badges {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
-  width: 80px;
   min-height: 20px;
 }
 
@@ -744,10 +766,7 @@ h1 {
 }
 
 .worker-badge:empty {
-  /* Keep space reserved but invisible */
   visibility: hidden;
-  width: 0;
-  padding: 0;
 }
 
 .worker-badge--manager {
@@ -772,15 +791,54 @@ h1 {
   justify-self: end;
   min-width: 90px;
   white-space: nowrap;
-}.worker-note {
+}
+
+.worker-note {
   margin-top: 8px;
   line-height: 1.35;
 }
 
 .worker-delta {
-  margin-top: 3px;
   font-size: 11px;
   color: var(--muted);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* --- Worker row hard stop: prevent horizontal layout push --- */
+
+/* Allow middle column to shrink no matter what text it contains */
+.worker-row {
+  grid-template-columns: 220px minmax(0, 1fr) auto auto;
+}
+
+/* If you also have a .worker-top grid, cover it too */
+.worker-top {
+  grid-template-columns: max-content minmax(0, 1fr) auto auto;
+}
+
+/* Ensure middle text can never force width */
+.worker-middle {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.worker-impact {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tighten Workers “carriage return” spacing */
+.worker-item { gap: 0px; }              /* was probably 2px */
+.worker-left, .worker-middle { line-height: 1.0; }
+.worker-delta { line-height: 1.0; }
+.worker-delta {
+  /* Optical alignment: reduce font-leading gap so this reads as a single carriage return */
+  margin-top: -5px;
 }
