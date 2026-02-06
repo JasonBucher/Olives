@@ -3,6 +3,7 @@
 import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
+import { formatSignedInt, formatSignedPct, formatSignedSeconds, joinStatPills } from './format.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -78,6 +79,18 @@ const harvestConfig = {
   outcomes: TUNING.harvest.outcomes,
 };
 
+// --- Baseline Harvest Duration Helper ---
+/**
+ * Get baseline harvest duration from "normal" outcome.
+ * Used for computing speed reductions in UI displays.
+ * @returns {number} Duration in milliseconds
+ */
+function getBaselineHarvestDurationMs() {
+  const normalOutcome = harvestConfig.outcomes.find(o => o.key === 'normal');
+  // Fallback to 4500 only if "normal" outcome missing (should not happen in practice)
+  return normalOutcome ? normalOutcome.durationMs : 4500;
+}
+
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
   return TUNING.workers.harvester.baseCost + (state.harvesterCount * TUNING.workers.harvester.costScale);
@@ -122,8 +135,8 @@ function calculateHarvesterHirePreview() {
   const nextHaul = getHarvesterAttemptBonus();
   state.harvesterCount = prevCount; // Restore
   
-  // Speed (use "normal" harvest as baseline: 4500ms)
-  const baseHarvestMs = 4500;
+  // Speed (derive baseline from configured "normal" outcome)
+  const baseHarvestMs = getBaselineHarvestDurationMs();
   const currentMultiplier = 1 - Math.min(
     currentCount * TUNING.workers.harvester.durationReductionPct,
     TUNING.workers.harvester.durationReductionCap
@@ -267,6 +280,10 @@ const arboristStatusEl = document.getElementById("arborist-status");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
 
+// Log UI
+const clearLogBtn = document.getElementById("clear-log-btn");
+const clearMarketLogBtn = document.getElementById("clear-market-log-btn");
+
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
 const debugModal = document.getElementById("debug-modal");
@@ -275,6 +292,7 @@ const debugResetBtn = document.getElementById("debug-reset-btn");
 const debugAddOlivesBtn = document.getElementById("debug-add-olives-btn");
 const debugAddFlorinsBtn = document.getElementById("debug-add-florins-btn");
 const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
+const debugHarvestChancesEl = document.getElementById("debug-harvest-chances");
 
 const harvestActionUI = createInlineActionController({
   pillEl: harvestPill,
@@ -487,38 +505,37 @@ function updateUI() {
   hireHarvesterCostEl.textContent = harvesterCost;
   hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
   
-  // Update harvester hire delta (always visible, single line)
+  // Update harvester stats and preview (sign-driven display)
   const preview = calculateHarvesterHirePreview();
+  const baseHarvestMs = getBaselineHarvestDurationMs(); // Derive from configured "normal" outcome
   
-  // Format haul (integers)
-  const haulText = `Haul +${preview.haul.current}→+${preview.haul.next}`;
-  
-  // Format speed (seconds with 1 decimal)
-  const currentSpeedSec = (preview.speed.current / 1000).toFixed(1);
-  const nextSpeedSec = (preview.speed.next / 1000).toFixed(1);
-  const speedText = `Speed ${currentSpeedSec}s→${nextSpeedSec}s`;
-  
-  // Format poor (percentage, with NaN guard)
-  let poorText;
-  if (Number.isFinite(preview.poor.current) && Number.isFinite(preview.poor.next)) {
-    const currentPct = (preview.poor.current * 100).toFixed(0);
-    const nextPct = (preview.poor.next * 100).toFixed(0);
-    poorText = `Poor ${currentPct}%→${nextPct}%`;
-  } else {
-    poorText = `Poor —→—`;
-  }
-  
-  // Combine into single line with bullet separators
-  harvesterDelta.textContent = ` ${haulText} • ${speedText} • ${poorText}`;
-  
-  // Update harvester impact (show harvest rate bonus)
+  // Top row: Current stats (sign-driven)
   if (state.harvesterCount > 0) {
-    const attemptBonus = getHarvesterAttemptBonus();
-    const speedBonus = Math.round((1 - getHarvesterDurationMultiplier()) * 100);
-    harvesterImpactEl.textContent = `+${attemptBonus} olives / harvest`;
+    const currentBatch = preview.haul.current;
+    const currentSpeedReduction = (baseHarvestMs - preview.speed.current) / 1000; // Reduction in seconds
+    const currentPoor = preview.poor.current;
+    
+    const batchStat = `Batch ${formatSignedInt(currentBatch)}`;
+    const speedStat = `Speed ${formatSignedSeconds(-currentSpeedReduction)}`; // Negative = faster/reduction
+    const poorStat = `Poor ${formatSignedPct(currentPoor)}`;
+    
+    harvesterImpactEl.textContent = joinStatPills([batchStat, speedStat, poorStat]);
   } else {
     harvesterImpactEl.textContent = "—";
   }
+  
+  // Bottom row: Next hire deltas (sign-driven)
+  const batchDelta = preview.haul.next - preview.haul.current;
+  const currentSpeedReduction = (baseHarvestMs - preview.speed.current) / 1000;
+  const nextSpeedReduction = (baseHarvestMs - preview.speed.next) / 1000;
+  const speedDelta = nextSpeedReduction - currentSpeedReduction; // Additional reduction
+  const poorDelta = preview.poor.next - preview.poor.current;
+  
+  const batchDeltaStat = `Batch ${formatSignedInt(batchDelta)}`;
+  const speedDeltaStat = `Speed ${formatSignedSeconds(-speedDelta)}`; // Negative = more reduction
+  const poorDeltaStat = `Poor ${formatSignedPct(poorDelta)}`;
+  
+  harvesterDelta.textContent = `Next: ${joinStatPills([batchDeltaStat, speedDeltaStat, poorDeltaStat])}`;
   
   // Update badges
   // Badge slot 1: Manager coverage
@@ -561,6 +578,28 @@ function updateUI() {
   }
 }
 
+// --- Debug: Render Current Harvest Outcome Chances ---
+function updateDebugHarvestChances() {
+  if (!debugHarvestChancesEl) return;
+  
+  const chances = getCurrentHarvestOutcomeChances();
+  
+  // Render as compact rows
+  debugHarvestChancesEl.innerHTML = chances.map(outcome => {
+    const percent = (outcome.weight * 100).toFixed(1);
+    const raw = outcome.weight.toFixed(3);
+    return `
+      <div class="debug-chance-row">
+        <span class="debug-chance-label">${outcome.key}</span>
+        <span class="debug-chance-value">
+          ${percent}%
+          <span class="debug-chance-raw">(${raw})</span>
+        </span>
+      </div>
+    `;
+  }).join('');
+}
+
 // --- Weighted Random Helper ---
 function rollWeighted(outcomesArray) {
   const totalWeight = outcomesArray.reduce((sum, o) => sum + o.weight, 0);
@@ -572,6 +611,22 @@ function rollWeighted(outcomesArray) {
   }
   
   return outcomesArray[outcomesArray.length - 1];
+}
+
+// --- Debug Helper: Current Harvest Outcome Chances ---
+/**
+ * Get the current normalized harvest outcome chances used by the game.
+ * This is the single source of truth for probabilities.
+ * @returns {Array} Normalized outcomes with weight property representing probabilities (0..1)
+ */
+function getCurrentHarvestOutcomeChances() {
+  return computeHarvestOutcomeChances({
+    outcomes: harvestConfig.outcomes,
+    harvesterCount: state.harvesterCount,
+    arboristIsActive: arboristIsActive,
+    upgrades: state.upgrades,
+    tuning: TUNING.harvest,
+  });
 }
 
 // --- Harvest System ---
@@ -591,13 +646,13 @@ function startHarvest(opts = {}) {
   const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
   
   // Use normalized chances from single source of truth
-  const adjustedOutcomes = computeHarvestOutcomeChances({
-    outcomes: harvestConfig.outcomes,
-    harvesterCount: state.harvesterCount,
-    arboristIsActive: arboristIsActive,
-    upgrades: state.upgrades,
-    tuning: TUNING.harvest,
-  });
+  const adjustedOutcomes = getCurrentHarvestOutcomeChances();
+  
+  // Log the probabilities used for this harvest (debug visibility)
+  const chancesLog = adjustedOutcomes
+    .map(o => `${o.key}=${o.weight.toFixed(3)}`)
+    .join(' ');
+  logLine(`Chances at harvest: ${chancesLog}`);
   
   // Select outcome with normalized chances (weights now represent probabilities 0..1)
   const outcome = rollWeighted(adjustedOutcomes);
@@ -1046,6 +1101,9 @@ function startLoop() {
 
 // --- Debug Modal ---
 function openDebug() {
+  // Capture current harvest chances as snapshot
+  updateDebugHarvestChances();
+  
   debugModal.classList.add("active");
   debugModal.setAttribute("aria-hidden", "false");
 }
@@ -1066,6 +1124,14 @@ hireHarvesterBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
+});
+
+clearLogBtn.addEventListener("click", () => {
+  logEl.innerHTML = '';
+});
+
+clearMarketLogBtn.addEventListener("click", () => {
+  marketLogEl.innerHTML = '';
 });
 
 debugBtn.addEventListener("click", openDebug);

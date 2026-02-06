@@ -123,6 +123,10 @@ h1 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .subhead {
@@ -253,6 +257,22 @@ h1 {
   border: 1px solid var(--divider);
 }
 .btn-quiet:hover { background: var(--btnHover); color: var(--text); }
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+.btn-muted {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.btn-muted:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
 
 /* --- Investment Cards --- */
 .investment-list {
@@ -473,6 +493,56 @@ h1 {
   flex-wrap: wrap;
 }
 
+.debug-section {
+  margin-top: 12px;
+}
+
+.debug-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.debug-section-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.debug-harvest-chances {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.debug-chance-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.debug-chance-row:last-child {
+  border-bottom: none;
+}
+
+.debug-chance-label {
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.debug-chance-value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.debug-chance-raw {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: 8px;
+}
+
 /* --- Thin Inventory Row + Inline Ship Progress (no-bounce) --- */
 
 .inventory-list {
@@ -623,7 +693,7 @@ h1 {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .worker-name {
@@ -641,7 +711,7 @@ h1 {
   display: flex;
   align-items: center;
   font-size: 12px;
-  line-height: 1;
+  line-height: 1.2;
   color: var(--muted);
 }
 
@@ -708,9 +778,9 @@ h1 {
 }
 
 .worker-delta {
-  margin-top: 4px;
+  margin-top: 3px;
   font-size: 11px;
   color: var(--muted);
-  line-height: 1;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }

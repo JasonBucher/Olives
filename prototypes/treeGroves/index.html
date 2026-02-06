@@ -197,7 +197,10 @@
           </section>
 
           <section id="log-section" class="section">
-            <div class="section-title">Log</div>
+            <div class="section-title">
+              Log
+              <button id="clear-log-btn" class="btn btn-sm btn-muted" type="button" title="Clear log">Clear</button>
+            </div>
             <div class="subsection">
               <div id="log" class="log"></div>
             </div>
@@ -238,7 +241,10 @@
           </section>
 
           <section class="section">
-            <div class="section-title">Log</div>
+            <div class="section-title">
+              Log
+              <button id="clear-market-log-btn" class="btn btn-sm btn-muted" type="button" title="Clear log">Clear</button>
+            </div>
             <div class="subsection">
               <div id="market-log" class="log market-log-compact"></div>
             </div>
@@ -266,6 +272,19 @@
           <button id="debug-add-olives-btn" class="btn" type="button">+100 Olives</button>
           <button id="debug-add-florins-btn" class="btn" type="button">+100 Florins</button>
           <button id="debug-add-oil-btn" class="btn" type="button">+100 Oil</button>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="debug-section">
+          <div class="debug-section-title">Current Harvest Outcome Chances</div>
+          <div class="debug-section-hint">Normalized probabilities used by game (single source of truth)</div>
+          <div class="debug-section-hint" style="color: #ff9f43; margin-bottom: 8px;">
+            ⚠️ Values captured when panel opened - will not update live
+          </div>
+          <div id="debug-harvest-chances" class="debug-harvest-chances">
+            <!-- Populated by JS -->
+          </div>
         </div>
 
         <hr class="divider" />
