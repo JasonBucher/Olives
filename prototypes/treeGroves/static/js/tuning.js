@@ -84,6 +84,8 @@ export const TUNING = {
   market: {
     tickSeconds: 12,
     olivePriceFlorins: 1,
+    oliveOilPriceFlorins: 5,
+    oliveOilBatchSize: 5,
   },
 
   // Investments: costs for managers and upgrades

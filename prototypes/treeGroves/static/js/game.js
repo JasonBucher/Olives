@@ -23,7 +23,8 @@ const PERSISTED_STATE_KEYS = [
   "treeOlives",
   "harvestedOlives",
   "marketOlives",
-  "oilCount",
+  "marketOliveOil",
+  "oliveOilCount",
   "florinCount",
   "harvesterCount",
   "arboristHired",
@@ -41,7 +42,8 @@ function createDefaultState() {
     // Player inventory
     harvestedOlives: 0,
     marketOlives: 0,
-    oilCount: 0,
+    marketOliveOil: 0,
+    oliveOilCount: 0,
     florinCount: 0,
 
     // Workers
@@ -199,10 +201,18 @@ const shippingConfig = {
   ],
 };
 
+// --- Oil Shipping Config (reuses same time/incident outcomes as olives) ---
+const oliveOilShippingConfig = {
+  batchSize: TUNING.market.oliveOilBatchSize,
+  timeOutcomes: shippingConfig.timeOutcomes,
+  incidentOutcomes: shippingConfig.incidentOutcomes,
+};
+
 // --- Market Config ---
 const marketConfig = {
   tickSeconds: TUNING.market.tickSeconds,
   olivePriceFlorins: TUNING.market.olivePriceFlorins,
+  oliveOilPriceFlorins: TUNING.market.oliveOilPriceFlorins,
   buyerOutcomes: [
     { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
     { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
@@ -245,6 +255,18 @@ let pressJob = {
   olivesConsumed: 0,
 };
 
+// --- Olive Oil Ship Job State (not persisted) ---
+let isShippingOliveOil = false;
+let oliveOilShipJob = {
+  startTimeMs: 0,
+  durationMs: 0,
+  amount: 0,
+  timeOutcomeKey: null,
+  incidentKey: null,
+  lostCount: 0,
+  stolenCount: 0,
+};
+
 // --- Market Timer (not persisted) ---
 let marketTickAcc = 0;
 
@@ -256,6 +278,7 @@ const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
 const marketOliveCountEl = document.getElementById("market-olive-count");
+const marketOilCountEl = document.getElementById("market-oil-count");
 const logEl = document.getElementById("log");
 const marketLogEl = document.getElementById("market-log");
 
@@ -268,13 +291,20 @@ const harvestAttemptingCount = document.getElementById("harvest-attempting-count
 const productionSection = document.getElementById("production-section");
 
 const invOlivesQty = document.getElementById("inv-olives-qty");
-const invOilQty = document.getElementById("inv-oil-qty");
+const invOliveOilQty = document.getElementById("inv-olive-oil-qty");
 const invTransitPill = document.getElementById("inv-olives-transit");
 const invTransitCount = document.getElementById("inv-olives-transit-count");
 const shipProgressBar = document.getElementById("ship-progress-bar");
 const shipCountdown = document.getElementById("ship-countdown");
 const shipProgressContainer = document.getElementById("ship-progress");
 const shipOlivesBtn = document.getElementById("ship-olives-btn");
+
+const invOliveOilTransit = document.getElementById("inv-olive-oil-transit");
+const invOliveOilTransitCount = document.getElementById("inv-olive-oil-transit-count");
+const shipOliveOilProgressBar = document.getElementById("ship-olive-oil-progress-bar");
+const shipOliveOilCountdown = document.getElementById("ship-olive-oil-countdown");
+const shipOliveOilProgressContainer = document.getElementById("ship-olive-oil-progress");
+const shipOliveOilBtn = document.getElementById("ship-olive-oil-btn");
 
 const pressBtn = document.getElementById("press-btn");
 const pressPill = document.getElementById("press-pill");
@@ -335,6 +365,15 @@ const pressActionUI = createInlineActionController({
   progressEl: pressProgressContainer,
   barEl: pressProgressBar,
   countdownEl: pressCountdown,
+  keepLayout: false,
+});
+
+const oliveOilShipActionUI = createInlineActionController({
+  pillEl: invOliveOilTransit,
+  countEl: invOliveOilTransitCount,
+  progressEl: shipOliveOilProgressContainer,
+  barEl: shipOliveOilProgressBar,
+  countdownEl: shipOliveOilCountdown,
   keepLayout: false,
 });
 
@@ -512,12 +551,18 @@ function updateUI() {
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
   invOlivesQty.textContent = state.harvestedOlives;
-  invOilQty.textContent = state.oilCount;
+  invOliveOilQty.textContent = state.oliveOilCount || 0;
   marketOliveCountEl.textContent = state.marketOlives;
+  marketOilCountEl.textContent = state.marketOliveOil || 0;
   
   // Update ship button state based on inventory
   if (!isShipping) {
     shipOlivesBtn.disabled = state.harvestedOlives === 0;
+  }
+
+  // Update oil ship button state based on inventory
+  if (!isShippingOliveOil) {
+    shipOliveOilBtn.disabled = state.oliveOilCount === 0;
   }
 
   // Update press button state based on inventory
@@ -909,13 +954,13 @@ function startPressing() {
 }
 
 function completePressing() {
-  const oilProduced = TUNING.production.olivePress.oilPerPress;
-  state.oilCount += oilProduced;
+  const oliveOilProduced = TUNING.production.olivePress.oilPerPress;
+  state.oliveOilCount += oliveOilProduced;
   
   isPressing = false;
   pressActionUI.end();
   
-  logLine(`Pressed olives into oil (+${oilProduced})`);
+  logLine(`Pressed olives into oil (+${oliveOilProduced})`);
   
   saveGame();
   updateUI();
@@ -938,32 +983,151 @@ function updatePressProgress() {
   }
 }
 
+// --- Olive Oil Shipping System ---
+function startShippingOliveOil() {
+  if (isShippingOliveOil) return;
+  
+  // Ensure oliveOilCount is a valid number
+  if (!state.oliveOilCount || state.oliveOilCount < 1) {
+    logLine("No olive oil to ship");
+    return;
+  }
+  
+  // Determine amount to ship
+  const amount = Math.min(state.oliveOilCount, oliveOilShippingConfig.batchSize);
+  
+  // Deduct from inventory immediately (loaded onto cart)
+  state.oliveOilCount = (state.oliveOilCount || 0) - amount;
+  
+  // Roll time outcome and incident outcome
+  const timeOutcome = rollWeighted(oliveOilShippingConfig.timeOutcomes);
+  const incidentOutcome = rollWeighted(oliveOilShippingConfig.incidentOutcomes);
+  
+  // Calculate losses
+  let lostCount = Math.floor(amount * incidentOutcome.lostPct);
+  let stolenCount = Math.floor(amount * incidentOutcome.stolenPct);
+  
+  // Ensure total losses don't exceed amount
+  if (lostCount + stolenCount > amount) {
+    const total = lostCount + stolenCount;
+    lostCount = Math.floor(amount * (lostCount / total));
+    stolenCount = amount - lostCount;
+  }
+  
+  // Set up olive oil ship job
+  oliveOilShipJob = {
+    startTimeMs: Date.now(),
+    durationMs: timeOutcome.durationMs,
+    amount,
+    timeOutcomeKey: timeOutcome.key,
+    incidentKey: incidentOutcome.key,
+    lostCount,
+    stolenCount,
+  };
+  
+  isShippingOliveOil = true;
+  
+  // Update inline UI
+  oliveOilShipActionUI.start({ count: amount, percent: 0 });
+  shipOliveOilBtn.disabled = true;
+  
+  logLine(`Loaded ${amount} olive oil onto cart for market`);
+  saveGame();
+  updateUI();
+}
+
+function completeShippingOliveOil() {
+  // Calculate how many arrive
+  const arrived = oliveOilShipJob.amount - oliveOilShipJob.lostCount - oliveOilShipJob.stolenCount;
+  
+  // Add to market oil inventory
+  state.marketOliveOil = (state.marketOliveOil || 0) + arrived;
+  
+  // Log to market log
+  const timeKey = oliveOilShipJob.timeOutcomeKey.toUpperCase();
+  const incidentKey = oliveOilShipJob.incidentKey.toUpperCase();
+  marketLogLine(
+    `Olive oil shipment arrived (${timeKey}, ${incidentKey}): sent ${oliveOilShipJob.amount}, arrived ${arrived}, lost ${oliveOilShipJob.lostCount}, stolen ${oliveOilShipJob.stolenCount}.`
+  );
+  
+  // Reset shipping state
+  isShippingOliveOil = false;
+  
+  // Update UI
+  oliveOilShipActionUI.end();
+  
+  saveGame();
+  updateUI();
+}
+
+function updateOliveOilShipProgress() {
+  if (!isShippingOliveOil) return;
+  
+  const now = Date.now();
+  const elapsed = now - oliveOilShipJob.startTimeMs;
+  const progress = Math.min(1, elapsed / oliveOilShipJob.durationMs);
+  const remaining = Math.max(0, (oliveOilShipJob.durationMs - elapsed) / 1000);
+  
+  // Update progress bar and countdown
+  const progressPct = Math.floor(progress * 100);
+  oliveOilShipActionUI.update({ percent: progressPct, countdownText: remaining.toFixed(2) + "s" });
+  
+  if (elapsed >= oliveOilShipJob.durationMs) {
+    completeShippingOliveOil();
+  }
+}
+
 // --- Market System ---
 function runMarketTick() {
-  if (state.marketOlives <= 0) return;
+  // Check if any goods are available
+  const hasOlives = state.marketOlives > 0;
+  const hasOil = (state.marketOliveOil || 0) > 0;
+  
+  if (!hasOlives && !hasOil) return;
+  
+  // Randomly choose which good to process this tick
+  let goodType;
+  if (hasOlives && hasOil) {
+    // Both available, randomly pick one
+    goodType = Math.random() < 0.5 ? 'olives' : 'oil';
+  } else {
+    // Only one available
+    goodType = hasOlives ? 'olives' : 'oil';
+  }
+  
+  // Get inventory and price for chosen good
+  const inventory = goodType === 'olives' ? state.marketOlives : state.marketOliveOil;
+  const price = goodType === 'olives' ? marketConfig.olivePriceFlorins : marketConfig.oliveOilPriceFlorins;
+  const goodName = goodType === 'olives' ? 'olives' : 'olive oil';
   
   // Buyer step
   const buyer = rollWeighted(marketConfig.buyerOutcomes);
   let buyCount;
   
   if (buyer.buyAll) {
-    buyCount = state.marketOlives;
+    buyCount = inventory;
   } else {
     // Random int between buyMin and buyMax
     buyCount = Math.floor(Math.random() * (buyer.buyMax - buyer.buyMin + 1)) + buyer.buyMin;
-    buyCount = Math.min(buyCount, state.marketOlives);
+    buyCount = Math.min(buyCount, inventory);
   }
   
-  state.marketOlives -= buyCount;
-  const earned = buyCount * marketConfig.olivePriceFlorins;
+  // Deduct from inventory
+  if (goodType === 'olives') {
+    state.marketOlives -= buyCount;
+  } else {
+    state.marketOliveOil = (state.marketOliveOil || 0) - buyCount;
+  }
+  const earned = buyCount * price;
   state.florinCount += earned;
   
   // Capitalize buyer name for display
   const buyerName = buyer.key.charAt(0).toUpperCase() + buyer.key.slice(1);
-  marketLogLine(`Buyer (${buyerName}) bought ${buyCount} olives (+${earned} florins).`);
+  marketLogLine(`Buyer (${buyerName}) bought ${buyCount} ${goodName} (+${earned} florins).`);
   
-  // Mishap step (only if olives remain)
-  if (state.marketOlives <= 0) return;
+  // Mishap step (only if goods remain)
+  const remainingInventory = goodType === 'olives' ? state.marketOlives : (state.marketOliveOil || 0);
+  if (remainingInventory <= 0) return;
   
   const mishap = rollWeighted(marketConfig.mishapOutcomes);
   
@@ -975,18 +1139,27 @@ function runMarketTick() {
   if (mishap.key === "urchin" || mishap.key === "crow") {
     // Stolen mishap
     const stolenCount = Math.floor(Math.random() * (mishap.stolenMax - mishap.stolenMin + 1)) + mishap.stolenMin;
-    const actualStolen = Math.min(stolenCount, state.marketOlives);
-    state.marketOlives -= actualStolen;
-    
+    const actualStolen = Math.min(stolenCount, remainingInventory);
     const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
-    marketLogLine(`Mishap (${mishapName}): ${actualStolen} olives stolen.`);
+    
+    if (goodType === 'olives') {
+      state.marketOlives -= actualStolen;
+    } else {
+      state.marketOliveOil = (state.marketOliveOil || 0) - actualStolen;
+    }
+    marketLogLine(`Mishap (${mishapName}): ${actualStolen} ${goodName} stolen.`);
   } else if (mishap.key === "spoil") {
     // Rotted mishap
     const rottedCount = Math.floor(Math.random() * (mishap.rottedMax - mishap.rottedMin + 1)) + mishap.rottedMin;
-    const actualRotted = Math.min(rottedCount, state.marketOlives);
-    state.marketOlives -= actualRotted;
+    const actualRotted = Math.min(rottedCount, remainingInventory);
+    const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
     
-    marketLogLine(`Mishap (Spoil): ${actualRotted} olives rotted.`);
+    if (goodType === 'olives') {
+      state.marketOlives -= actualRotted;
+    } else {
+      state.marketOliveOil = (state.marketOliveOil || 0) - actualRotted;
+    }
+    marketLogLine(`Mishap (${mishapName}): ${actualRotted} ${goodName} rotted.`);
   }
 }
 
@@ -1178,6 +1351,9 @@ function startLoop() {
     // Update press progress
     updatePressProgress();
     
+    // Update olive oil ship progress
+    updateOliveOilShipProgress();
+    
     // Market tick accumulator
     marketTickAcc += dt;
     while (marketTickAcc >= marketConfig.tickSeconds) {
@@ -1209,6 +1385,7 @@ function closeDebug() {
 // --- Wire Events ---
 harvestBtn.addEventListener("click", startHarvest);
 shipOlivesBtn.addEventListener("click", startShipping);
+shipOliveOilBtn.addEventListener("click", startShippingOliveOil);
 pressBtn.addEventListener("click", startPressing);
 
 hireHarvesterBtn.addEventListener("click", () => {
@@ -1247,9 +1424,9 @@ debugAddFlorinsBtn.addEventListener("click", () => {
 });
 
 debugAddOilBtn.addEventListener("click", () => {
-  state.oilCount += 100;
+  state.oliveOilCount += 100;
   saveGame();
-  logLine("Debug: +100 oil");
+  logLine("Debug: +100 olive oil");
 });
 
 // Close modal on outside click
