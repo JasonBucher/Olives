@@ -293,6 +293,7 @@ const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
 const harvesterDelta = document.getElementById("harvester-delta");
 
 const arboristNameEl = document.getElementById("arborist-name");
+const arboristSalaryEl = document.getElementById("arborist-salary");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
 
@@ -1283,6 +1284,10 @@ setShipUIIdle();
 // Set press button label from TUNING
 const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
 pressBtn.textContent = `Press (${olivesPerPress} Olives)`;
+
+// Set arborist salary from TUNING (display as negative cost)
+const arboristSalary = TUNING.managers.arborist.salaryPerMin;
+arboristSalaryEl.textContent = "-" + arboristSalary + " fl/min";
 
 startLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");
