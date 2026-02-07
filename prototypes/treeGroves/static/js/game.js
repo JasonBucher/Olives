@@ -276,7 +276,7 @@ const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
 const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
 const harvesterDelta = document.getElementById("harvester-delta");
 
-const arboristStatusEl = document.getElementById("arborist-status");
+const arboristNameEl = document.getElementById("arborist-name");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
 
@@ -559,7 +559,14 @@ function updateUI() {
   if (state.arboristHired) {
     managersEmptyEl.hidden = true;
     managersArboristWrap.hidden = false;
-    arboristStatusEl.textContent = arboristIsActive ? "Active" : "Inactive (Unpaid)";
+    // Toggle active/inactive styling on manager name
+    if (arboristIsActive) {
+      arboristNameEl.classList.add("mgr-name--active");
+      arboristNameEl.classList.remove("mgr-name--inactive");
+    } else {
+      arboristNameEl.classList.add("mgr-name--inactive");
+      arboristNameEl.classList.remove("mgr-name--active");
+    }
   } else {
     managersEmptyEl.hidden = false;
     managersArboristWrap.hidden = true;

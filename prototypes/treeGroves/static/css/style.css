@@ -197,6 +197,38 @@ h1 {
   padding: 6px 0;
 }
 
+/* Manager row layout */
+.mgr-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mgr-name {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.mgr-name--active {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mgr-name--inactive {
+  color: var(--muted);
+}
+
+.mgr-salary {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .label {
   color: var(--muted);
   font-size: 13px;
