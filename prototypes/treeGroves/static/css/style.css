@@ -842,3 +842,35 @@ h1 {
   /* Optical alignment: reduce font-leading gap so this reads as a single carriage return */
   margin-top: -5px;
 }
+
+/* --- Workers: pin MGR to the Hire button without affecting layout --- */
+
+/* Make the top row 3 columns: name | stats | actions(button) */
+.worker-top,
+.worker-row {
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+}
+
+/* The actions cell is exactly as wide as the button, and right-aligned */
+.worker-actions {
+  grid-column: 3;
+  justify-self: end;
+  position: relative;
+  display: inline-block; /* shrink-wrap to button width */
+}
+
+/* Take badges out of layout; draw them to the LEFT of the button */
+.worker-actions .worker-badges {
+  position: absolute;
+  right: calc(100% + 12px); /* gap between badge and button */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  min-height: 20px;
+}
+
+/* Ensure empty badges don't reserve space (important now that it's absolute) */
+.worker-actions .worker-badge:empty {
+  display: none;
+}
