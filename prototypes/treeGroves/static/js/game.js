@@ -237,6 +237,14 @@ let shipJob = {
   stolenCount: 0,
 };
 
+// --- Press Job State (not persisted) ---
+let isPressing = false;
+let pressJob = {
+  startTimeMs: 0,
+  durationMs: 0,
+  olivesConsumed: 0,
+};
+
 // --- Market Timer (not persisted) ---
 let marketTickAcc = 0;
 
@@ -260,12 +268,20 @@ const harvestAttemptingCount = document.getElementById("harvest-attempting-count
 const productionSection = document.getElementById("production-section");
 
 const invOlivesQty = document.getElementById("inv-olives-qty");
+const invOilQty = document.getElementById("inv-oil-qty");
 const invTransitPill = document.getElementById("inv-olives-transit");
 const invTransitCount = document.getElementById("inv-olives-transit-count");
 const shipProgressBar = document.getElementById("ship-progress-bar");
 const shipCountdown = document.getElementById("ship-countdown");
 const shipProgressContainer = document.getElementById("ship-progress");
 const shipOlivesBtn = document.getElementById("ship-olives-btn");
+
+const pressBtn = document.getElementById("press-btn");
+const pressPill = document.getElementById("press-pill");
+const pressPillCount = document.getElementById("press-pill-count");
+const pressProgressContainer = document.getElementById("press-progress");
+const pressProgressBar = document.getElementById("press-progress-bar");
+const pressCountdown = document.getElementById("press-countdown");
 
 const harvesterCountEl = document.getElementById("harvester-count");
 const hireHarvesterBtn = document.getElementById("hire-harvester-btn");
@@ -309,6 +325,15 @@ const shipActionUI = createInlineActionController({
   progressEl: shipProgressContainer,
   barEl: shipProgressBar,
   countdownEl: shipCountdown,
+  keepLayout: false,
+});
+
+const pressActionUI = createInlineActionController({
+  pillEl: pressPill,
+  countEl: pressPillCount,
+  progressEl: pressProgressContainer,
+  barEl: pressProgressBar,
+  countdownEl: pressCountdown,
   keepLayout: false,
 });
 
@@ -486,11 +511,18 @@ function updateUI() {
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   treeCapacityEl.textContent = state.treeCapacity;
   invOlivesQty.textContent = state.harvestedOlives;
+  invOilQty.textContent = state.oilCount;
   marketOliveCountEl.textContent = state.marketOlives;
   
   // Update ship button state based on inventory
   if (!isShipping) {
     shipOlivesBtn.disabled = state.harvestedOlives === 0;
+  }
+
+  // Update press button state based on inventory
+  const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
+  if (!isPressing) {
+    pressBtn.disabled = state.harvestedOlives < olivesPerPress;
   }
 
   // Update harvest button state and pill visibility
@@ -574,15 +606,6 @@ function updateUI() {
   
   // Update investment button states (state-aware previews)
   updateInvestmentButtons();
-
-  // Toggle Production section visibility
-  if (productionSection) {
-    if (state.arboristHired) {
-      productionSection.hidden = false;
-    } else {
-      productionSection.hidden = true;
-    }
-  }
 }
 
 // --- Debug: Render Current Harvest Outcome Chances ---
@@ -854,6 +877,66 @@ function updateShipProgress() {
   }
 }
 
+// --- Olive Press ---
+function startPressing() {
+  if (isPressing) return;
+  
+  const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
+  if (state.harvestedOlives < olivesPerPress) {
+    logLine("Not enough olives to press");
+    return;
+  }
+  
+  // Deduct olives immediately
+  state.harvestedOlives -= olivesPerPress;
+  
+  // Set up press job
+  pressJob = {
+    startTimeMs: Date.now(),
+    durationMs: TUNING.production.olivePress.pressDurationMs,
+    olivesConsumed: olivesPerPress,
+  };
+  
+  isPressing = true;
+  
+  // Update inline UI
+  pressActionUI.start({ count: olivesPerPress, percent: 0 });
+  pressBtn.disabled = true;
+  
+  saveGame();
+  updateUI();
+}
+
+function completePressing() {
+  const oilProduced = TUNING.production.olivePress.oilPerPress;
+  state.oilCount += oilProduced;
+  
+  isPressing = false;
+  pressActionUI.end();
+  
+  logLine(`Pressed olives into oil (+${oilProduced})`);
+  
+  saveGame();
+  updateUI();
+}
+
+function updatePressProgress() {
+  if (!isPressing) return;
+  
+  const now = Date.now();
+  const elapsed = now - pressJob.startTimeMs;
+  const progress = Math.min(1, elapsed / pressJob.durationMs);
+  const remaining = Math.max(0, (pressJob.durationMs - elapsed) / 1000);
+  
+  // Update progress bar and countdown
+  const progressPct = Math.floor(progress * 100);
+  pressActionUI.update({ percent: progressPct, countdownText: remaining.toFixed(2) + "s" });
+  
+  if (elapsed >= pressJob.durationMs) {
+    completePressing();
+  }
+}
+
 // --- Market System ---
 function runMarketTick() {
   if (state.marketOlives <= 0) return;
@@ -1091,6 +1174,9 @@ function startLoop() {
     // Update ship progress
     updateShipProgress();
     
+    // Update press progress
+    updatePressProgress();
+    
     // Market tick accumulator
     marketTickAcc += dt;
     while (marketTickAcc >= marketConfig.tickSeconds) {
@@ -1122,6 +1208,7 @@ function closeDebug() {
 // --- Wire Events ---
 harvestBtn.addEventListener("click", startHarvest);
 shipOlivesBtn.addEventListener("click", startShipping);
+pressBtn.addEventListener("click", startPressing);
 
 hireHarvesterBtn.addEventListener("click", () => {
   const cost = getHarvesterHireCost();
@@ -1192,5 +1279,10 @@ loadGame();
 initInvestments();
 updateUI();
 setShipUIIdle();
+
+// Set press button label from TUNING
+const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
+pressBtn.textContent = `Press (${olivesPerPress} Olives)`;
+
 startLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");

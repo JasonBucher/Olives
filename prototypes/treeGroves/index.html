@@ -137,6 +137,27 @@
 
                   <button id="ship-olives-btn" class="btn btn-primary" type="button">Ship</button>
                 </div>
+
+                <div class="inventory-row" id="inv-oil-row">
+                  <div class="inv-name">Olive Oil</div>
+                  <div class="inv-qty" id="inv-oil-qty">0</div>
+
+                  <div class="inv-middle">
+                    <span id="inv-oil-transit" class="inv-transit-pill" aria-label="Olive Oil in transit" hidden>
+                      <span id="inv-oil-transit-count">0</span>→
+                    </span>
+                    
+                    <!-- Progress bar inline -->
+                    <div id="ship-oil-progress" class="inv-progress">
+                      <div class="inv-progress-bar">
+                        <div id="ship-oil-countdown" class="action-countdown"></div>
+                        <div id="ship-oil-progress-bar" class="inv-progress-fill"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button id="ship-oil-btn" class="btn btn-primary" type="button">Ship</button>
+                </div>
               </div>
             </div>
           </section>
@@ -203,15 +224,29 @@
             </div>
           </section>
 
-          <section id="production-section" class="section section-locked">
-            <div class="section-title">Production <span class="badge locked-badge">Locked</span></div>
+          <section id="production-section" class="section">
+            <div class="section-title">Production</div>
             
             <div class="subsection">
-              <div class="placeholder-item locked">
-                <span class="item-name">Olive Press</span>
-              </div>
-              <div class="placeholder-item locked">
-                <span class="item-name">Grape Crush</span>
+              <div class="inventory-row">
+                <div class="inv-name">Olive Press</div>
+                <div class="inv-qty"></div>
+
+                <div class="inv-middle">
+                  <span id="press-pill" class="inv-transit-pill" hidden>
+                    <span id="press-pill-count">3</span><span>→</span>
+                  </span>
+                  
+                  <!-- Progress bar inline -->
+                  <div id="press-progress" class="inv-progress">
+                    <div class="inv-progress-bar">
+                      <div id="press-progress-bar" class="inv-progress-fill"></div>
+                      <div id="press-countdown" class="action-countdown"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button id="press-btn" class="btn btn-primary" type="button">Press</button>
               </div>
             </div>
           </section>

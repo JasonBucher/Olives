@@ -71,6 +71,15 @@ export const TUNING = {
     },
   },
 
+  // Production: processor batch sizes, durations, and conversions
+  production: {
+    olivePress: {
+      olivesPerPress: 3,
+      pressDurationMs: 3000,
+      oilPerPress: 1,
+    },
+  },
+
   // Market: timing and pricing
   market: {
     tickSeconds: 12,
