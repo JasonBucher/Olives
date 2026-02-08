@@ -1606,7 +1606,9 @@ function initInvestments() {
     btn.appendChild(effects);
     
     // Click handler
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      // Prevent multiple rapid clicks
+      if (btn.disabled) return;
       buyInvestment(investment.id);
     });
     
