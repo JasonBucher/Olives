@@ -395,6 +395,8 @@ const managersArboristWrap = document.getElementById("managers-arborist");
 const managersPressMgrWrap = document.getElementById("managers-press-manager");
 const pressManagerNameEl = document.getElementById("press-manager-name");
 const pressManagerSalaryEl = document.getElementById("press-manager-salary");
+const managersTotalWrap = document.getElementById("managers-total");
+const managersTotalCostEl = document.getElementById("managers-total-cost");
 
 // Log UI
 const clearLogBtn = document.getElementById("clear-log-btn");
@@ -777,6 +779,26 @@ function updateUI() {
     }
   } else {
     managersPressMgrWrap.hidden = true;
+  }
+  
+  // Update total active manager cost
+  if (anyManagerHired) {
+    let totalCost = 0;
+    if (arboristIsActive) {
+      totalCost += TUNING.managers.arborist.salaryPerMin;
+    }
+    if (pressManagerIsActive) {
+      totalCost += TUNING.managers.pressManager.salaryPerMin;
+    }
+    
+    if (totalCost > 0) {
+      managersTotalWrap.hidden = false;
+      managersTotalCostEl.textContent = "-" + totalCost.toFixed(2) + " fl/min";
+    } else {
+      managersTotalWrap.hidden = true;
+    }
+  } else {
+    managersTotalWrap.hidden = true;
   }
   
   // Update investment button states (state-aware previews)
@@ -1620,11 +1642,11 @@ setShipUIIdle();
 
 // Set arborist salary from TUNING (display as negative cost)
 const arboristSalary = TUNING.managers.arborist.salaryPerMin;
-arboristSalaryEl.textContent = "-" + arboristSalary + " fl/min";
+arboristSalaryEl.textContent = "-" + arboristSalary.toFixed(2) + " fl/min";
 
 // Set press manager salary from TUNING (display as negative cost)
 const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
-pressManagerSalaryEl.textContent = "-" + pressManagerSalary + " fl/min";
+pressManagerSalaryEl.textContent = "-" + pressManagerSalary.toFixed(2) + " fl/min";
 
 startLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");

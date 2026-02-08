@@ -205,19 +205,30 @@ h1 {
   gap: 12px;
 }
 
+.mgr-row-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 8px 0;
+}
+
 .mgr-name {
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0.02em;
+  color: var(--muted);
 }
 
 .mgr-name--active {
-  font-weight: 600;
-  color: var(--text);
+  color: var(--muted);
 }
 
 .mgr-name--inactive {
   color: var(--muted);
+}
+
+.mgr-name--total {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .mgr-salary {
