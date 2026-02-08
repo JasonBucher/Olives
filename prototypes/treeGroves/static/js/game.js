@@ -1399,9 +1399,14 @@ function updateInvestmentButtons() {
     if (!btn) return;
     
     // Hide if owned
-    const isOwned = investment.id === "arborist" 
-      ? state.arboristHired 
-      : state.upgrades[investment.id];
+    let isOwned = false;
+    if (investment.id === "arborist") {
+      isOwned = state.arboristHired;
+    } else if (investment.id === "pressManager") {
+      isOwned = state.pressManagerHired;
+    } else {
+      isOwned = state.upgrades[investment.id];
+    }
     
     if (isOwned) {
       btn.style.display = "none";
