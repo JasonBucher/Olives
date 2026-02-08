@@ -108,25 +108,29 @@ export const TUNING = {
       baseDurationMs: 3000,
       stochasticRounding: true,
       // Press outcome probabilities (weights normalized at runtime)
+      // Expected yield progression:
+      //   Base (0 pressers, no manager): ~0.88x multiplier (slight loss, oil not "free")
+      //   With 5 pressers: ~0.94x multiplier (approaching parity)
+      //   With 5 pressers + manager: ~1.08x multiplier (clearly better, masterwork possible)
       outcomes: [
-        { key: "poor", weight: 0.15, yieldMultiplier: 0.75 },
-        { key: "normal", weight: 0.50, yieldMultiplier: 1.0 },
-        { key: "good", weight: 0.25, yieldMultiplier: 1.25 },
-        { key: "excellent", weight: 0.10, yieldMultiplier: 1.6 },
-        { key: "masterwork", weight: 0.00, yieldMultiplier: 2.0 },  // Enabled by Press Manager
+        { key: "poor", weight: 0.30, yieldMultiplier: 0.6 },      // Wasteful: lose 40%
+        { key: "normal", weight: 0.50, yieldMultiplier: 0.9 },    // Slight loss: 10% waste
+        { key: "good", weight: 0.15, yieldMultiplier: 1.2 },      // Efficient: +20% bonus
+        { key: "excellent", weight: 0.05, yieldMultiplier: 1.5 }, // Great: +50% bonus
+        { key: "masterwork", weight: 0.00, yieldMultiplier: 2.0 },// Rare jackpot: 2x (manager only)
       ],
       // Weight modifiers that shift outcome probabilities
       weightModifiers: {
         perPresser: {
-          poorDelta: -0.008,      // Each presser reduces poor weight
-          normalDelta: -0.002,    // Each presser slightly reduces normal weight
-          goodDelta: 0.006,       // Each presser increases good weight
-          excellentDelta: 0.004,  // Each presser increases excellent weight
+          poorDelta: -0.012,      // Each presser reduces poor weight (fewer bad outcomes)
+          normalDelta: -0.004,    // Each presser reduces normal weight (shift to better)
+          goodDelta: 0.010,       // Each presser increases good weight
+          excellentDelta: 0.006,  // Each presser increases excellent weight
         },
         pressManager: {
-          poorMultiplier: 0.6,    // Multiplies poor weight when active
-          masterworkBonus: 0.03,  // Adds flat weight to masterwork when active
-          excellentBonus: 0.05,   // Adds flat weight to excellent when active
+          poorMultiplier: 0.4,    // Cuts poor weight significantly when active
+          masterworkBonus: 0.05,  // Adds 5% masterwork chance (2 oil from 3 olives)
+          excellentBonus: 0.08,   // Adds 8% excellent chance
         },
       },
     },
