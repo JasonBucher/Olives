@@ -62,6 +62,13 @@
                   <div class="mgr-salary" id="arborist-salary"></div>
                 </div>
               </div>
+              
+              <div id="managers-press-manager" hidden>
+                <div class="mgr-row">
+                  <div class="mgr-name" id="press-manager-name">Press Manager</div>
+                  <div class="mgr-salary" id="press-manager-salary"></div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -195,30 +202,32 @@
                   <div class="worker-delta" id="harvester-delta"></div>
                 </div>
                 
-                <!-- Presser: visual/layout stub for testing multi-worker layout -->
+                <!-- Presser: Increases pressing capacity -->
                 <div class="worker-item" id="worker-presser-item">
                   <div class="worker-top" id="worker-presser-row">
                     <div class="worker-left">
                       <span class="worker-name">Presser</span>
-                      <span class="worker-count">x1</span>
+                      <span class="worker-count" id="presser-count">x0</span>
                     </div>
                     
                     <div class="worker-middle">
-                      <span class="worker-impact">Press rate +0 • Quality 0%</span>
+                      <span class="worker-impact" id="presser-impact">—</span>
                     </div>
                     
                     <div class="worker-actions">
-<div class="worker-badges">
-                      <span class="worker-badge worker-badge--manager">MGR</span>
-                    </div>
+                      <div class="worker-badges">
+                        <span class="worker-badge worker-badge--manager" id="presser-badge-manager"></span>
+                        <span class="worker-badge worker-badge--status" id="presser-badge-status"></span>
+                        <span class="worker-badge worker-badge--extra" id="presser-badge-extra"></span>
+                      </div>
 
-<button class="btn btn-primary worker-hire-btn" type="button">
-                      Hire (50)
-                    </button>
-</div>
+                      <button class="btn btn-primary worker-hire-btn" type="button" id="hire-presser-btn">
+                        Hire (<span id="hire-presser-cost">12</span>)
+                      </button>
+                    </div>
                   </div>
                   
-                  <div class="worker-delta">Next: Press rate +0 • Quality +0%</div>
+                  <div class="worker-delta" id="presser-delta">Next: —</div>
                 </div>
               </div>
             </div>

@@ -27,7 +27,9 @@ const PERSISTED_STATE_KEYS = [
   "oliveOilCount",
   "florinCount",
   "harvesterCount",
+  "presserCount",
   "arboristHired",
+  "pressManagerHired",
   "upgrades",
   "meta",
 ];
@@ -48,7 +50,9 @@ function createDefaultState() {
 
     // Workers
     harvesterCount: 0,
+    presserCount: 0,
     arboristHired: false,
+    pressManagerHired: false,
 
     // Upgrades
     upgrades: {},
@@ -182,6 +186,59 @@ function calculateHarvesterHirePreview() {
     haul: { current: currentHaul, next: nextHaul },
     speed: { current: currentSpeed, next: nextSpeed },
     poor: { current: safeCurrentPoor, next: safeNextPoor }
+  };
+}
+
+// --- Presser Hire Cost ---
+function getPresserHireCost() {
+  return TUNING.workers.presser.baseCost + (state.presserCount * TUNING.workers.presser.costScale);
+}
+
+// --- Presser Effects ---
+// Active state for Press Manager (computed each tick)
+let pressManagerIsActive = false;
+
+/**
+ * Calculate pressing capacity based on presser count and manager status.
+ * Uses logarithmic scaling: capacity = base + (log(1 + count) / logScale) * capacityPerLog
+ * Press Manager multiplies the variable portion of the capacity.
+ */
+function getPressingCapacity() {
+  const baseCapacity = TUNING.workers.presser.baseCapacity;
+  const count = state.presserCount;
+  
+  if (count === 0) return baseCapacity;
+  
+  const logScale = TUNING.workers.presser.logScale;
+  const capacityPerLog = TUNING.workers.presser.capacityPerLog;
+  
+  // Logarithmic scaling: log(1 + count) for smooth diminishing returns
+  const logFactor = Math.log(1 + count) / logScale;
+  let variableCapacity = logFactor * capacityPerLog;
+  
+  // Apply Press Manager multiplier to variable portion
+  if (state.pressManagerHired && pressManagerIsActive) {
+    variableCapacity *= TUNING.managers.pressManager.effectMultiplier;
+  }
+  
+  return Math.floor(baseCapacity + variableCapacity);
+}
+
+function calculatePresserHirePreview() {
+  const currentCount = state.presserCount;
+  const nextCount = currentCount + 1;
+  
+  // Calculate current capacity
+  const currentCapacity = getPressingCapacity();
+  
+  // Temporarily increment count to calculate next capacity
+  const prevCount = state.presserCount;
+  state.presserCount = nextCount;
+  const nextCapacity = getPressingCapacity();
+  state.presserCount = prevCount; // Restore
+  
+  return {
+    capacity: { current: currentCapacity, next: nextCapacity }
   };
 }
 
@@ -322,10 +379,22 @@ const harvesterBadgeStatus = document.getElementById("harvester-badge-status");
 const harvesterBadgeExtra = document.getElementById("harvester-badge-extra");
 const harvesterDelta = document.getElementById("harvester-delta");
 
+const presserCountEl = document.getElementById("presser-count");
+const hirePresserBtn = document.getElementById("hire-presser-btn");
+const hirePresserCostEl = document.getElementById("hire-presser-cost");
+const presserImpactEl = document.getElementById("presser-impact");
+const presserBadgeManager = document.getElementById("presser-badge-manager");
+const presserBadgeStatus = document.getElementById("presser-badge-status");
+const presserBadgeExtra = document.getElementById("presser-badge-extra");
+const presserDelta = document.getElementById("presser-delta");
+
 const arboristNameEl = document.getElementById("arborist-name");
 const arboristSalaryEl = document.getElementById("arborist-salary");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
+const managersPressMgrWrap = document.getElementById("managers-press-manager");
+const pressManagerNameEl = document.getElementById("press-manager-name");
+const pressManagerSalaryEl = document.getElementById("press-manager-salary");
 
 // Log UI
 const clearLogBtn = document.getElementById("clear-log-btn");
@@ -565,10 +634,12 @@ function updateUI() {
     shipOliveOilBtn.disabled = state.oliveOilCount === 0;
   }
 
-  // Update press button state based on inventory
-  const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
+  // Update press button state based on inventory and capacity
+  const pressingCapacity = getPressingCapacity();
   if (!isPressing) {
-    pressBtn.disabled = state.harvestedOlives < olivesPerPress;
+    pressBtn.disabled = state.harvestedOlives < pressingCapacity;
+    // Update button text to show current capacity
+    pressBtn.textContent = `Press (${pressingCapacity} Olives)`;
   }
 
   // Update harvest button state and pill visibility
@@ -633,9 +704,54 @@ function updateUI() {
   harvesterBadgeExtra.textContent = "";
   harvesterBadgeExtra.style.visibility = "hidden";
 
+  // Update presser UI
+  presserCountEl.textContent = `x${state.presserCount}`;
+  const presserCost = getPresserHireCost();
+  hirePresserCostEl.textContent = presserCost;
+  hirePresserBtn.disabled = state.florinCount < presserCost;
+  
+  // Update presser stats and preview
+  const presserPreview = calculatePresserHirePreview();
+  const basePressingCapacity = TUNING.workers.presser.baseCapacity;
+  
+  // Top row: Current capacity bonus (not total)
+  if (state.presserCount > 0) {
+    const currentCapacity = presserPreview.capacity.current;
+    const capacityBonus = currentCapacity - basePressingCapacity;
+    const capacityStat = `Capacity ${formatSignedInt(capacityBonus)}`;
+    presserImpactEl.textContent = capacityStat;
+  } else {
+    presserImpactEl.textContent = "—";
+  }
+  
+  // Bottom row: Next hire delta
+  const capacityDelta = presserPreview.capacity.next - presserPreview.capacity.current;
+  const capacityDeltaStat = `Capacity ${formatSignedInt(capacityDelta)}`;
+  presserDelta.textContent = `Next: ${capacityDeltaStat}`;
+  
+  // Update presser badges
+  // Badge slot 1: Press Manager coverage
+  if (pressManagerIsActive) {
+    presserBadgeManager.textContent = "Mgr";
+    presserBadgeManager.style.visibility = "visible";
+  } else {
+    presserBadgeManager.textContent = "";
+    presserBadgeManager.style.visibility = "hidden";
+  }
+  
+  // Badge slot 2: Status modifier (for future use)
+  presserBadgeStatus.textContent = "";
+  presserBadgeStatus.style.visibility = "hidden";
+  
+  // Badge slot 3: Extra modifier (for future use)
+  presserBadgeExtra.textContent = "";
+  presserBadgeExtra.style.visibility = "hidden";
+
   // Toggle Managers section
+  const anyManagerHired = state.arboristHired || state.pressManagerHired;
+  managersEmptyEl.hidden = anyManagerHired;
+  
   if (state.arboristHired) {
-    managersEmptyEl.hidden = true;
     managersArboristWrap.hidden = false;
     // Toggle active/inactive styling on manager name
     if (arboristIsActive) {
@@ -646,8 +762,21 @@ function updateUI() {
       arboristNameEl.classList.remove("mgr-name--active");
     }
   } else {
-    managersEmptyEl.hidden = false;
     managersArboristWrap.hidden = true;
+  }
+  
+  if (state.pressManagerHired) {
+    managersPressMgrWrap.hidden = false;
+    // Toggle active/inactive styling on manager name
+    if (pressManagerIsActive) {
+      pressManagerNameEl.classList.add("mgr-name--active");
+      pressManagerNameEl.classList.remove("mgr-name--inactive");
+    } else {
+      pressManagerNameEl.classList.add("mgr-name--inactive");
+      pressManagerNameEl.classList.remove("mgr-name--active");
+    }
+  } else {
+    managersPressMgrWrap.hidden = true;
   }
   
   // Update investment button states (state-aware previews)
@@ -927,26 +1056,30 @@ function updateShipProgress() {
 function startPressing() {
   if (isPressing) return;
   
-  const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
-  if (state.harvestedOlives < olivesPerPress) {
+  const pressingCapacity = getPressingCapacity();
+  
+  // Use the minimum of pressing capacity and available olives
+  const olivesToPress = Math.min(pressingCapacity, state.harvestedOlives);
+  
+  if (olivesToPress < pressingCapacity) {
     logLine("Not enough olives to press");
     return;
   }
   
   // Deduct olives immediately
-  state.harvestedOlives -= olivesPerPress;
+  state.harvestedOlives -= olivesToPress;
   
   // Set up press job
   pressJob = {
     startTimeMs: Date.now(),
     durationMs: TUNING.production.olivePress.pressDurationMs,
-    olivesConsumed: olivesPerPress,
+    olivesConsumed: olivesToPress,
   };
   
   isPressing = true;
   
   // Update inline UI
-  pressActionUI.start({ count: olivesPerPress, percent: 0 });
+  pressActionUI.start({ count: olivesToPress, percent: 0 });
   pressBtn.disabled = true;
   
   saveGame();
@@ -954,13 +1087,16 @@ function startPressing() {
 }
 
 function completePressing() {
-  const oliveOilProduced = TUNING.production.olivePress.oilPerPress;
+  // Calculate oil produced based on how many olives were consumed
+  const oilPerOlive = TUNING.production.olivePress.oilPerPress / TUNING.production.olivePress.olivesPerPress;
+  const oliveOilProduced = Math.floor(pressJob.olivesConsumed * oilPerOlive);
+  
   state.oliveOilCount += oliveOilProduced;
   
   isPressing = false;
   pressActionUI.end();
   
-  logLine(`Pressed olives into oil (+${oliveOilProduced})`);
+  logLine(`Pressed ${pressJob.olivesConsumed} olives into ${oliveOilProduced} oil`);
   
   saveGame();
   updateUI();
@@ -1334,6 +1470,20 @@ function startLoop() {
       arboristIsActive = false;
     }
 
+    // Press Manager salary drain
+    if (state.pressManagerHired) {
+      const salaryPerSec = TUNING.managers.pressManager.salaryPerMin / 60;
+      const costThisTick = salaryPerSec * dt;
+      if (state.florinCount >= costThisTick) {
+        state.florinCount -= costThisTick;
+        pressManagerIsActive = true;
+      } else {
+        pressManagerIsActive = false;
+      }
+    } else {
+      pressManagerIsActive = false;
+    }
+
     // Trees grow olives automatically
     growTrees(dt);
     
@@ -1398,6 +1548,16 @@ hireHarvesterBtn.addEventListener("click", () => {
   logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
 });
 
+hirePresserBtn.addEventListener("click", () => {
+  const cost = getPresserHireCost();
+  if (state.florinCount < cost) return;
+  state.florinCount -= cost;
+  state.presserCount += 1;
+  saveGame();
+  updateUI();
+  logLine(`Hired Presser (#${state.presserCount}) for ${cost} florins.`);
+});
+
 clearLogBtn.addEventListener("click", () => {
   logEl.innerHTML = '';
 });
@@ -1458,13 +1618,13 @@ initInvestments();
 updateUI();
 setShipUIIdle();
 
-// Set press button label from TUNING
-const olivesPerPress = TUNING.production.olivePress.olivesPerPress;
-pressBtn.textContent = `Press (${olivesPerPress} Olives)`;
-
 // Set arborist salary from TUNING (display as negative cost)
 const arboristSalary = TUNING.managers.arborist.salaryPerMin;
 arboristSalaryEl.textContent = "-" + arboristSalary + " fl/min";
+
+// Set press manager salary from TUNING (display as negative cost)
+const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
+pressManagerSalaryEl.textContent = "-" + pressManagerSalary + " fl/min";
 
 startLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");

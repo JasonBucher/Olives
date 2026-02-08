@@ -54,6 +54,39 @@ export const INVESTMENTS = [
       ];
     },
   },
+
+  {
+    id: "pressManager",
+    title: "Hire a Press Manager",
+    
+    cost: (tuning, state) => tuning.managers.pressManager.hireCost,
+    
+    isUnlocked: (state, tuning) => true,
+    
+    canPurchase: (state, tuning) => {
+      return !state.pressManagerHired && 
+             state.florinCount >= tuning.managers.pressManager.hireCost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "pressManager");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.managers.pressManager.hireCost;
+      state.pressManagerHired = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const salary = tuning.managers.pressManager.salaryPerMin;
+      const multiplier = tuning.managers.pressManager.effectMultiplier;
+      const bonusPct = ((multiplier - 1) * 100).toFixed(0);
+      
+      return [
+        `Press (while paid): Capacity curve ×${multiplier} (+${bonusPct}% more olives per presser)`,
+        `Ongoing: Salary ${salary} florins/min`,
+      ];
+    },
+  },
   
   // --- Upgrades ---
   {

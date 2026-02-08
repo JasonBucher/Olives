@@ -61,6 +61,13 @@ export const TUNING = {
       durationReductionPct: 0.04, // 4% speed per harvester
       durationReductionCap: 0.25,  // Max 25% total speed boost
     },
+    presser: {
+      baseCost: 12,
+      costScale: 6,              // Cost increase per presser hired
+      baseCapacity: 3,           // Minimum olives that can be pressed
+      logScale: 4.4,             // Logarithmic scaling factor (higher = slower growth)
+      capacityPerLog: 5,         // Capacity added per log unit
+    },
   },
 
   // Managers: hiring costs, salaries, and supervision effects
@@ -68,6 +75,11 @@ export const TUNING = {
     arborist: {
       hireCost: 50,
       salaryPerMin: 0.2,         // Florins per minute
+    },
+    pressManager: {
+      hireCost: 150,
+      salaryPerMin: 0.75,        // Florins per minute
+      effectMultiplier: 1.25,    // 25% increase to presser capacity curve
     },
   },
 
