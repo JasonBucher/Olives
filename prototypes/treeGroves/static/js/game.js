@@ -1536,7 +1536,33 @@ function initInvestments() {
   
   container.innerHTML = "";
   
-  INVESTMENTS.forEach(investment => {
+  // Sort investments by: group (managers first), then cost, then tie-breakers
+  const sortedInvestments = [...INVESTMENTS].sort((a, b) => {
+    // Group ranking: manager=0, upgrade=1
+    const groupRank = { manager: 0, upgrade: 1 };
+    const rankA = groupRank[a.group] ?? 999;
+    const rankB = groupRank[b.group] ?? 999;
+    if (rankA !== rankB) return rankA - rankB;
+    
+    // Cost comparison
+    const costA = a.cost(TUNING, state);
+    const costB = b.cost(TUNING, state);
+    if (costA !== costB) return costA - costB;
+    
+    // Optional sortOrder
+    const sortOrderA = a.sortOrder ?? 0;
+    const sortOrderB = b.sortOrder ?? 0;
+    if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+    
+    // Title alphabetical
+    const titleCmp = a.title.localeCompare(b.title);
+    if (titleCmp !== 0) return titleCmp;
+    
+    // ID alphabetical (final tie-breaker)
+    return a.id.localeCompare(b.id);
+  });
+  
+  sortedInvestments.forEach(investment => {
     const btn = document.createElement("button");
     btn.className = "inv";
     btn.type = "button";

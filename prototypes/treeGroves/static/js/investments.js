@@ -17,13 +17,14 @@ import { computeHarvestOutcomeWeights, BASE_HARVEST_OUTCOMES } from './harvestWe
 
 /**
  * Registry of all available investments (managers and upgrades)
- * Ordered by: managers first, then upgrades in logical progression
+ * Organized logically by type. UI sorting happens at render time based on group and cost.
  */
 export const INVESTMENTS = [
   // --- Managers ---
   {
     id: "arborist",
     title: "Hire an Arborist",
+    group: "manager",
     
     cost: (tuning, state) => tuning.managers.arborist.hireCost,
     
@@ -57,6 +58,7 @@ export const INVESTMENTS = [
   {
     id: "foreman",
     title: "Hire a Foreman",
+    group: "manager",
     
     cost: (tuning, state) => tuning.managers.foreman.hireCost,
     
@@ -90,6 +92,7 @@ export const INVESTMENTS = [
   {
     id: "pressManager",
     title: "Hire a Press Manager",
+    group: "manager",
     
     cost: (tuning, state) => tuning.managers.pressManager.hireCost,
     
@@ -125,6 +128,7 @@ export const INVESTMENTS = [
   {
     id: "standardized_tools",
     title: "Standardized Tools",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.costs.standardized_tools,
     
@@ -154,6 +158,7 @@ export const INVESTMENTS = [
   {
     id: "training_program",
     title: "Training Program",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.costs.training_program,
     
@@ -197,6 +202,7 @@ export const INVESTMENTS = [
   {
     id: "selective_picking",
     title: "Selective Picking",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.costs.selective_picking,
     
@@ -226,6 +232,7 @@ export const INVESTMENTS = [
   {
     id: "ladders_nets",
     title: "Ladders & Nets",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.costs.ladders_nets,
     
@@ -276,6 +283,7 @@ export const INVESTMENTS = [
   {
     id: "quality_inspector",
     title: "Quality Inspector",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.costs.quality_inspector,
     
@@ -313,6 +321,7 @@ export const INVESTMENTS = [
   {
     id: "olive_ship_efficiency_1",
     title: "Olive Ship Efficiency I",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[0].cost,
     
@@ -342,6 +351,7 @@ export const INVESTMENTS = [
   {
     id: "olive_ship_efficiency_2",
     title: "Olive Ship Efficiency II",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[1].cost,
     
@@ -372,6 +382,7 @@ export const INVESTMENTS = [
   {
     id: "olive_ship_efficiency_3",
     title: "Olive Ship Efficiency III",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[2].cost,
     
@@ -402,6 +413,7 @@ export const INVESTMENTS = [
   {
     id: "olive_oil_ship_efficiency_1",
     title: "Olive Oil Ship Efficiency I",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[0].cost,
     
@@ -431,6 +443,7 @@ export const INVESTMENTS = [
   {
     id: "olive_oil_ship_efficiency_2",
     title: "Olive Oil Ship Efficiency II",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[1].cost,
     
@@ -461,6 +474,7 @@ export const INVESTMENTS = [
   {
     id: "olive_oil_ship_efficiency_3",
     title: "Olive Oil Ship Efficiency III",
+    group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[2].cost,
     
