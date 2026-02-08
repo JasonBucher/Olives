@@ -5,6 +5,7 @@ import { computePressOutcomeChances } from './pressWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { formatSignedInt, formatSignedPct, formatSignedSeconds, joinStatPills } from './format.js';
+import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -395,8 +396,18 @@ const treeCapacityEl = document.getElementById("tree-capacity");
 const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
-const logEl = document.getElementById("log");
-const marketLogEl = document.getElementById("market-log");
+
+// Log containers
+const farmLogPlayerEl = document.getElementById("farmLogPlayer");
+const farmLogDebugEl = document.getElementById("farmLogDebug");
+const marketLogPlayerEl = document.getElementById("marketLogPlayer");
+const marketLogDebugEl = document.getElementById("marketLogDebug");
+
+// Log tab buttons
+const farmLogTabPlayer = document.getElementById("farmLogTabPlayer");
+const farmLogTabDebug = document.getElementById("farmLogTabDebug");
+const marketLogTabPlayer = document.getElementById("marketLogTabPlayer");
+const marketLogTabDebug = document.getElementById("marketLogTabDebug");
 
 const harvestBtn = document.getElementById("harvest-btn");
 const harvestProgress = document.getElementById("harvest-progress");
@@ -520,34 +531,15 @@ const oliveOilShipActionUI = createInlineActionController({
 });
 
 // --- Logging ---
+// --- Logging (wrappers for new logger) ---
 function logLine(message, color = null) {
-  const div = document.createElement("div");
-  div.className = "line";
-  if (color) {
-    div.classList.add(`log-${color}`);
-  }
-  div.textContent = message;
-  logEl.prepend(div);
-
-  // Cap lines
-  const maxLines = 60;
-  while (logEl.children.length > maxLines) {
-    logEl.removeChild(logEl.lastChild);
-  }
+  logPlayer({ channel: 'farm', text: message, color });
 }
 
 function marketLogLine(message) {
-  const div = document.createElement("div");
-  div.className = "line";
-  div.textContent = message;
-  marketLogEl.prepend(div);
-
-  // Cap lines
-  const maxLines = 60;
-  while (marketLogEl.children.length > maxLines) {
-    marketLogEl.removeChild(marketLogEl.lastChild);
-  }
+  logPlayer({ channel: 'market', text: message });
 }
+
 
 // --- Inline Action UI ---
 function createInlineActionController({ pillEl, countEl, progressEl, barEl, countdownEl, keepLayout }) {
@@ -1047,7 +1039,7 @@ function startHarvest(opts = {}) {
   const chancesLog = adjustedOutcomes
     .map(o => `${o.key}=${o.weight.toFixed(3)}`)
     .join(' ');
-  logLine(`Chances at harvest: ${chancesLog}`);
+  logDebug({ channel: 'farm', text: `Chances at harvest: ${chancesLog}` });
   
   // Select outcome with normalized chances (weights now represent probabilities 0..1)
   const outcome = rollWeighted(adjustedOutcomes);
@@ -1308,12 +1300,40 @@ function completePressing() {
   const outcomeName = pressJob.outcome?.key || 'unknown';
   
   // Determine color based on outcome
-  let logColor = null;
-  if (outcomeName === 'poor') logColor = 'red';
-  else if (outcomeName === 'good') logColor = 'green';
-  else if (outcomeName === 'excellent' || outcomeName === 'masterwork') logColor = 'gold';
+  let playerColor = null;
+  if (outcomeName === 'poor') playerColor = 'red';
+  else if (outcomeName === 'good' || outcomeName === 'excellent' || outcomeName === 'masterwork') playerColor = 'gold';
   
-  logLine(`Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`, logColor);
+  // Create flavorful player message
+  const outcomeLabels = {
+    poor: 'Poor Press',
+    normal: 'Normal Press',
+    good: 'Good Press',
+    excellent: 'Excellent Press',
+    masterwork: 'Masterwork Press'
+  };
+  const outcomeLabel = outcomeLabels[outcomeName] || 'Unknown Press';
+  
+  let playerText = `${outcomeLabel} → ${producedOil} Olive Oil`;
+  
+  // Check if we got lucky with stochastic rounding (only show sparkle for positive outcomes)
+  const gotExtraOil = producedOil > floor;
+  const isPositiveOutcome = outcomeName === 'good' || outcomeName === 'excellent' || outcomeName === 'masterwork';
+  if (gotExtraOil && isPositiveOutcome) {
+    playerText += ' ✨ Extracted extra oil!';
+  }
+  
+  // Create mechanical debug message
+  const debugText = `Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`;
+  
+  // Log to both tabs
+  logEvent({
+    channel: 'farm',
+    playerText: playerText,
+    debugText: debugText,
+    playerColor: playerColor,
+    debugColor: playerColor
+  });
   
   saveGame();
   updateUI();
@@ -1836,11 +1856,13 @@ hirePresserBtn.addEventListener("click", () => {
 });
 
 clearLogBtn.addEventListener("click", () => {
-  logEl.innerHTML = '';
+  clearLog('farm', 'player');
+  clearLog('farm', 'debug');
 });
 
 clearMarketLogBtn.addEventListener("click", () => {
-  marketLogEl.innerHTML = '';
+  clearLog('market', 'player');
+  clearLog('market', 'debug');
 });
 
 debugBtn.addEventListener("click", openDebug);
@@ -1890,6 +1912,34 @@ window.addEventListener("focus", () => {
 });
 
 // --- Init ---
+// Initialize logger
+initLogger({
+  farmPlayerEl: farmLogPlayerEl,
+  farmDebugEl: farmLogDebugEl,
+  marketPlayerEl: marketLogPlayerEl,
+  marketDebugEl: marketLogDebugEl,
+});
+
+// Set up log tab switching
+function setupLogTabs(playerBtn, debugBtn, playerContainer, debugContainer) {
+  playerBtn.addEventListener('click', () => {
+    playerBtn.classList.add('is-active');
+    debugBtn.classList.remove('is-active');
+    playerContainer.classList.remove('is-hidden');
+    debugContainer.classList.add('is-hidden');
+  });
+  
+  debugBtn.addEventListener('click', () => {
+    debugBtn.classList.add('is-active');
+    playerBtn.classList.remove('is-active');
+    debugContainer.classList.remove('is-hidden');
+    playerContainer.classList.add('is-hidden');
+  });
+}
+
+setupLogTabs(farmLogTabPlayer, farmLogTabDebug, farmLogPlayerEl, farmLogDebugEl);
+setupLogTabs(marketLogTabPlayer, marketLogTabDebug, marketLogPlayerEl, marketLogDebugEl);
+
 loadGame();
 initInvestments();
 updateUI();

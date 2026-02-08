@@ -28,6 +28,10 @@
   display: none !important;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -462,6 +466,39 @@ h1 {
 .log .log-green { color: #2ecc71; }
 .log .log-orange { color: #e67e22; }
 .log .log-gold { color: #f1c40f; }
+
+/* Log tabs */
+.log-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 2px;
+}
+
+.log-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.log-tab:hover {
+  color: rgba(255,255,255,0.7);
+}
+
+.log-tab.is-active {
+  color: var(--text);
+  border-bottom-color: rgba(255,255,255,0.3);
+}
+
 
 .muted {
   color: var(--muted);

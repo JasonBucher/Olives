@@ -316,7 +316,12 @@
               <button id="clear-log-btn" class="btn btn-sm btn-muted" type="button" title="Clear log">Clear</button>
             </div>
             <div class="subsection">
-              <div id="log" class="log"></div>
+              <div class="log-tabs">
+                <button id="farmLogTabPlayer" class="log-tab is-active" type="button">Player</button>
+                <button id="farmLogTabDebug" class="log-tab" type="button">Debug</button>
+              </div>
+              <div id="farmLogPlayer" class="log"></div>
+              <div id="farmLogDebug" class="log is-hidden"></div>
             </div>
           </section>
         </div>
@@ -364,7 +369,12 @@
               <button id="clear-market-log-btn" class="btn btn-sm btn-muted" type="button" title="Clear log">Clear</button>
             </div>
             <div class="subsection">
-              <div id="market-log" class="log market-log-compact"></div>
+              <div class="log-tabs">
+                <button id="marketLogTabPlayer" class="log-tab is-active" type="button">Player</button>
+                <button id="marketLogTabDebug" class="log-tab" type="button">Debug</button>
+              </div>
+              <div id="marketLogPlayer" class="log market-log-compact"></div>
+              <div id="marketLogDebug" class="log market-log-compact is-hidden"></div>
             </div>
           </section>
         </div>
