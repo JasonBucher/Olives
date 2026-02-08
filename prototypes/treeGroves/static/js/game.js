@@ -524,9 +524,12 @@ const oliveOilShipActionUI = createInlineActionController({
 });
 
 // --- Logging ---
-function logLine(message) {
+function logLine(message, color = null) {
   const div = document.createElement("div");
   div.className = "line";
+  if (color) {
+    div.classList.add(`log-${color}`);
+  }
   div.textContent = message;
   logEl.prepend(div);
 
@@ -1092,10 +1095,17 @@ function completeHarvest() {
   // Log outcome
   const outcomeLabel = outcome.key.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase());
   const durationSec = (durationMs / 1000).toFixed(2);
+  
+  // Determine color based on outcome
+  let logColor = null;
+  if (outcome.key === 'poor') logColor = 'red';
+  else if (outcome.key === 'efficient') logColor = 'green';
+  else if (outcome.key.startsWith('interrupted')) logColor = 'orange';
+  
   if (remaining > 0) {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`, logColor);
   } else {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost}`);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost}`, logColor);
   }
   
   // Reset state
@@ -1298,7 +1308,14 @@ function completePressing() {
   pressActionUI.end();
   
   const outcomeName = pressJob.outcome?.key || 'unknown';
-  logLine(`Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`);
+  
+  // Determine color based on outcome
+  let logColor = null;
+  if (outcomeName === 'poor') logColor = 'red';
+  else if (outcomeName === 'good') logColor = 'green';
+  else if (outcomeName === 'excellent' || outcomeName === 'masterwork') logColor = 'gold';
+  
+  logLine(`Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`, logColor);
   
   saveGame();
   updateUI();

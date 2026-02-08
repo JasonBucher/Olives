@@ -457,6 +457,12 @@ h1 {
 }
 .log .line:last-child { border-bottom: 0; }
 
+/* Log outcome colors */
+.log .log-red { color: #e74c3c; }
+.log .log-green { color: #2ecc71; }
+.log .log-orange { color: #e67e22; }
+.log .log-gold { color: #f1c40f; }
+
 .muted {
   color: var(--muted);
   font-size: 12px;
