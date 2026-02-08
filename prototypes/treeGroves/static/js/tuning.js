@@ -136,12 +136,45 @@ export const TUNING = {
     },
   },
 
-  // Market: timing and pricing
+  // Market: timing, pricing, shipping, and trading
   market: {
     tickSeconds: 12,
-    olivePriceFlorins: 1,
-    oliveOilPriceFlorins: 5,
-    oliveOilBatchSize: 5,
+    prices: {
+      olivesFlorins: 1,
+      oliveOilFlorins: 5,
+    },
+    shipping: {
+      // Shared time outcomes for both olive and olive oil shipping
+      sharedTimeOutcomes: [
+        { key: "fast", weight: 0.20, durationMs: 3000 },
+        { key: "normal", weight: 0.60, durationMs: 5000 },
+        { key: "slow", weight: 0.20, durationMs: 8000 },
+      ],
+      // Shared incident outcomes for both olive and olive oil shipping
+      sharedIncidentOutcomes: [
+        { key: "none", weight: 0.60, lostPct: 0.00, stolenPct: 0.00 },
+        { key: "bumps", weight: 0.20, lostPct: 0.10, stolenPct: 0.00 },
+        { key: "snack", weight: 0.10, lostPct: 0.05, stolenPct: 0.00 },
+        { key: "bandits", weight: 0.10, lostPct: 0.00, stolenPct: 0.30 },
+      ],
+      olives: {
+        baseBatchSize: 10,
+      },
+      oliveOil: {
+        baseBatchSize: 5,
+      },
+    },
+    buyerOutcomes: [
+      { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
+      { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
+      { key: "giuseppe", weight: 0.15, buyAll: true },
+    ],
+    mishapOutcomes: [
+      { key: "none", weight: 0.70 },
+      { key: "urchin", weight: 0.15, stolenMin: 1, stolenMax: 3 },
+      { key: "crow", weight: 0.10, stolenMin: 1, stolenMax: 2 },
+      { key: "spoil", weight: 0.05, rottedMin: 1, rottedMax: 4 },
+    ],
   },
 
   // Investments: costs for managers and upgrades
@@ -152,6 +185,18 @@ export const TUNING = {
       selective_picking: 200,
       ladders_nets: 300,
       quality_inspector: 500,
+    },
+    shippingEfficiency: {
+      olives: [
+        { idSuffix: 1, cost: 25, capacityBonus: 10 },
+        { idSuffix: 2, cost: 50, capacityBonus: 10 },
+        { idSuffix: 3, cost: 100, capacityBonus: 5 },
+      ],
+      oliveOil: [
+        { idSuffix: 1, cost: 100, capacityBonus: 10 },
+        { idSuffix: 2, cost: 200, capacityBonus: 10 },
+        { idSuffix: 3, cost: 500, capacityBonus: 25 },
+      ],
     },
   },
 };

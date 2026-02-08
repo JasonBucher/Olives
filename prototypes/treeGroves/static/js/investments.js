@@ -308,4 +308,183 @@ export const INVESTMENTS = [
       return lines;
     },
   },
+  
+  // --- Shipping Efficiency Upgrades ---
+  {
+    id: "olive_ship_efficiency_1",
+    title: "Olive Ship Efficiency I",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[0].cost,
+    
+    isUnlocked: (state, tuning) => !state.upgrades.olive_ship_efficiency_1,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_ship_efficiency_1 && 
+             state.florinCount >= tuning.investments.shippingEfficiency.olives[0].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_ship_efficiency_1");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.olives[0].cost;
+      state.upgrades.olive_ship_efficiency_1 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.olives[0].capacityBonus;
+      return [
+        `Market: Olive shipping capacity +${bonus}`,
+      ];
+    },
+  },
+  
+  {
+    id: "olive_ship_efficiency_2",
+    title: "Olive Ship Efficiency II",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[1].cost,
+    
+    isUnlocked: (state, tuning) => state.upgrades.olive_ship_efficiency_1 && !state.upgrades.olive_ship_efficiency_2,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_ship_efficiency_2 && 
+             state.upgrades.olive_ship_efficiency_1 &&
+             state.florinCount >= tuning.investments.shippingEfficiency.olives[1].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_ship_efficiency_2");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.olives[1].cost;
+      state.upgrades.olive_ship_efficiency_2 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.olives[1].capacityBonus;
+      return [
+        `Market: Olive shipping capacity +${bonus}`,
+      ];
+    },
+  },
+  
+  {
+    id: "olive_ship_efficiency_3",
+    title: "Olive Ship Efficiency III",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[2].cost,
+    
+    isUnlocked: (state, tuning) => state.upgrades.olive_ship_efficiency_2 && !state.upgrades.olive_ship_efficiency_3,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_ship_efficiency_3 && 
+             state.upgrades.olive_ship_efficiency_2 &&
+             state.florinCount >= tuning.investments.shippingEfficiency.olives[2].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_ship_efficiency_3");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.olives[2].cost;
+      state.upgrades.olive_ship_efficiency_3 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.olives[2].capacityBonus;
+      return [
+        `Market: Olive shipping capacity +${bonus}`,
+      ];
+    },
+  },
+  
+  {
+    id: "olive_oil_ship_efficiency_1",
+    title: "Olive Oil Ship Efficiency I",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[0].cost,
+    
+    isUnlocked: (state, tuning) => !state.upgrades.olive_oil_ship_efficiency_1,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_oil_ship_efficiency_1 && 
+             state.florinCount >= tuning.investments.shippingEfficiency.oliveOil[0].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_oil_ship_efficiency_1");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.oliveOil[0].cost;
+      state.upgrades.olive_oil_ship_efficiency_1 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.oliveOil[0].capacityBonus;
+      return [
+        `Market: Olive Oil shipping capacity +${bonus}`,
+      ];
+    },
+  },
+  
+  {
+    id: "olive_oil_ship_efficiency_2",
+    title: "Olive Oil Ship Efficiency II",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[1].cost,
+    
+    isUnlocked: (state, tuning) => state.upgrades.olive_oil_ship_efficiency_1 && !state.upgrades.olive_oil_ship_efficiency_2,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_oil_ship_efficiency_2 && 
+             state.upgrades.olive_oil_ship_efficiency_1 &&
+             state.florinCount >= tuning.investments.shippingEfficiency.oliveOil[1].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_oil_ship_efficiency_2");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.oliveOil[1].cost;
+      state.upgrades.olive_oil_ship_efficiency_2 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.oliveOil[1].capacityBonus;
+      return [
+        `Market: Olive Oil shipping capacity +${bonus}`,
+      ];
+    },
+  },
+  
+  {
+    id: "olive_oil_ship_efficiency_3",
+    title: "Olive Oil Ship Efficiency III",
+    
+    cost: (tuning, state) => tuning.investments.shippingEfficiency.oliveOil[2].cost,
+    
+    isUnlocked: (state, tuning) => state.upgrades.olive_oil_ship_efficiency_2 && !state.upgrades.olive_oil_ship_efficiency_3,
+    
+    canPurchase: (state, tuning) => {
+      return !state.upgrades.olive_oil_ship_efficiency_3 && 
+             state.upgrades.olive_oil_ship_efficiency_2 &&
+             state.florinCount >= tuning.investments.shippingEfficiency.oliveOil[2].cost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "olive_oil_ship_efficiency_3");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.investments.shippingEfficiency.oliveOil[2].cost;
+      state.upgrades.olive_oil_ship_efficiency_3 = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.shippingEfficiency.oliveOil[2].capacityBonus;
+      return [
+        `Market: Olive Oil shipping capacity +${bonus}`,
+      ];
+    },
+  },
 ];

@@ -303,46 +303,42 @@ function calculatePresserHirePreview() {
   };
 }
 
-// --- Shipping Config ---
-const shippingConfig = {
-  batchSize: 10,
-  timeOutcomes: [
-    { key: "fast", weight: 0.20, durationMs: 3000 },
-    { key: "normal", weight: 0.60, durationMs: 5000 },
-    { key: "slow", weight: 0.20, durationMs: 8000 },
-  ],
-  incidentOutcomes: [
-    { key: "none", weight: 0.60, lostPct: 0.00, stolenPct: 0.00 },
-    { key: "bumps", weight: 0.20, lostPct: 0.10, stolenPct: 0.00 },
-    { key: "snack", weight: 0.10, lostPct: 0.05, stolenPct: 0.00 },
-    { key: "bandits", weight: 0.10, lostPct: 0.00, stolenPct: 0.30 },
-  ],
-};
+// --- Shipping Capacity Helpers ---
+/**
+ * Calculate olive shipping capacity including upgrade bonuses.
+ */
+function getOliveShippingCapacity() {
+  let capacity = TUNING.market.shipping.olives.baseBatchSize;
+  
+  // Add bonuses from purchased upgrades
+  const upgrades = TUNING.investments.shippingEfficiency.olives;
+  for (let i = 0; i < upgrades.length; i++) {
+    const upgradeId = `olive_ship_efficiency_${upgrades[i].idSuffix}`;
+    if (state.upgrades[upgradeId]) {
+      capacity += upgrades[i].capacityBonus;
+    }
+  }
+  
+  return capacity;
+}
 
-// --- Oil Shipping Config (reuses same time/incident outcomes as olives) ---
-const oliveOilShippingConfig = {
-  batchSize: TUNING.market.oliveOilBatchSize,
-  timeOutcomes: shippingConfig.timeOutcomes,
-  incidentOutcomes: shippingConfig.incidentOutcomes,
-};
-
-// --- Market Config ---
-const marketConfig = {
-  tickSeconds: TUNING.market.tickSeconds,
-  olivePriceFlorins: TUNING.market.olivePriceFlorins,
-  oliveOilPriceFlorins: TUNING.market.oliveOilPriceFlorins,
-  buyerOutcomes: [
-    { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
-    { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
-    { key: "giuseppe", weight: 0.15, buyAll: true },
-  ],
-  mishapOutcomes: [
-    { key: "none", weight: 0.70 },
-    { key: "urchin", weight: 0.15, stolenMin: 1, stolenMax: 3 },
-    { key: "crow", weight: 0.10, stolenMin: 1, stolenMax: 2 },
-    { key: "spoil", weight: 0.05, rottedMin: 1, rottedMax: 4 },
-  ],
-};
+/**
+ * Calculate olive oil shipping capacity including upgrade bonuses.
+ */
+function getOliveOilShippingCapacity() {
+  let capacity = TUNING.market.shipping.oliveOil.baseBatchSize;
+  
+  // Add bonuses from purchased upgrades
+  const upgrades = TUNING.investments.shippingEfficiency.oliveOil;
+  for (let i = 0; i < upgrades.length; i++) {
+    const upgradeId = `olive_oil_ship_efficiency_${upgrades[i].idSuffix}`;
+    if (state.upgrades[upgradeId]) {
+      capacity += upgrades[i].capacityBonus;
+    }
+  }
+  
+  return capacity;
+}
 
 // --- Harvest Job State (not persisted) ---
 let isHarvesting = false;
@@ -715,11 +711,13 @@ function updateUI() {
   // Update ship button state based on inventory
   if (!isShipping) {
     shipOlivesBtn.disabled = state.harvestedOlives === 0;
+    shipOlivesBtn.textContent = `Ship (up to ${getOliveShippingCapacity()})`;
   }
 
   // Update oil ship button state based on inventory
   if (!isShippingOliveOil) {
     shipOliveOilBtn.disabled = state.oliveOilCount === 0;
+    shipOliveOilBtn.textContent = `Ship (up to ${getOliveOilShippingCapacity()})`;
   }
 
   // Update press button state based on inventory and capacity
@@ -1167,15 +1165,15 @@ function startShipping() {
     return;
   }
   
-  // Determine amount to ship
-  const amount = Math.min(state.harvestedOlives, shippingConfig.batchSize);
+  // Determine amount to ship (use capacity helper)
+  const amount = Math.min(state.harvestedOlives, getOliveShippingCapacity());
   
   // Deduct from farm inventory immediately (loaded onto cart)
   state.harvestedOlives -= amount;
   
   // Roll time outcome and incident outcome
-  const timeOutcome = rollWeighted(shippingConfig.timeOutcomes);
-  const incidentOutcome = rollWeighted(shippingConfig.incidentOutcomes);
+  const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
+  const incidentOutcome = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes);
   
   // Calculate losses
   let lostCount = Math.floor(amount * incidentOutcome.lostPct);
@@ -1348,15 +1346,15 @@ function startShippingOliveOil() {
     return;
   }
   
-  // Determine amount to ship
-  const amount = Math.min(state.oliveOilCount, oliveOilShippingConfig.batchSize);
+  // Determine amount to ship (use capacity helper)
+  const amount = Math.min(state.oliveOilCount, getOliveOilShippingCapacity());
   
   // Deduct from inventory immediately (loaded onto cart)
   state.oliveOilCount = (state.oliveOilCount || 0) - amount;
   
   // Roll time outcome and incident outcome
-  const timeOutcome = rollWeighted(oliveOilShippingConfig.timeOutcomes);
-  const incidentOutcome = rollWeighted(oliveOilShippingConfig.incidentOutcomes);
+  const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
+  const incidentOutcome = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes);
   
   // Calculate losses
   let lostCount = Math.floor(amount * incidentOutcome.lostPct);
@@ -1452,11 +1450,11 @@ function runMarketTick() {
   
   // Get inventory and price for chosen good
   const inventory = goodType === 'olives' ? state.marketOlives : state.marketOliveOil;
-  const price = goodType === 'olives' ? marketConfig.olivePriceFlorins : marketConfig.oliveOilPriceFlorins;
+  const price = goodType === 'olives' ? TUNING.market.prices.olivesFlorins : TUNING.market.prices.oliveOilFlorins;
   const goodName = goodType === 'olives' ? 'olives' : 'olive oil';
   
   // Buyer step
-  const buyer = rollWeighted(marketConfig.buyerOutcomes);
+  const buyer = rollWeighted(TUNING.market.buyerOutcomes);
   let buyCount;
   
   if (buyer.buyAll) {
@@ -1484,7 +1482,7 @@ function runMarketTick() {
   const remainingInventory = goodType === 'olives' ? state.marketOlives : (state.marketOliveOil || 0);
   if (remainingInventory <= 0) return;
   
-  const mishap = rollWeighted(marketConfig.mishapOutcomes);
+  const mishap = rollWeighted(TUNING.market.mishapOutcomes);
   
   if (mishap.key === "none") {
     // No mishap, no log
@@ -1747,8 +1745,8 @@ function startLoop() {
     
     // Market tick accumulator
     marketTickAcc += dt;
-    while (marketTickAcc >= marketConfig.tickSeconds) {
-      marketTickAcc -= marketConfig.tickSeconds;
+    while (marketTickAcc >= TUNING.market.tickSeconds) {
+      marketTickAcc -= TUNING.market.tickSeconds;
       runMarketTick();
     }
 
