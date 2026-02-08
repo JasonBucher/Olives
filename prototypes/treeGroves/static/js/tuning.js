@@ -50,6 +50,15 @@ export const TUNING = {
 
   // Workers: hiring costs and production effects
   workers: {
+    farmHand: {
+      baseCost: 5,
+      costScaleLow: 2,           // Cost increase per farm hand (0-30)
+      costScaleHigh: 8,          // Cost increase per farm hand (30+)
+      costScaleThreshold: 30,    // When cost scaling increases
+      growthBonusPct: 0.08,      // 8% growth speed bonus per farm hand
+      capacityBonusPerWorker: 1, // +1 capacity per farm hand
+      capacityBonusCap: 25,      // Max bonus to capacity (doubles base 25)
+    },
     harvester: {
       baseCost: 10,
       costScale: 5,              // Cost increase per harvester hired
@@ -75,6 +84,11 @@ export const TUNING = {
     arborist: {
       hireCost: 50,
       salaryPerMin: 0.2,         // Florins per minute
+    },
+    foreman: {
+      hireCost: 50,
+      salaryPerMin: 0.2,         // Florins per minute
+      growthMultiplier: 1.25,    // 25% increase to farm hand growth bonus
     },
     pressManager: {
       hireCost: 150,

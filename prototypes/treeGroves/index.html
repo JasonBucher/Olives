@@ -63,6 +63,13 @@
                 </div>
               </div>
               
+              <div id="managers-foreman" hidden>
+                <div class="mgr-row">
+                  <div class="mgr-name" id="foreman-name">Foreman</div>
+                  <div class="mgr-salary" id="foreman-salary"></div>
+                </div>
+              </div>
+              
               <div id="managers-press-manager" hidden>
                 <div class="mgr-row">
                   <div class="mgr-name" id="press-manager-name">Press Manager</div>
@@ -105,7 +112,7 @@
             
             <div class="subsection">
               <div class="inventory-row">
-                <div class="inv-name">Olive Trees</div>
+                <div class="inv-name">Olive Trees <span id="tree-growth-rate" class="muted u-text-13"></span></div>
                 <div class="inv-qty"><span id="tree-olives">0</span> / <span id="tree-capacity">10</span></div>
 
                 <div class="inv-middle">
@@ -182,7 +189,35 @@
             
             <div class="subsection">
               <div class="worker-list">
-                <!-- Worker rows will be rendered here by JS -->
+                <!-- Farm Hand: Increases tree growth speed and capacity -->
+                <div class="worker-item" id="worker-farm-hand-item">
+                  <div class="worker-top" id="worker-farm-hand-row">
+                    <div class="worker-left">
+                      <span class="worker-name">Farm Hand</span>
+                      <span class="worker-count" id="farm-hand-count">x0</span>
+                    </div>
+                    
+                    <div class="worker-middle">
+                      <span class="worker-impact" id="farm-hand-impact">—</span>
+                    </div>
+                    
+                    <div class="worker-actions">
+                      <div class="worker-badges">
+                        <span class="worker-badge worker-badge--manager" id="farm-hand-badge-manager"></span>
+                        <span class="worker-badge worker-badge--status" id="farm-hand-badge-status"></span>
+                        <span class="worker-badge worker-badge--extra" id="farm-hand-badge-extra"></span>
+                      </div>
+
+                      <button class="btn btn-primary worker-hire-btn" type="button" id="hire-farm-hand-btn">
+                        Hire (<span id="hire-farm-hand-cost">5</span>)
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div class="worker-delta" id="farm-hand-delta">Next: —</div>
+                </div>
+                
+                <!-- Harvester: Increases harvest batch and speed -->
                 <div class="worker-item" id="worker-harvester-item">
                   <div class="worker-top" id="worker-harvester-row">
                     <div class="worker-left">

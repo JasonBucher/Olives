@@ -26,9 +26,11 @@ const PERSISTED_STATE_KEYS = [
   "marketOliveOil",
   "oliveOilCount",
   "florinCount",
+  "farmHandCount",
   "harvesterCount",
   "presserCount",
   "arboristHired",
+  "foremanHired",
   "pressManagerHired",
   "upgrades",
   "meta",
@@ -49,9 +51,11 @@ function createDefaultState() {
     florinCount: 0,
 
     // Workers
+    farmHandCount: 0,
     harvesterCount: 0,
     presserCount: 0,
     arboristHired: false,
+    foremanHired: false,
     pressManagerHired: false,
 
     // Upgrades
@@ -95,6 +99,63 @@ function getBaselineHarvestDurationMs() {
   const normalOutcome = harvestConfig.outcomes.find(o => o.key === 'normal');
   // Fallback to 4500 only if "normal" outcome missing (should not happen in practice)
   return normalOutcome ? normalOutcome.durationMs : 4500;
+}
+
+// --- Farm Hand Hire Cost ---
+function getFarmHandHireCost() {
+  const count = state.farmHandCount;
+  const baseCost = TUNING.workers.farmHand.baseCost;
+  const threshold = TUNING.workers.farmHand.costScaleThreshold;
+  
+  if (count < threshold) {
+    return baseCost + (count * TUNING.workers.farmHand.costScaleLow);
+  } else {
+    // Cost at threshold + additional cost for workers beyond threshold
+    const costAtThreshold = baseCost + (threshold * TUNING.workers.farmHand.costScaleLow);
+    const beyondThreshold = count - threshold;
+    return costAtThreshold + (beyondThreshold * TUNING.workers.farmHand.costScaleHigh);
+  }
+}
+
+// --- Farm Hand Effects ---
+function getFarmHandGrowthMultiplier() {
+  let bonusPct = state.farmHandCount * TUNING.workers.farmHand.growthBonusPct;
+  
+  // Apply Foreman multiplier to the bonus if Foreman is active
+  if (state.foremanHired && foremanIsActive) {
+    bonusPct *= TUNING.managers.foreman.growthMultiplier;
+  }
+  
+  return 1 + bonusPct;
+}
+
+function getFarmHandCapacityBonus() {
+  const bonusPerWorker = TUNING.workers.farmHand.capacityBonusPerWorker;
+  const maxBonus = TUNING.workers.farmHand.capacityBonusCap;
+  return Math.min(state.farmHandCount * bonusPerWorker, maxBonus);
+}
+
+function calculateFarmHandHirePreview() {
+  const currentCount = state.farmHandCount;
+  const nextCount = currentCount + 1;
+  
+  // Growth speed
+  const currentGrowthMult = 1 + (currentCount * TUNING.workers.farmHand.growthBonusPct);
+  const nextGrowthMult = 1 + (nextCount * TUNING.workers.farmHand.growthBonusPct);
+  const baseGrowth = TUNING.grove.treeGrowthPerSec;
+  const currentGrowth = baseGrowth * currentGrowthMult;
+  const nextGrowth = baseGrowth * nextGrowthMult;
+  
+  // Capacity bonus
+  const bonusPerWorker = TUNING.workers.farmHand.capacityBonusPerWorker;
+  const maxBonus = TUNING.workers.farmHand.capacityBonusCap;
+  const currentCapacityBonus = Math.min(currentCount * bonusPerWorker, maxBonus);
+  const nextCapacityBonus = Math.min(nextCount * bonusPerWorker, maxBonus);
+  
+  return {
+    growth: { current: currentGrowth, next: nextGrowth },
+    capacityBonus: { current: currentCapacityBonus, next: nextCapacityBonus }
+  };
 }
 
 // --- Harvester Hire Cost ---
@@ -197,6 +258,9 @@ function getPresserHireCost() {
 // --- Presser Effects ---
 // Active state for Press Manager (computed each tick)
 let pressManagerIsActive = false;
+
+// Active state for Foreman (computed each tick)
+let foremanIsActive = false;
 
 /**
  * Calculate pressing capacity based on presser count and manager status.
@@ -334,6 +398,7 @@ let arboristIsActive = false;
 const florinCountEl = document.getElementById("florin-count");
 const treeOlivesEl = document.getElementById("tree-olives");
 const treeCapacityEl = document.getElementById("tree-capacity");
+const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
 const logEl = document.getElementById("log");
@@ -370,6 +435,15 @@ const pressProgressContainer = document.getElementById("press-progress");
 const pressProgressBar = document.getElementById("press-progress-bar");
 const pressCountdown = document.getElementById("press-countdown");
 
+const farmHandCountEl = document.getElementById("farm-hand-count");
+const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
+const hireFarmHandCostEl = document.getElementById("hire-farm-hand-cost");
+const farmHandImpactEl = document.getElementById("farm-hand-impact");
+const farmHandBadgeManager = document.getElementById("farm-hand-badge-manager");
+const farmHandBadgeStatus = document.getElementById("farm-hand-badge-status");
+const farmHandBadgeExtra = document.getElementById("farm-hand-badge-extra");
+const farmHandDelta = document.getElementById("farm-hand-delta");
+
 const harvesterCountEl = document.getElementById("harvester-count");
 const hireHarvesterBtn = document.getElementById("hire-harvester-btn");
 const hireHarvesterCostEl = document.getElementById("hire-harvester-cost");
@@ -395,6 +469,9 @@ const managersArboristWrap = document.getElementById("managers-arborist");
 const managersPressMgrWrap = document.getElementById("managers-press-manager");
 const pressManagerNameEl = document.getElementById("press-manager-name");
 const pressManagerSalaryEl = document.getElementById("press-manager-salary");
+const managersForemanWrap = document.getElementById("managers-foreman");
+const foremanNameEl = document.getElementById("foreman-name");
+const foremanSalaryEl = document.getElementById("foreman-salary");
 const managersTotalWrap = document.getElementById("managers-total");
 const managersTotalCostEl = document.getElementById("managers-total-cost");
 
@@ -612,15 +689,23 @@ function resetGame() {
 
 // --- Tree Growth ---
 function growTrees(dt) {
-  const growth = state.treeGrowthPerSec * dt;
-  state.treeOlives = Math.min(state.treeOlives + growth, state.treeCapacity);
+  const growthMultiplier = getFarmHandGrowthMultiplier();
+  const growth = state.treeGrowthPerSec * growthMultiplier * dt;
+  const currentCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+  state.treeOlives = Math.min(state.treeOlives + growth, currentCapacity);
 }
 
 // --- UI ---
 function updateUI() {
   florinCountEl.textContent = state.florinCount.toFixed(2);
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
-  treeCapacityEl.textContent = state.treeCapacity;
+  const currentTreeCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+  treeCapacityEl.textContent = currentTreeCapacity;
+  
+  // Display growth rate (olives/sec)
+  const growthRate = TUNING.grove.treeGrowthPerSec * getFarmHandGrowthMultiplier();
+  treeGrowthRateEl.textContent = `(${growthRate.toFixed(2)}/s)`;
+  
   invOlivesQty.textContent = state.harvestedOlives;
   invOliveOilQty.textContent = state.oliveOilCount || 0;
   marketOliveCountEl.textContent = state.marketOlives;
@@ -649,6 +734,57 @@ function updateUI() {
     harvestBtn.disabled = false;
     harvestActionUI.setIdle({ resetBar: false });
   }
+
+  // Update farm hand UI
+  farmHandCountEl.textContent = `x${state.farmHandCount}`;
+  const farmHandCost = getFarmHandHireCost();
+  hireFarmHandCostEl.textContent = farmHandCost;
+  hireFarmHandBtn.disabled = state.florinCount < farmHandCost;
+  
+  // Update farm hand stats and preview
+  const farmHandPreview = calculateFarmHandHirePreview();
+  const baseGrowth = TUNING.grove.treeGrowthPerSec;
+  const baseCapacity = TUNING.grove.treeCapacity;
+  
+  // Top row: Current stats
+  if (state.farmHandCount > 0) {
+    const currentGrowth = farmHandPreview.growth.current;
+    const currentCapacityBonus = farmHandPreview.capacityBonus.current;
+    
+    const growthStat = `Growth ${formatSignedInt(Math.floor((currentGrowth - baseGrowth) * 10))} per 10s`;
+    const capacityStat = `Capacity ${formatSignedInt(currentCapacityBonus)}`;
+    
+    farmHandImpactEl.textContent = joinStatPills([growthStat, capacityStat]);
+  } else {
+    farmHandImpactEl.textContent = "—";
+  }
+  
+  // Bottom row: Next hire delta
+  const growthDelta = farmHandPreview.growth.next - farmHandPreview.growth.current;
+  const farmHandCapacityDelta = farmHandPreview.capacityBonus.next - farmHandPreview.capacityBonus.current;
+  
+  const growthDeltaStat = `Growth ${formatSignedInt(Math.floor(growthDelta * 10))} per 10s`;
+  const farmHandCapacityDeltaStat = `Capacity ${formatSignedInt(farmHandCapacityDelta)}`;
+  
+  farmHandDelta.textContent = `Next: ${joinStatPills([growthDeltaStat, farmHandCapacityDeltaStat])}`;
+  
+  // Update farm hand badges
+  // Badge slot 1: Foreman coverage
+  if (foremanIsActive) {
+    farmHandBadgeManager.textContent = "Mgr";
+    farmHandBadgeManager.style.visibility = "visible";
+  } else {
+    farmHandBadgeManager.textContent = "";
+    farmHandBadgeManager.style.visibility = "hidden";
+  }
+  
+  // Badge slot 2: Status modifier (for future use)
+  farmHandBadgeStatus.textContent = "";
+  farmHandBadgeStatus.style.visibility = "hidden";
+  
+  // Badge slot 3: Extra modifier (for future use)
+  farmHandBadgeExtra.textContent = "";
+  farmHandBadgeExtra.style.visibility = "hidden";
 
   // Update harvester UI
   harvesterCountEl.textContent = `x${state.harvesterCount}`;
@@ -727,9 +863,9 @@ function updateUI() {
   }
   
   // Bottom row: Next hire delta
-  const capacityDelta = presserPreview.capacity.next - presserPreview.capacity.current;
-  const capacityDeltaStat = `Capacity ${formatSignedInt(capacityDelta)}`;
-  presserDelta.textContent = `Next: ${capacityDeltaStat}`;
+  const presserCapacityDelta = presserPreview.capacity.next - presserPreview.capacity.current;
+  const presserCapacityDeltaStat = `Capacity ${formatSignedInt(presserCapacityDelta)}`;
+  presserDelta.textContent = `Next: ${presserCapacityDeltaStat}`;
   
   // Update presser badges
   // Badge slot 1: Press Manager coverage
@@ -750,7 +886,7 @@ function updateUI() {
   presserBadgeExtra.style.visibility = "hidden";
 
   // Toggle Managers section
-  const anyManagerHired = state.arboristHired || state.pressManagerHired;
+  const anyManagerHired = state.arboristHired || state.foremanHired || state.pressManagerHired;
   managersEmptyEl.hidden = anyManagerHired;
   
   if (state.arboristHired) {
@@ -765,6 +901,20 @@ function updateUI() {
     }
   } else {
     managersArboristWrap.hidden = true;
+  }
+  
+  if (state.foremanHired) {
+    managersForemanWrap.hidden = false;
+    // Toggle active/inactive styling on manager name
+    if (foremanIsActive) {
+      foremanNameEl.classList.add("mgr-name--active");
+      foremanNameEl.classList.remove("mgr-name--inactive");
+    } else {
+      foremanNameEl.classList.add("mgr-name--inactive");
+      foremanNameEl.classList.remove("mgr-name--active");
+    }
+  } else {
+    managersForemanWrap.hidden = true;
   }
   
   if (state.pressManagerHired) {
@@ -786,6 +936,9 @@ function updateUI() {
     let totalCost = 0;
     if (arboristIsActive) {
       totalCost += TUNING.managers.arborist.salaryPerMin;
+    }
+    if (foremanIsActive) {
+      totalCost += TUNING.managers.foreman.salaryPerMin;
     }
     if (pressManagerIsActive) {
       totalCost += TUNING.managers.pressManager.salaryPerMin;
@@ -1402,6 +1555,8 @@ function updateInvestmentButtons() {
     let isOwned = false;
     if (investment.id === "arborist") {
       isOwned = state.arboristHired;
+    } else if (investment.id === "foreman") {
+      isOwned = state.foremanHired;
     } else if (investment.id === "pressManager") {
       isOwned = state.pressManagerHired;
     } else {
@@ -1511,11 +1666,26 @@ function startLoop() {
       pressManagerIsActive = false;
     }
 
+    // Foreman salary drain
+    if (state.foremanHired) {
+      const salaryPerSec = TUNING.managers.foreman.salaryPerMin / 60;
+      const costThisTick = salaryPerSec * dt;
+      if (state.florinCount >= costThisTick) {
+        state.florinCount -= costThisTick;
+        foremanIsActive = true;
+      } else {
+        foremanIsActive = false;
+      }
+    } else {
+      foremanIsActive = false;
+    }
+
     // Trees grow olives automatically
     growTrees(dt);
     
     // Auto-harvest if Arborist is active and trees are at capacity
-    if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= state.treeCapacity) {
+    const currentTreeCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+    if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= currentTreeCapacity) {
       startHarvest({ source: "auto" });
     }
     
@@ -1564,6 +1734,16 @@ harvestBtn.addEventListener("click", startHarvest);
 shipOlivesBtn.addEventListener("click", startShipping);
 shipOliveOilBtn.addEventListener("click", startShippingOliveOil);
 pressBtn.addEventListener("click", startPressing);
+
+hireFarmHandBtn.addEventListener("click", () => {
+  const cost = getFarmHandHireCost();
+  if (state.florinCount < cost) return;
+  state.florinCount -= cost;
+  state.farmHandCount += 1;
+  saveGame();
+  updateUI();
+  logLine(`Hired Farm Hand (#${state.farmHandCount}) for ${cost} florins.`);
+});
 
 hireHarvesterBtn.addEventListener("click", () => {
   const cost = getHarvesterHireCost();
@@ -1648,6 +1828,10 @@ setShipUIIdle();
 // Set arborist salary from TUNING (display as negative cost)
 const arboristSalary = TUNING.managers.arborist.salaryPerMin;
 arboristSalaryEl.textContent = "-" + arboristSalary.toFixed(2) + " fl/min";
+
+// Set foreman salary from TUNING (display as negative cost)
+const foremanSalary = TUNING.managers.foreman.salaryPerMin;
+foremanSalaryEl.textContent = "-" + foremanSalary.toFixed(2) + " fl/min";
 
 // Set press manager salary from TUNING (display as negative cost)
 const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;

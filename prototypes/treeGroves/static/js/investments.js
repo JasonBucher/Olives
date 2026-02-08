@@ -42,14 +42,46 @@ export const INVESTMENTS = [
     },
     
     effectLines: (state, tuning) => {
-      const capacity = tuning.grove.treeCapacity;
       const salary = tuning.managers.arborist.salaryPerMin;
       const poorMult = tuning.harvest.arborist.poorReductionMult;
       const efficientBonus = tuning.harvest.arborist.efficientBonus;
       
       return [
-        `Behavior: Auto-harvest at capacity (${capacity}/${capacity})`,
+        `Behavior: Auto-harvest Olive Trees at capacity`,
         `Harvest (while paid): Poor multiplier ×${poorMult}, Efficient +${efficientBonus.toFixed(2)}`,
+        `Ongoing: Salary ${salary} florins/min`,
+      ];
+    },
+  },
+
+  {
+    id: "foreman",
+    title: "Hire a Foreman",
+    
+    cost: (tuning, state) => tuning.managers.foreman.hireCost,
+    
+    isUnlocked: (state, tuning) => true,
+    
+    canPurchase: (state, tuning) => {
+      return !state.foremanHired && 
+             state.florinCount >= tuning.managers.foreman.hireCost;
+    },
+    
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "foreman");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.managers.foreman.hireCost;
+      state.foremanHired = true;
+      return true;
+    },
+    
+    effectLines: (state, tuning) => {
+      const salary = tuning.managers.foreman.salaryPerMin;
+      const multiplier = tuning.managers.foreman.growthMultiplier;
+      const bonusPct = ((multiplier - 1) * 100).toFixed(0);
+      
+      return [
+        `Farm Hands (while paid): Growth bonus ×${multiplier} (+${bonusPct}% more from farm hands)`,
         `Ongoing: Salary ${salary} florins/min`,
       ];
     },
