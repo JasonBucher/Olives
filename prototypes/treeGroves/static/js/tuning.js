@@ -93,7 +93,9 @@ export const TUNING = {
     pressManager: {
       hireCost: 150,
       salaryPerMin: 0.75,        // Florins per minute
-      effectMultiplier: 1.25,    // 25% increase to presser capacity curve
+      poorMultiplier: 0.6,       // Reduces poor outcome weight
+      masterworkBonus: 0.03,     // Adds weight to masterwork outcome
+      excellentBonus: 0.05,      // Increases excellent outcome weight
     },
   },
 
@@ -103,6 +105,30 @@ export const TUNING = {
       olivesPerPress: 3,
       pressDurationMs: 3000,
       oilPerPress: 1,
+      baseDurationMs: 3000,
+      stochasticRounding: true,
+      // Press outcome probabilities (weights normalized at runtime)
+      outcomes: [
+        { key: "poor", weight: 0.15, yieldMultiplier: 0.75 },
+        { key: "normal", weight: 0.50, yieldMultiplier: 1.0 },
+        { key: "good", weight: 0.25, yieldMultiplier: 1.25 },
+        { key: "excellent", weight: 0.10, yieldMultiplier: 1.6 },
+        { key: "masterwork", weight: 0.00, yieldMultiplier: 2.0 },  // Enabled by Press Manager
+      ],
+      // Weight modifiers that shift outcome probabilities
+      weightModifiers: {
+        perPresser: {
+          poorDelta: -0.008,      // Each presser reduces poor weight
+          normalDelta: -0.002,    // Each presser slightly reduces normal weight
+          goodDelta: 0.006,       // Each presser increases good weight
+          excellentDelta: 0.004,  // Each presser increases excellent weight
+        },
+        pressManager: {
+          poorMultiplier: 0.6,    // Multiplies poor weight when active
+          masterworkBonus: 0.03,  // Adds flat weight to masterwork when active
+          excellentBonus: 0.05,   // Adds flat weight to excellent when active
+        },
+      },
     },
   },
 

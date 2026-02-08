@@ -1,6 +1,7 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
 import { computeHarvestOutcomeChances } from './harvestWeights.js';
+import { computePressOutcomeChances } from './pressWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { formatSignedInt, formatSignedPct, formatSignedSeconds, joinStatPills } from './format.js';
@@ -263,13 +264,12 @@ let pressManagerIsActive = false;
 let foremanIsActive = false;
 
 /**
- * Calculate pressing capacity based on presser count and manager status.
+ * Calculate pressing capacity for a given presser count (pure function).
  * Uses logarithmic scaling: capacity = base + (log(1 + count) / logScale) * capacityPerLog
- * Press Manager multiplies the variable portion of the capacity.
+ * Note: Press Manager no longer affects capacity (affects outcome quality instead)
  */
-function getPressingCapacity() {
+function getPressingCapacityForCount(count) {
   const baseCapacity = TUNING.workers.presser.baseCapacity;
-  const count = state.presserCount;
   
   if (count === 0) return baseCapacity;
   
@@ -278,28 +278,25 @@ function getPressingCapacity() {
   
   // Logarithmic scaling: log(1 + count) for smooth diminishing returns
   const logFactor = Math.log(1 + count) / logScale;
-  let variableCapacity = logFactor * capacityPerLog;
-  
-  // Apply Press Manager multiplier to variable portion
-  if (state.pressManagerHired && pressManagerIsActive) {
-    variableCapacity *= TUNING.managers.pressManager.effectMultiplier;
-  }
+  const variableCapacity = logFactor * capacityPerLog;
   
   return Math.floor(baseCapacity + variableCapacity);
+}
+
+/**
+ * Get current pressing capacity based on current state.
+ */
+function getPressingCapacity() {
+  return getPressingCapacityForCount(state.presserCount);
 }
 
 function calculatePresserHirePreview() {
   const currentCount = state.presserCount;
   const nextCount = currentCount + 1;
   
-  // Calculate current capacity
-  const currentCapacity = getPressingCapacity();
-  
-  // Temporarily increment count to calculate next capacity
-  const prevCount = state.presserCount;
-  state.presserCount = nextCount;
-  const nextCapacity = getPressingCapacity();
-  state.presserCount = prevCount; // Restore
+  // Use pure helper to avoid state mutation
+  const currentCapacity = getPressingCapacityForCount(currentCount);
+  const nextCapacity = getPressingCapacityForCount(nextCount);
   
   return {
     capacity: { current: currentCapacity, next: nextCapacity }
@@ -374,6 +371,7 @@ let pressJob = {
   startTimeMs: 0,
   durationMs: 0,
   olivesConsumed: 0,
+  outcome: null,
 };
 
 // --- Olive Oil Ship Job State (not persisted) ---
@@ -724,9 +722,9 @@ function updateUI() {
   // Update press button state based on inventory and capacity
   const pressingCapacity = getPressingCapacity();
   if (!isPressing) {
-    pressBtn.disabled = state.harvestedOlives < pressingCapacity;
-    // Update button text to show current capacity
-    pressBtn.textContent = `Press (${pressingCapacity} Olives)`;
+    pressBtn.disabled = state.harvestedOlives === 0;
+    // Update button text to show capacity (but allow partial pressing)
+    pressBtn.textContent = `Press (up to ${pressingCapacity})`;
   }
 
   // Update harvest button state and pill visibility
@@ -1009,6 +1007,22 @@ function getCurrentHarvestOutcomeChances() {
   });
 }
 
+// --- Debug Helper: Current Press Outcome Chances ---
+/**
+ * Get the current normalized press outcome chances used by the game.
+ * This is the single source of truth for press probabilities.
+ * @returns {Array} Normalized outcomes with weight property representing probabilities (0..1)
+ */
+function getCurrentPressOutcomeChances() {
+  return computePressOutcomeChances({
+    outcomes: TUNING.production.olivePress.outcomes,
+    presserCount: state.presserCount,
+    pressManagerIsActive: state.pressManagerHired && pressManagerIsActive,
+    upgrades: state.upgrades,
+    tuning: TUNING.production.olivePress,
+  });
+}
+
 // --- Harvest System ---
 function selectWeightedOutcome() {
   return rollWeighted(harvestConfig.outcomes);
@@ -1236,10 +1250,15 @@ function startPressing() {
   // Use the minimum of pressing capacity and available olives
   const olivesToPress = Math.min(pressingCapacity, state.harvestedOlives);
   
-  if (olivesToPress < pressingCapacity) {
+  // Allow partial pressing - just need at least 1 olive
+  if (olivesToPress <= 0) {
     logLine("Not enough olives to press");
     return;
   }
+  
+  // Get current press outcome chances and roll
+  const adjustedOutcomes = getCurrentPressOutcomeChances();
+  const outcome = rollWeighted(adjustedOutcomes);
   
   // Deduct olives immediately
   state.harvestedOlives -= olivesToPress;
@@ -1247,8 +1266,9 @@ function startPressing() {
   // Set up press job
   pressJob = {
     startTimeMs: Date.now(),
-    durationMs: TUNING.production.olivePress.pressDurationMs,
+    durationMs: TUNING.production.olivePress.baseDurationMs,
     olivesConsumed: olivesToPress,
+    outcome: outcome,
   };
   
   isPressing = true;
@@ -1262,16 +1282,23 @@ function startPressing() {
 }
 
 function completePressing() {
-  // Calculate oil produced based on how many olives were consumed
+  // Calculate expected oil using outcome yield multiplier
   const oilPerOlive = TUNING.production.olivePress.oilPerPress / TUNING.production.olivePress.olivesPerPress;
-  const oliveOilProduced = Math.floor(pressJob.olivesConsumed * oilPerOlive);
+  const yieldMultiplier = pressJob.outcome?.yieldMultiplier || 1.0;
+  const expectedOil = pressJob.olivesConsumed * oilPerOlive * yieldMultiplier;
   
-  state.oliveOilCount += oliveOilProduced;
+  // Apply stochastic rounding: "swim" to handle fractional oil
+  const floor = Math.floor(expectedOil);
+  const frac = expectedOil - floor;
+  const producedOil = floor + (Math.random() < frac ? 1 : 0);
+  
+  state.oliveOilCount += producedOil;
   
   isPressing = false;
   pressActionUI.end();
   
-  logLine(`Pressed ${pressJob.olivesConsumed} olives into ${oliveOilProduced} oil`);
+  const outcomeName = pressJob.outcome?.key || 'unknown';
+  logLine(`Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`);
   
   saveGame();
   updateUI();
