@@ -48,6 +48,12 @@ export const TUNING = {
     },
   },
 
+  // Press: deterministic conversion tuning
+  press: {
+    olivesPerPress: 3,
+    baseOilPerPress: 1,
+  },
+
   // Workers: hiring costs and production effects
   workers: {
     farmHand: {
@@ -78,6 +84,7 @@ export const TUNING = {
       baseCapacity: 3,           // Minimum olives that can be pressed
       logScale: 4.4,             // Logarithmic scaling factor (higher = slower growth)
       capacityPerLog: 5,         // Capacity added per log unit
+      oilPerOlivePerPresser: 0.005, // Linear oil bonus per presser per olive pressed
     },
   },
 

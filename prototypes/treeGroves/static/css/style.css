@@ -645,6 +645,20 @@ h1 {
   min-height: 34px;
 }
 
+.press-preview {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.press-preview-sep {
+  opacity: 0.6;
+}
+
 .inv-name {
   font-weight: 400;
   font-size: 13px;

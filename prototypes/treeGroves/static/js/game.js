@@ -1,7 +1,6 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
 import { computeHarvestOutcomeChances } from './harvestWeights.js';
-import { computePressOutcomeChances } from './pressWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { formatSignedInt, formatSignedPct, formatSignedSeconds, joinStatPills } from './format.js';
@@ -236,6 +235,16 @@ function calculatePresserHirePreview() {
   };
 }
 
+// --- Press Output Helpers ---
+function getBaseOilPerOlive() {
+  return TUNING.press.baseOilPerPress / TUNING.press.olivesPerPress;
+}
+
+function getTotalOilPerOlive() {
+  const bonusPerOlive = state.presserCount * TUNING.workers.presser.oilPerOlivePerPresser;
+  return getBaseOilPerOlive() + bonusPerOlive;
+}
+
 // --- Shipping Capacity Helpers ---
 /**
  * Calculate olive shipping capacity including upgrade bonuses.
@@ -300,7 +309,7 @@ let pressJob = {
   startTimeMs: 0,
   durationMs: 0,
   olivesConsumed: 0,
-  outcome: null,
+  oilPerOlive: 0,
 };
 
 // --- Olive Oil Ship Job State (not persisted) ---
@@ -371,6 +380,9 @@ const pressPillCount = document.getElementById("press-pill-count");
 const pressProgressContainer = document.getElementById("press-progress");
 const pressProgressBar = document.getElementById("press-progress-bar");
 const pressCountdown = document.getElementById("press-countdown");
+const pressConsumesEl = document.getElementById("press-consumes");
+const pressProducesEl = document.getElementById("press-produces");
+const pressOilPerOliveEl = document.getElementById("press-oil-per-olive");
 
 const farmHandCountEl = document.getElementById("farm-hand-count");
 const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
@@ -692,14 +704,25 @@ function updateUI() {
     shipOliveOilBtn.textContent = `Ship (up to ${maxShipOil})`;
   }
 
-  // Update press button state based on inventory and capacity (only whole goods can be pressed)
-  const pressingCapacity = getPressingCapacity();
+  // Update press button state based on inventory (only whole goods can be pressed)
+  const olivesPerPress = TUNING.press.olivesPerPress;
   if (!isPressing) {
     const pressableOlives = getShippableCount(state.harvestedOlives);
-    pressBtn.disabled = pressableOlives === 0;
-    const maxPress = Math.min(pressableOlives, pressingCapacity);
-    // Update button text to show capacity (but allow partial pressing)
-    pressBtn.textContent = `Press (up to ${maxPress})`;
+    pressBtn.disabled = pressableOlives < olivesPerPress;
+    pressBtn.textContent = `Press (${olivesPerPress})`;
+  }
+
+  // Update press preview (deterministic output per press)
+  const oilPerOlive = getTotalOilPerOlive();
+  const oilPerPress = olivesPerPress * oilPerOlive;
+  if (pressConsumesEl) {
+    pressConsumesEl.textContent = `Consumes: ${olivesPerPress} Olives`;
+  }
+  if (pressProducesEl) {
+    pressProducesEl.textContent = `Produces: ${oilPerPress.toFixed(2)} Olive Oil`;
+  }
+  if (pressOilPerOliveEl) {
+    pressOilPerOliveEl.textContent = `Oil per olive: ${oilPerOlive.toFixed(2)}`;
   }
 
   // Update harvest button state and pill visibility
@@ -805,24 +828,21 @@ function updateUI() {
   hirePresserCostEl.textContent = presserCost;
   hirePresserBtn.disabled = state.florinCount < presserCost;
   
-  // Update presser stats and preview
-  const presserPreview = calculatePresserHirePreview();
-  const basePressingCapacity = TUNING.workers.presser.baseCapacity;
+  // Update presser stats and preview (conversion bonus)
+  const oilBonusPerPresser = TUNING.workers.presser.oilPerOlivePerPresser;
+  const currentOilBonus = state.presserCount * oilBonusPerPresser;
+  const nextOilBonus = (state.presserCount + 1) * oilBonusPerPresser;
   
-  // Top row: Current capacity bonus (not total)
+  // Top row: Current bonus per olive
   if (state.presserCount > 0) {
-    const currentCapacity = presserPreview.capacity.current;
-    const capacityBonus = currentCapacity - basePressingCapacity;
-    const capacityStat = `Capacity ${formatSignedInt(capacityBonus)}`;
-    presserImpactEl.textContent = capacityStat;
+    presserImpactEl.textContent = `Oil +${currentOilBonus.toFixed(3)}/olive`;
   } else {
     presserImpactEl.textContent = "—";
   }
   
   // Bottom row: Next hire delta
-  const presserCapacityDelta = presserPreview.capacity.next - presserPreview.capacity.current;
-  const presserCapacityDeltaStat = `Capacity ${formatSignedInt(presserCapacityDelta)}`;
-  presserDelta.textContent = `Next: ${presserCapacityDeltaStat}`;
+  const presserOilDelta = nextOilBonus - currentOilBonus;
+  presserDelta.textContent = `Next: +${presserOilDelta.toFixed(3)} oil/olive`;
   
   // Update presser badges
   // Badge slot 1: Press Manager coverage
@@ -963,22 +983,6 @@ function getCurrentHarvestOutcomeChances() {
     arboristIsActive: arboristIsActive,
     upgrades: state.upgrades,
     tuning: TUNING.harvest,
-  });
-}
-
-// --- Debug Helper: Current Press Outcome Chances ---
-/**
- * Get the current normalized press outcome chances used by the game.
- * This is the single source of truth for press probabilities.
- * @returns {Array} Normalized outcomes with weight property representing probabilities (0..1)
- */
-function getCurrentPressOutcomeChances() {
-  return computePressOutcomeChances({
-    outcomes: TUNING.production.olivePress.outcomes,
-    presserCount: state.presserCount,
-    pressManagerIsActive: state.pressManagerHired && pressManagerIsActive,
-    upgrades: state.upgrades,
-    tuning: TUNING.production.olivePress,
   });
 }
 
@@ -1234,21 +1238,16 @@ function updateShipProgress() {
 function startPressing() {
   if (isPressing) return;
   
-  const pressingCapacity = getPressingCapacity();
-  
   // Only whole goods can be pressed
   const pressableOlives = getShippableCount(state.harvestedOlives);
-  const olivesToPress = Math.min(pressingCapacity, pressableOlives);
+  const olivesPerPress = TUNING.press.olivesPerPress;
   
-  // Allow partial pressing - just need at least 1 whole olive
-  if (olivesToPress <= 0) {
+  if (pressableOlives < olivesPerPress) {
     logLine("Not enough olives to press");
     return;
   }
-  
-  // Get current press outcome chances and roll
-  const adjustedOutcomes = getCurrentPressOutcomeChances();
-  const outcome = rollWeighted(adjustedOutcomes);
+  const olivesToPress = olivesPerPress;
+  const oilPerOlive = getTotalOilPerOlive();
   
   // Deduct integer amount from float inventory (preserves remainder)
   state.harvestedOlives = consumeInventory(state.harvestedOlives, olivesToPress);
@@ -1258,7 +1257,7 @@ function startPressing() {
     startTimeMs: Date.now(),
     durationMs: TUNING.production.olivePress.baseDurationMs,
     olivesConsumed: olivesToPress,
-    outcome: outcome,
+    oilPerOlive: oilPerOlive,
   };
   
   isPressing = true;
@@ -1272,57 +1271,20 @@ function startPressing() {
 }
 
 function completePressing() {
-  // Calculate expected oil using outcome yield multiplier
-  const oilPerOlive = TUNING.production.olivePress.oilPerPress / TUNING.production.olivePress.olivesPerPress;
-  const yieldMultiplier = pressJob.outcome?.yieldMultiplier || 1.0;
-  const expectedOil = pressJob.olivesConsumed * oilPerOlive * yieldMultiplier;
-  
-  // Apply stochastic rounding: "swim" to handle fractional oil
-  const floor = Math.floor(expectedOil);
-  const frac = expectedOil - floor;
-  const producedOil = floor + (Math.random() < frac ? 1 : 0);
-  
+  const producedOil = pressJob.olivesConsumed * pressJob.oilPerOlive;
   state.oliveOilCount += producedOil;
   
   isPressing = false;
   pressActionUI.end();
   
-  const outcomeName = pressJob.outcome?.key || 'unknown';
-  
-  // Determine color based on outcome
-  let playerColor = null;
-  if (outcomeName === 'poor') playerColor = 'red';
-  else if (outcomeName === 'good' || outcomeName === 'excellent' || outcomeName === 'masterwork') playerColor = 'gold';
-  
-  // Create flavorful player message
-  const outcomeLabels = {
-    poor: 'Poor Press',
-    normal: 'Normal Press',
-    good: 'Good Press',
-    excellent: 'Excellent Press',
-    masterwork: 'Masterwork Press'
-  };
-  const outcomeLabel = outcomeLabels[outcomeName] || 'Unknown Press';
-  
-  let playerText = `${outcomeLabel} → ${producedOil} Olive Oil`;
-  
-  // Check if we got lucky with stochastic rounding (only show sparkle for positive outcomes)
-  const gotExtraOil = producedOil > floor;
-  const isPositiveOutcome = outcomeName === 'good' || outcomeName === 'excellent' || outcomeName === 'masterwork';
-  if (gotExtraOil && isPositiveOutcome) {
-    playerText += ' ✨ Extracted extra oil!';
-  }
-  
-  // Create mechanical debug message
-  const debugText = `Pressed ${pressJob.olivesConsumed} olives: ${outcomeName} outcome, expected=${expectedOil.toFixed(2)}, produced=${producedOil}`;
+  const playerText = `Pressed ${pressJob.olivesConsumed} olives → +${producedOil.toFixed(2)} olive oil`;
+  const debugText = `Pressed ${pressJob.olivesConsumed} olives: oilPerOlive=${pressJob.oilPerOlive.toFixed(4)}, produced=${producedOil.toFixed(4)}`;
   
   // Log to both tabs
   logEvent({
     channel: 'farm',
     playerText: playerText,
     debugText: debugText,
-    playerColor: playerColor,
-    debugColor: playerColor
   });
   
   saveGame();
