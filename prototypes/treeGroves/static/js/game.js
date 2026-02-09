@@ -245,6 +245,10 @@ function getTotalOilPerOlive() {
   return getBaseOilPerOlive() + bonusPerOlive;
 }
 
+function formatOilPerPress(value) {
+  return value < 1 ? value.toFixed(3) : value.toFixed(2);
+}
+
 // --- Shipping Capacity Helpers ---
 /**
  * Calculate olive shipping capacity including upgrade bonuses.
@@ -382,7 +386,6 @@ const pressProgressBar = document.getElementById("press-progress-bar");
 const pressCountdown = document.getElementById("press-countdown");
 const pressConsumesEl = document.getElementById("press-consumes");
 const pressProducesEl = document.getElementById("press-produces");
-const pressOilPerOliveEl = document.getElementById("press-oil-per-olive");
 
 const farmHandCountEl = document.getElementById("farm-hand-count");
 const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
@@ -721,9 +724,6 @@ function updateUI() {
   if (pressProducesEl) {
     pressProducesEl.textContent = `Produces: ${oilPerPress.toFixed(2)} Olive Oil`;
   }
-  if (pressOilPerOliveEl) {
-    pressOilPerOliveEl.textContent = `Oil per olive: ${oilPerOlive.toFixed(2)}`;
-  }
 
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
@@ -830,19 +830,18 @@ function updateUI() {
   
   // Update presser stats and preview (conversion bonus)
   const oilBonusPerPresser = TUNING.workers.presser.oilPerOlivePerPresser;
-  const currentOilBonus = state.presserCount * oilBonusPerPresser;
-  const nextOilBonus = (state.presserCount + 1) * oilBonusPerPresser;
+  const currentOilBonus = olivesPerPress * state.presserCount * oilBonusPerPresser;
+  const nextOilBonus = olivesPerPress * oilBonusPerPresser;
   
-  // Top row: Current bonus per olive
+  // Top row: Current bonus per press
   if (state.presserCount > 0) {
-    presserImpactEl.textContent = `Oil +${currentOilBonus.toFixed(3)}/olive`;
+    presserImpactEl.textContent = `+${formatOilPerPress(currentOilBonus)} oil / press`;
   } else {
     presserImpactEl.textContent = "—";
   }
   
   // Bottom row: Next hire delta
-  const presserOilDelta = nextOilBonus - currentOilBonus;
-  presserDelta.textContent = `Next: +${presserOilDelta.toFixed(3)} oil/olive`;
+  presserDelta.textContent = `Next: +${formatOilPerPress(nextOilBonus)} oil / press`;
   
   // Update presser badges
   // Badge slot 1: Press Manager coverage
