@@ -62,13 +62,15 @@ export const TUNING = {
     harvester: {
       baseCost: 10,
       costScale: 5,              // Cost increase per harvester hired
-      attemptBonusTiers: {       // Harvest batch size bonuses by count
-        tier1: { max: 5, bonus: 1 },     // First 5: +1 each
-        tier2: { max: 10, bonus: 0.5 },  // 6-10: +0.5 each
-        tier3: { bonus: 0.25 },          // 11+: +0.25 each
+      olivesPerHarvest: 0.6,     // Flat olives bonus per harvester (floating point)
+      // Legacy effects (disabled)
+      attemptBonusTiers: {       // DEPRECATED: No longer used
+        tier1: { max: 5, bonus: 1 },
+        tier2: { max: 10, bonus: 0.5 },
+        tier3: { bonus: 0.25 },
       },
-      durationReductionPct: 0.04, // 4% speed per harvester
-      durationReductionCap: 0.25,  // Max 25% total speed boost
+      durationReductionPct: 0,   // DISABLED: Was 0.04
+      durationReductionCap: 0,   // DISABLED: Was 0.25
     },
     presser: {
       baseCost: 12,
