@@ -134,6 +134,33 @@
             </div>
           </section>
 
+          <section id="production-section" class="section">
+            <div class="section-title">Production</div>
+            
+            <div class="subsection">
+              <div class="inventory-row">
+                <div class="inv-name">Olive Press</div>
+                <div class="inv-qty"></div>
+
+                <div class="inv-middle">
+                  <span id="press-pill" class="inv-transit-pill" hidden>
+                    <span id="press-pill-count">3</span><span>→</span>
+                  </span>
+                  
+                  <!-- Progress bar inline -->
+                  <div id="press-progress" class="inv-progress">
+                    <div class="inv-progress-bar">
+                      <div id="press-progress-bar" class="inv-progress-fill"></div>
+                      <div id="press-countdown" class="action-countdown"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button id="press-btn" class="btn btn-primary" type="button">Press</button>
+              </div>
+            </div>
+          </section>
+
           <section class="section">
             <div class="section-title">Inventory</div>
 
@@ -272,33 +299,6 @@
                   
                   <div class="worker-delta" id="presser-delta">Next: —</div>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          <section id="production-section" class="section">
-            <div class="section-title">Production</div>
-            
-            <div class="subsection">
-              <div class="inventory-row">
-                <div class="inv-name">Olive Press</div>
-                <div class="inv-qty"></div>
-
-                <div class="inv-middle">
-                  <span id="press-pill" class="inv-transit-pill" hidden>
-                    <span id="press-pill-count">3</span><span>→</span>
-                  </span>
-                  
-                  <!-- Progress bar inline -->
-                  <div id="press-progress" class="inv-progress">
-                    <div class="inv-progress-bar">
-                      <div id="press-progress-bar" class="inv-progress-fill"></div>
-                      <div id="press-countdown" class="action-countdown"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <button id="press-btn" class="btn btn-primary" type="button">Press</button>
               </div>
             </div>
           </section>
