@@ -166,89 +166,21 @@ function getHarvesterHireCost() {
 }
 
 // --- Harvester Effects ---
-function getHarvesterAttemptBonus() {
-  const count = state.harvesterCount;
-  if (count === 0) return 0;
-  
-  const tiers = TUNING.workers.harvester.attemptBonusTiers;
-  let bonus = 0;
-  // Tier 1: 1-5
-  bonus += Math.min(count, tiers.tier1.max) * tiers.tier1.bonus;
-  // Tier 2: 6-10
-  if (count > tiers.tier1.max) {
-    bonus += Math.min(count - tiers.tier1.max, tiers.tier2.max - tiers.tier1.max) * tiers.tier2.bonus;
-  }
-  // Tier 3: 11+
-  if (count > tiers.tier2.max) bonus += (count - tiers.tier2.max) * tiers.tier3.bonus;
-  
-  return Math.floor(bonus);
-}
-
-function getHarvesterDurationMultiplier() {
-  const reductionPct = Math.min(
-    state.harvesterCount * TUNING.workers.harvester.durationReductionPct,
-    TUNING.workers.harvester.durationReductionCap
-  );
-  return 1 - reductionPct;
+function getHarvesterOlivesBonus() {
+  // Simple linear bonus: each harvester provides +0.6 olives per harvest
+  return state.harvesterCount * TUNING.workers.harvester.olivesPerHarvest;
 }
 
 function calculateHarvesterHirePreview() {
   const currentCount = state.harvesterCount;
   const nextCount = currentCount + 1;
   
-  // Haul (attempt bonus)
-  const currentHaul = getHarvesterAttemptBonus();
-  // Temporarily increment count to calculate next bonus
-  const prevCount = state.harvesterCount;
-  state.harvesterCount = nextCount;
-  const nextHaul = getHarvesterAttemptBonus();
-  state.harvesterCount = prevCount; // Restore
-  
-  // Speed (derive baseline from configured "normal" outcome)
-  const baseHarvestMs = getBaselineHarvestDurationMs();
-  const currentMultiplier = 1 - Math.min(
-    currentCount * TUNING.workers.harvester.durationReductionPct,
-    TUNING.workers.harvester.durationReductionCap
-  );
-  const nextMultiplier = 1 - Math.min(
-    nextCount * TUNING.workers.harvester.durationReductionPct,
-    TUNING.workers.harvester.durationReductionCap
-  );
-  const currentSpeed = baseHarvestMs * currentMultiplier;
-  const nextSpeed = baseHarvestMs * nextMultiplier;
-  
-  // Poor chance (actual probability, not just weight)
-  // Use the normalized chance computation as single source of truth
-  const currentChances = computeHarvestOutcomeChances({
-    outcomes: harvestConfig.outcomes,
-    harvesterCount: currentCount,
-    arboristIsActive: arboristIsActive,
-    upgrades: state.upgrades,
-    tuning: TUNING.harvest,
-  });
-  
-  const nextChances = computeHarvestOutcomeChances({
-    outcomes: harvestConfig.outcomes,
-    harvesterCount: nextCount,
-    arboristIsActive: arboristIsActive,
-    upgrades: state.upgrades,
-    tuning: TUNING.harvest,
-  });
-  
-  // Find poor outcome and extract normalized chance (already 0..1)
-  const currentPoorOutcome = currentChances.find(o => o.key === "poor");
-  const nextPoorOutcome = nextChances.find(o => o.key === "poor");
-  const currentPoorChance = currentPoorOutcome?.weight ?? 0;
-  const nextPoorChance = nextPoorOutcome?.weight ?? 0;
-  
-  // These should always be finite due to normalization, but keep defensive check
-  const safeCurrentPoor = Number.isFinite(currentPoorChance) ? currentPoorChance : 0;
-  const safeNextPoor = Number.isFinite(nextPoorChance) ? nextPoorChance : 0;
+  // Calculate olives bonus (simple linear scaling)
+  const currentOlives = currentCount * TUNING.workers.harvester.olivesPerHarvest;
+  const nextOlives = nextCount * TUNING.workers.harvester.olivesPerHarvest;
   
   return {
-    haul: { current: currentHaul, next: nextHaul },
-    speed: { current: currentSpeed, next: nextSpeed },
-    poor: { current: safeCurrentPoor, next: safeNextPoor }
+    olives: { current: currentOlives, next: nextOlives }
   };
 }
 
@@ -684,6 +616,49 @@ function growTrees(dt) {
   state.treeOlives = Math.min(state.treeOlives + growth, currentCapacity);
 }
 
+// --- Inventory Helpers (Fractional Internal, Integer Display/Shipping) ---
+/**
+ * Get display count for inventory (always integer).
+ * @param {number} actualValue - The actual float inventory value
+ * @returns {number} Integer count for display
+ */
+function getDisplayCount(actualValue) {
+  return Math.floor(actualValue);
+}
+
+/**
+ * Get maximum shippable/consumable count (always integer).
+ * @param {number} actualValue - The actual float inventory value
+ * @returns {number} Integer count available for shipping/consumption
+ */
+function getShippableCount(actualValue) {
+  return Math.floor(actualValue);
+}
+
+/**
+ * Check if we can consume a given integer amount.
+ * @param {number} actualValue - The actual float inventory value
+ * @param {number} intAmount - Integer amount to consume
+ * @returns {boolean} True if floor(actualValue) >= intAmount
+ */
+function canConsume(actualValue, intAmount) {
+  return getShippableCount(actualValue) >= intAmount;
+}
+
+/**
+ * Consume an integer amount from float inventory.
+ * Subtracts exactly intAmount from actualValue and guards against float precision issues.
+ * @param {number} actualValue - The actual float inventory value
+ * @param {number} intAmount - Integer amount to consume
+ * @returns {number} New inventory value (clamped to 0 if within epsilon)
+ */
+function consumeInventory(actualValue, intAmount) {
+  const newValue = actualValue - intAmount;
+  // Guard against float precision creating tiny negatives
+  const EPSILON = 1e-9;
+  return newValue < EPSILON ? 0 : newValue;
+}
+
 // --- UI ---
 function updateUI() {
   florinCountEl.textContent = state.florinCount.toFixed(2);
@@ -695,29 +670,36 @@ function updateUI() {
   const growthRate = TUNING.grove.treeGrowthPerSec * getFarmHandGrowthMultiplier();
   treeGrowthRateEl.textContent = `(${growthRate.toFixed(2)}/s)`;
   
-  invOlivesQty.textContent = state.harvestedOlives;
-  invOliveOilQty.textContent = state.oliveOilCount || 0;
-  marketOliveCountEl.textContent = state.marketOlives;
-  marketOilCountEl.textContent = state.marketOliveOil || 0;
+  // Inventory displays always show integers (floor of actual float values)
+  invOlivesQty.textContent = getDisplayCount(state.harvestedOlives);
+  invOliveOilQty.textContent = getDisplayCount(state.oliveOilCount || 0);
+  marketOliveCountEl.textContent = getDisplayCount(state.marketOlives);
+  marketOilCountEl.textContent = getDisplayCount(state.marketOliveOil || 0);
   
-  // Update ship button state based on inventory
+  // Update ship button state based on inventory (only whole goods can be shipped)
   if (!isShipping) {
-    shipOlivesBtn.disabled = state.harvestedOlives === 0;
-    shipOlivesBtn.textContent = `Ship (up to ${getOliveShippingCapacity()})`;
+    const shippableOlives = getShippableCount(state.harvestedOlives);
+    shipOlivesBtn.disabled = shippableOlives === 0;
+    const maxShip = Math.min(shippableOlives, getOliveShippingCapacity());
+    shipOlivesBtn.textContent = `Ship (up to ${maxShip})`;
   }
 
-  // Update oil ship button state based on inventory
+  // Update oil ship button state based on inventory (only whole goods can be shipped)
   if (!isShippingOliveOil) {
-    shipOliveOilBtn.disabled = state.oliveOilCount === 0;
-    shipOliveOilBtn.textContent = `Ship (up to ${getOliveOilShippingCapacity()})`;
+    const shippableOil = getShippableCount(state.oliveOilCount || 0);
+    shipOliveOilBtn.disabled = shippableOil === 0;
+    const maxShipOil = Math.min(shippableOil, getOliveOilShippingCapacity());
+    shipOliveOilBtn.textContent = `Ship (up to ${maxShipOil})`;
   }
 
-  // Update press button state based on inventory and capacity
+  // Update press button state based on inventory and capacity (only whole goods can be pressed)
   const pressingCapacity = getPressingCapacity();
   if (!isPressing) {
-    pressBtn.disabled = state.harvestedOlives === 0;
+    const pressableOlives = getShippableCount(state.harvestedOlives);
+    pressBtn.disabled = pressableOlives === 0;
+    const maxPress = Math.min(pressableOlives, pressingCapacity);
     // Update button text to show capacity (but allow partial pressing)
-    pressBtn.textContent = `Press (up to ${pressingCapacity})`;
+    pressBtn.textContent = `Press (up to ${maxPress})`;
   }
 
   // Update harvest button state and pill visibility
@@ -783,37 +765,21 @@ function updateUI() {
   hireHarvesterCostEl.textContent = harvesterCost;
   hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
   
-  // Update harvester stats and preview (sign-driven display)
+  // Update harvester stats and preview
   const preview = calculateHarvesterHirePreview();
-  const baseHarvestMs = getBaselineHarvestDurationMs(); // Derive from configured "normal" outcome
   
-  // Top row: Current stats (sign-driven)
+  // Top row: Current stats
   if (state.harvesterCount > 0) {
-    const currentBatch = preview.haul.current;
-    const currentSpeedReduction = (baseHarvestMs - preview.speed.current) / 1000; // Reduction in seconds
-    const currentPoor = preview.poor.current;
-    
-    const batchStat = `Batch ${formatSignedInt(currentBatch)}`;
-    const speedStat = `Speed ${formatSignedSeconds(-currentSpeedReduction)}`; // Negative = faster/reduction
-    const poorStat = `Poor ${formatSignedPct(currentPoor)}`;
-    
-    harvesterImpactEl.textContent = joinStatPills([batchStat, speedStat, poorStat]);
+    const currentBonus = preview.olives.current;
+    harvesterImpactEl.textContent = `Harvest +${currentBonus.toFixed(1)} olives`;
   } else {
     harvesterImpactEl.textContent = "—";
   }
   
-  // Bottom row: Next hire deltas (sign-driven)
-  const batchDelta = preview.haul.next - preview.haul.current;
-  const currentSpeedReduction = (baseHarvestMs - preview.speed.current) / 1000;
-  const nextSpeedReduction = (baseHarvestMs - preview.speed.next) / 1000;
-  const speedDelta = nextSpeedReduction - currentSpeedReduction; // Additional reduction
-  const poorDelta = preview.poor.next - preview.poor.current;
-  
-  const batchDeltaStat = `Batch ${formatSignedInt(batchDelta)}`;
-  const speedDeltaStat = `Speed ${formatSignedSeconds(-speedDelta)}`; // Negative = more reduction
-  const poorDeltaStat = `Poor ${formatSignedPct(poorDelta)}`;
-  
-  harvesterDelta.textContent = `Next: ${joinStatPills([batchDeltaStat, speedDeltaStat, poorDeltaStat])}`;
+  // Bottom row: Next hire delta (olives bonus increase)
+  const olivesDelta = preview.olives.next - preview.olives.current;
+  harvesterDelta.textContent = `Next: +${olivesDelta.toFixed(1)} olives per harvest`;
+
   
   // Update badges
   // Badge slot 1: Manager coverage
@@ -1021,17 +987,31 @@ function selectWeightedOutcome() {
   return rollWeighted(harvestConfig.outcomes);
 }
 
+function getCurrentHarvestBatchSize() {
+  // Harvest attempt amount = base batch size + harvester bonus
+  // Must return a float (harvester bonus can be fractional)
+  // Must never return less than 0
+  return Math.max(0, harvestConfig.batchSize + getHarvesterOlivesBonus());
+}
+
 function startHarvest(opts = {}) {
   if (isHarvesting) return;
   if (state.treeOlives < 1) {
     logLine("No olives to harvest");
     return;
   }
-  
-  // Determine batch with harvester bonus
-  const effectiveBatchSize = harvestConfig.batchSize + getHarvesterAttemptBonus();
-  const attempted = Math.min(Math.floor(state.treeOlives), effectiveBatchSize);
-  
+  // Determine batch (harvesters increase batch size, use float for logic)
+  const attempted = Math.min(state.treeOlives, getCurrentHarvestBatchSize());
+  if (attempted < 1) {
+    logLine("No olives to harvest");
+    return;
+  }
+  // Floor attempted for outcome calculations and display
+  const attemptedInt = Math.floor(attempted);
+  if (attemptedInt < 1) {
+    logLine("No olives to harvest");
+    return;
+  }
   // Use normalized chances from single source of truth
   const adjustedOutcomes = getCurrentHarvestOutcomeChances();
   
@@ -1044,43 +1024,46 @@ function startHarvest(opts = {}) {
   // Select outcome with normalized chances (weights now represent probabilities 0..1)
   const outcome = rollWeighted(adjustedOutcomes);
   
-  // Apply harvester speed bonus to duration
-  const effectiveDurationMs = Math.floor(outcome.durationMs * getHarvesterDurationMultiplier());
+  // Use outcome duration directly (harvesters no longer affect speed)
+  const effectiveDurationMs = outcome.durationMs;
   
   // Start job
   isHarvesting = true;
   harvestJob = {
     startTimeMs: Date.now(),
     durationMs: effectiveDurationMs,
-    attempted,
+    attempted: attemptedInt,
     outcome,
   };
   
   // Update UI
   harvestBtn.disabled = true;
-  harvestActionUI.start({ count: attempted, percent: 0 });
-  
+  harvestActionUI.start({ count: attemptedInt, percent: 0 });
+  harvestAttemptingCount.textContent = attemptedInt;
   // Show harvest pill with attempting count
   harvestPill.classList.remove("inline-fade-out");
   
   if (opts.source === "auto") {
     logLine("Arborist ordered harvest (trees at capacity).");
   } else {
-    logLine(`Starting harvest (H: ${state.harvesterCount}): attempting ${attempted} olives`);
+    logLine(`Starting harvest (H: ${state.harvesterCount}): attempting ${attemptedInt} olives`);
   }
 }
 
 function completeHarvest() {
   const { attempted, outcome, durationMs } = harvestJob;
   
-  // Calculate results
-  const collected = Math.floor(attempted * outcome.collectedPct);
+  // Calculate base results from outcome
+  const baseCollected = attempted * outcome.collectedPct;
   const lost = Math.floor(attempted * outcome.lostPct);
-  const remaining = attempted - collected - lost;
+  const remaining = attempted - Math.floor(baseCollected) - lost;
+  
+  // No separate harvester bonus: batch size already includes harvester effect
+  const totalCollected = baseCollected;
   
   // Apply changes
-  state.treeOlives -= (collected + lost);
-  state.harvestedOlives += collected;
+  state.treeOlives -= (Math.floor(baseCollected) + lost);
+  state.harvestedOlives += totalCollected;
   
   // Log outcome
   const outcomeLabel = outcome.key.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -1092,10 +1075,13 @@ function completeHarvest() {
   else if (outcome.key === 'efficient') logColor = 'green';
   else if (outcome.key.startsWith('interrupted')) logColor = 'orange';
   
+  // Format collection message (no harvester bonus shown)
+  let collectedMsg = totalCollected.toFixed(1);
+  
   if (remaining > 0) {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost} (${remaining} left on trees)`, logColor);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost} (${remaining} left on trees)`, logColor);
   } else {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collected}, lost ${lost}`, logColor);
+    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost}`, logColor);
   }
   
   // Reset state
@@ -1134,7 +1120,8 @@ function updateHarvestProgress() {
 // --- Shipping System ---
 function setShipUIIdle() {
   shipActionUI.setIdle();
-  shipOlivesBtn.disabled = state.harvestedOlives === 0 || isShipping;
+  const shippableOlives = getShippableCount(state.harvestedOlives);
+  shipOlivesBtn.disabled = shippableOlives === 0 || isShipping;
 }
 
 function setShipUIActive(percent, countdownText) {
@@ -1152,16 +1139,18 @@ function setShipUIComplete() {
 function startShipping() {
   if (isShipping) return;
   
-  if (state.harvestedOlives < 1) {
+  // Only whole goods can be shipped
+  const shippableOlives = getShippableCount(state.harvestedOlives);
+  if (shippableOlives < 1) {
     logLine("No harvested olives to ship");
     return;
   }
   
-  // Determine amount to ship (use capacity helper)
-  const amount = Math.min(state.harvestedOlives, getOliveShippingCapacity());
+  // Determine amount to ship (integer only, up to capacity)
+  const amount = Math.min(shippableOlives, getOliveShippingCapacity());
   
-  // Deduct from farm inventory immediately (loaded onto cart)
-  state.harvestedOlives -= amount;
+  // Deduct integer amount from float inventory (preserves remainder)
+  state.harvestedOlives = consumeInventory(state.harvestedOlives, amount);
   
   // Roll time outcome and incident outcome
   const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
@@ -1247,10 +1236,11 @@ function startPressing() {
   
   const pressingCapacity = getPressingCapacity();
   
-  // Use the minimum of pressing capacity and available olives
-  const olivesToPress = Math.min(pressingCapacity, state.harvestedOlives);
+  // Only whole goods can be pressed
+  const pressableOlives = getShippableCount(state.harvestedOlives);
+  const olivesToPress = Math.min(pressingCapacity, pressableOlives);
   
-  // Allow partial pressing - just need at least 1 olive
+  // Allow partial pressing - just need at least 1 whole olive
   if (olivesToPress <= 0) {
     logLine("Not enough olives to press");
     return;
@@ -1260,8 +1250,8 @@ function startPressing() {
   const adjustedOutcomes = getCurrentPressOutcomeChances();
   const outcome = rollWeighted(adjustedOutcomes);
   
-  // Deduct olives immediately
-  state.harvestedOlives -= olivesToPress;
+  // Deduct integer amount from float inventory (preserves remainder)
+  state.harvestedOlives = consumeInventory(state.harvestedOlives, olivesToPress);
   
   // Set up press job
   pressJob = {
@@ -1360,17 +1350,18 @@ function updatePressProgress() {
 function startShippingOliveOil() {
   if (isShippingOliveOil) return;
   
-  // Ensure oliveOilCount is a valid number
-  if (!state.oliveOilCount || state.oliveOilCount < 1) {
+  // Only whole goods can be shipped
+  const shippableOil = getShippableCount(state.oliveOilCount || 0);
+  if (shippableOil < 1) {
     logLine("No olive oil to ship");
     return;
   }
   
-  // Determine amount to ship (use capacity helper)
-  const amount = Math.min(state.oliveOilCount, getOliveOilShippingCapacity());
+  // Determine amount to ship (integer only, up to capacity)
+  const amount = Math.min(shippableOil, getOliveOilShippingCapacity());
   
-  // Deduct from inventory immediately (loaded onto cart)
-  state.oliveOilCount = (state.oliveOilCount || 0) - amount;
+  // Deduct integer amount from float inventory (preserves remainder)
+  state.oliveOilCount = consumeInventory(state.oliveOilCount || 0, amount);
   
   // Roll time outcome and incident outcome
   const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
@@ -1452,9 +1443,9 @@ function updateOliveOilShipProgress() {
 
 // --- Market System ---
 function runMarketTick() {
-  // Check if any goods are available
-  const hasOlives = state.marketOlives > 0;
-  const hasOil = (state.marketOliveOil || 0) > 0;
+  // Check if any goods are available (only whole goods can be sold)
+  const hasOlives = getShippableCount(state.marketOlives) > 0;
+  const hasOil = getShippableCount(state.marketOliveOil || 0) > 0;
   
   if (!hasOlives && !hasOil) return;
   
@@ -1468,8 +1459,8 @@ function runMarketTick() {
     goodType = hasOlives ? 'olives' : 'oil';
   }
   
-  // Get inventory and price for chosen good
-  const inventory = goodType === 'olives' ? state.marketOlives : state.marketOliveOil;
+  // Get inventory (floor'd for market operations) and price for chosen good
+  const inventory = goodType === 'olives' ? getShippableCount(state.marketOlives) : getShippableCount(state.marketOliveOil || 0);
   const price = goodType === 'olives' ? TUNING.market.prices.olivesFlorins : TUNING.market.prices.oliveOilFlorins;
   const goodName = goodType === 'olives' ? 'olives' : 'olive oil';
   
@@ -1485,11 +1476,11 @@ function runMarketTick() {
     buyCount = Math.min(buyCount, inventory);
   }
   
-  // Deduct from inventory
+  // Deduct integer amount from float inventory (preserves remainder)
   if (goodType === 'olives') {
-    state.marketOlives -= buyCount;
+    state.marketOlives = consumeInventory(state.marketOlives, buyCount);
   } else {
-    state.marketOliveOil = (state.marketOliveOil || 0) - buyCount;
+    state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, buyCount);
   }
   const earned = buyCount * price;
   state.florinCount += earned;
@@ -1498,8 +1489,8 @@ function runMarketTick() {
   const buyerName = buyer.key.charAt(0).toUpperCase() + buyer.key.slice(1);
   marketLogLine(`Buyer (${buyerName}) bought ${buyCount} ${goodName} (+${earned} florins).`);
   
-  // Mishap step (only if goods remain)
-  const remainingInventory = goodType === 'olives' ? state.marketOlives : (state.marketOliveOil || 0);
+  // Mishap step (only if goods remain - check floor'd amount)
+  const remainingInventory = goodType === 'olives' ? getShippableCount(state.marketOlives) : getShippableCount(state.marketOliveOil || 0);
   if (remainingInventory <= 0) return;
   
   const mishap = rollWeighted(TUNING.market.mishapOutcomes);
@@ -1515,10 +1506,11 @@ function runMarketTick() {
     const actualStolen = Math.min(stolenCount, remainingInventory);
     const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
     
+    // Deduct integer amount from float inventory
     if (goodType === 'olives') {
-      state.marketOlives -= actualStolen;
+      state.marketOlives = consumeInventory(state.marketOlives, actualStolen);
     } else {
-      state.marketOliveOil = (state.marketOliveOil || 0) - actualStolen;
+      state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, actualStolen);
     }
     marketLogLine(`Mishap (${mishapName}): ${actualStolen} ${goodName} stolen.`);
   } else if (mishap.key === "spoil") {
@@ -1527,10 +1519,11 @@ function runMarketTick() {
     const actualRotted = Math.min(rottedCount, remainingInventory);
     const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
     
+    // Deduct integer amount from float inventory
     if (goodType === 'olives') {
-      state.marketOlives -= actualRotted;
+      state.marketOlives = consumeInventory(state.marketOlives, actualRotted);
     } else {
-      state.marketOliveOil = (state.marketOliveOil || 0) - actualRotted;
+      state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, actualRotted);
     }
     marketLogLine(`Mishap (${mishapName}): ${actualRotted} ${goodName} rotted.`);
   }
