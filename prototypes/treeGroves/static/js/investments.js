@@ -83,7 +83,7 @@ export const INVESTMENTS = [
       const bonusPct = ((multiplier - 1) * 100).toFixed(0);
       
       return [
-        `Farm Hands (while paid): Growth bonus ×${multiplier} (+${bonusPct}% more from farm hands)`,
+        `Cultivators (while paid): Growth bonus ×${multiplier} (+${bonusPct}% more from cultivators)`,
         `Ongoing: Salary ${salary} florins/min`,
       ];
     },

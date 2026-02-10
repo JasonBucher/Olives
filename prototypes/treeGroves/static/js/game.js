@@ -3,7 +3,6 @@
 import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
-import { formatSignedInt, formatSignedPct, formatSignedSeconds, joinStatPills } from './format.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
 
 const STORAGE_PREFIX = "treeGroves_";
@@ -27,7 +26,7 @@ const PERSISTED_STATE_KEYS = [
   "marketOliveOil",
   "oliveOilCount",
   "florinCount",
-  "farmHandCount",
+  "cultivatorCount",
   "harvesterCount",
   "presserCount",
   "arboristHired",
@@ -56,7 +55,7 @@ function createDefaultState() {
     stone: 0,
 
     // Workers
-    farmHandCount: 0,
+    cultivatorCount: 0,
     harvesterCount: 0,
     presserCount: 0,
     arboristHired: false,
@@ -77,6 +76,10 @@ function createDefaultState() {
 function pickPersistedState(parsed) {
   if (!parsed || typeof parsed !== "object") return {};
   return PERSISTED_STATE_KEYS.reduce((acc, key) => {
+    if (key === "cultivatorCount" && !(key in parsed) && "farmHandCount" in parsed) {
+      acc[key] = parsed.farmHandCount;
+      return acc;
+    }
     if (key in parsed) acc[key] = parsed[key];
     return acc;
   }, {});
@@ -106,38 +109,31 @@ function getBaselineHarvestDurationMs() {
   return normalOutcome ? normalOutcome.durationMs : 4500;
 }
 
-// --- Farm Hand Hire Cost ---
-function getFarmHandHireCost() {
-  const count = state.farmHandCount;
-  const baseCost = TUNING.workers.farmHand.baseCost;
-  const threshold = TUNING.workers.farmHand.costScaleThreshold;
+// --- Cultivator Hire Cost ---
+function getCultivatorHireCost() {
+  const count = state.cultivatorCount;
+  const baseCost = TUNING.workers.cultivator.baseCost;
+  const threshold = TUNING.workers.cultivator.costScaleThreshold;
   
   if (count < threshold) {
-    return baseCost + (count * TUNING.workers.farmHand.costScaleLow);
+    return baseCost + (count * TUNING.workers.cultivator.costScaleLow);
   } else {
     // Cost at threshold + additional cost for workers beyond threshold
-    const costAtThreshold = baseCost + (threshold * TUNING.workers.farmHand.costScaleLow);
+    const costAtThreshold = baseCost + (threshold * TUNING.workers.cultivator.costScaleLow);
     const beyondThreshold = count - threshold;
-    return costAtThreshold + (beyondThreshold * TUNING.workers.farmHand.costScaleHigh);
+    return costAtThreshold + (beyondThreshold * TUNING.workers.cultivator.costScaleHigh);
   }
 }
 
-// --- Farm Hand Effects ---
-function getFarmHandGrowthMultiplier() {
-  let bonusPct = state.farmHandCount * TUNING.workers.farmHand.growthBonusPct;
+// --- Cultivator Effects ---
+function getCultivatorBonusPerSecond() {
+  let bonus = state.cultivatorCount * TUNING.workers.cultivator.olivesPerSecondPerCultivator;
   
-  // Apply Foreman multiplier to the bonus if Foreman is active
   if (state.foremanHired && foremanIsActive) {
-    bonusPct *= TUNING.managers.foreman.growthMultiplier;
+    bonus *= TUNING.managers.foreman.growthMultiplier;
   }
   
-  return 1 + bonusPct;
-}
-
-function getFarmHandCapacityBonus() {
-  const bonusPerWorker = TUNING.workers.farmHand.capacityBonusPerWorker;
-  const maxBonus = TUNING.workers.farmHand.capacityBonusCap;
-  return Math.min(state.farmHandCount * bonusPerWorker, maxBonus);
+  return bonus;
 }
 
 function getGroveExpansionBonus() {
@@ -152,27 +148,9 @@ function getGroveExpansionBonus() {
   return bonus;
 }
 
-function calculateFarmHandHirePreview() {
-  const currentCount = state.farmHandCount;
-  const nextCount = currentCount + 1;
-  
-  // Growth speed
-  const currentGrowthMult = 1 + (currentCount * TUNING.workers.farmHand.growthBonusPct);
-  const nextGrowthMult = 1 + (nextCount * TUNING.workers.farmHand.growthBonusPct);
-  const baseGrowth = TUNING.grove.treeGrowthPerSec;
-  const currentGrowth = baseGrowth * currentGrowthMult;
-  const nextGrowth = baseGrowth * nextGrowthMult;
-  
-  // Capacity bonus
-  const bonusPerWorker = TUNING.workers.farmHand.capacityBonusPerWorker;
-  const maxBonus = TUNING.workers.farmHand.capacityBonusCap;
-  const currentCapacityBonus = Math.min(currentCount * bonusPerWorker, maxBonus);
-  const nextCapacityBonus = Math.min(nextCount * bonusPerWorker, maxBonus);
-  
-  return {
-    growth: { current: currentGrowth, next: nextGrowth },
-    capacityBonus: { current: currentCapacityBonus, next: nextCapacityBonus }
-  };
+function formatOlivesPerSecond(value) {
+  const rounded = value < 1 ? value.toFixed(3) : value.toFixed(2);
+  return rounded.replace(/\.?0+$/, "");
 }
 
 // --- Harvester Hire Cost ---
@@ -420,14 +398,14 @@ const quarryNextEl = document.getElementById("quarry-next");
 const harvestNextEl = document.getElementById("harvest-next");
 const invStoneQty = document.getElementById("inv-stone-qty");
 
-const farmHandCountEl = document.getElementById("farm-hand-count");
-const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
-const hireFarmHandCostEl = document.getElementById("hire-farm-hand-cost");
-const farmHandImpactEl = document.getElementById("farm-hand-impact");
-const farmHandBadgeManager = document.getElementById("farm-hand-badge-manager");
-const farmHandBadgeStatus = document.getElementById("farm-hand-badge-status");
-const farmHandBadgeExtra = document.getElementById("farm-hand-badge-extra");
-const farmHandDelta = document.getElementById("farm-hand-delta");
+const cultivatorCountEl = document.getElementById("cultivator-count");
+const hireCultivatorBtn = document.getElementById("hire-cultivator-btn");
+const hireCultivatorCostEl = document.getElementById("hire-cultivator-cost");
+const cultivatorImpactEl = document.getElementById("cultivator-impact");
+const cultivatorBadgeManager = document.getElementById("cultivator-badge-manager");
+const cultivatorBadgeStatus = document.getElementById("cultivator-badge-status");
+const cultivatorBadgeExtra = document.getElementById("cultivator-badge-extra");
+const cultivatorDelta = document.getElementById("cultivator-delta");
 
 const harvesterCountEl = document.getElementById("harvester-count");
 const hireHarvesterBtn = document.getElementById("hire-harvester-btn");
@@ -667,9 +645,9 @@ function resetGame() {
 
 // --- Tree Growth ---
 function growTrees(dt) {
-  const growthMultiplier = getFarmHandGrowthMultiplier();
-  const growth = state.treeGrowthPerSec * growthMultiplier * dt;
-  const currentCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
+  const baseGrowth = TUNING.grove.treeGrowthPerSec;
+  const growth = (baseGrowth + getCultivatorBonusPerSecond()) * dt;
+  const currentCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
   state.treeOlives = Math.min(state.treeOlives + growth, currentCapacity);
 }
 
@@ -720,11 +698,11 @@ function consumeInventory(actualValue, intAmount) {
 function updateUI() {
   florinCountEl.textContent = state.florinCount.toFixed(2);
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
-  const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
+  const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
   treeCapacityEl.textContent = currentTreeCapacity;
   
   // Display growth rate (olives/sec)
-  const growthRate = TUNING.grove.treeGrowthPerSec * getFarmHandGrowthMultiplier();
+  const growthRate = TUNING.grove.treeGrowthPerSec + getCultivatorBonusPerSecond();
   treeGrowthRateEl.textContent = `(${growthRate.toFixed(2)}/s)`;
   
   // Inventory displays always show integers (floor of actual float values)
@@ -781,56 +759,34 @@ function updateUI() {
   }
   harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} Olives \u2022 ${TUNING.harvest.durationSeconds}s`;
 
-  // Update farm hand UI
-  farmHandCountEl.textContent = `x${state.farmHandCount}`;
-  const farmHandCost = getFarmHandHireCost();
-  hireFarmHandCostEl.textContent = farmHandCost;
-  hireFarmHandBtn.disabled = state.florinCount < farmHandCost;
+  // Update cultivator UI
+  cultivatorCountEl.textContent = `x${state.cultivatorCount}`;
+  const cultivatorCost = getCultivatorHireCost();
+  hireCultivatorCostEl.textContent = cultivatorCost;
+  hireCultivatorBtn.disabled = state.florinCount < cultivatorCost;
   
-  // Update farm hand stats and preview
-  const farmHandPreview = calculateFarmHandHirePreview();
-  const baseGrowth = TUNING.grove.treeGrowthPerSec;
-  const baseCapacity = TUNING.grove.treeCapacity;
+  const perCultivator = TUNING.workers.cultivator.olivesPerSecondPerCultivator;
+  const cultivatorMultiplier = (state.foremanHired && foremanIsActive)
+    ? TUNING.managers.foreman.growthMultiplier
+    : 1;
+  const currentBonus = state.cultivatorCount * perCultivator * cultivatorMultiplier;
+  const nextBonus = perCultivator * cultivatorMultiplier;
   
-  // Top row: Current stats
-  if (state.farmHandCount > 0) {
-    const currentGrowth = farmHandPreview.growth.current;
-    const currentCapacityBonus = farmHandPreview.capacityBonus.current;
-    
-    const growthStat = `Growth ${formatSignedInt(Math.floor((currentGrowth - baseGrowth) * 10))} per 10s`;
-    const capacityStat = `Capacity ${formatSignedInt(currentCapacityBonus)}`;
-    
-    farmHandImpactEl.textContent = joinStatPills([growthStat, capacityStat]);
-  } else {
-    farmHandImpactEl.textContent = "—";
-  }
+  cultivatorImpactEl.textContent = `+${formatOlivesPerSecond(currentBonus)} olives / s`;
+  cultivatorDelta.textContent = `Next: +${formatOlivesPerSecond(nextBonus)} olives / s`;
   
-  // Bottom row: Next hire delta
-  const growthDelta = farmHandPreview.growth.next - farmHandPreview.growth.current;
-  const farmHandCapacityDelta = farmHandPreview.capacityBonus.next - farmHandPreview.capacityBonus.current;
-  
-  const growthDeltaStat = `Growth ${formatSignedInt(Math.floor(growthDelta * 10))} per 10s`;
-  const farmHandCapacityDeltaStat = `Capacity ${formatSignedInt(farmHandCapacityDelta)}`;
-  
-  farmHandDelta.textContent = `Next: ${joinStatPills([growthDeltaStat, farmHandCapacityDeltaStat])}`;
-  
-  // Update farm hand badges
-  // Badge slot 1: Foreman coverage
+  // Update cultivator badges
   if (foremanIsActive) {
-    farmHandBadgeManager.textContent = "Mgr";
-    farmHandBadgeManager.style.visibility = "visible";
+    cultivatorBadgeManager.textContent = "Mgr";
+    cultivatorBadgeManager.style.visibility = "visible";
   } else {
-    farmHandBadgeManager.textContent = "";
-    farmHandBadgeManager.style.visibility = "hidden";
+    cultivatorBadgeManager.textContent = "";
+    cultivatorBadgeManager.style.visibility = "hidden";
   }
-  
-  // Badge slot 2: Status modifier (for future use)
-  farmHandBadgeStatus.textContent = "";
-  farmHandBadgeStatus.style.visibility = "hidden";
-  
-  // Badge slot 3: Extra modifier (for future use)
-  farmHandBadgeExtra.textContent = "";
-  farmHandBadgeExtra.style.visibility = "hidden";
+  cultivatorBadgeStatus.textContent = "";
+  cultivatorBadgeStatus.style.visibility = "hidden";
+  cultivatorBadgeExtra.textContent = "";
+  cultivatorBadgeExtra.style.visibility = "hidden";
 
   // Update harvester UI
   harvesterCountEl.textContent = `x${state.harvesterCount}`;
@@ -1884,7 +1840,7 @@ function startLoop() {
     growTrees(dt);
     
     // Auto-harvest if Arborist is active and trees are at capacity
-    const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
+    const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
     if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= currentTreeCapacity) {
       startHarvest({ source: "auto" });
     }
@@ -1940,14 +1896,14 @@ pressBtn.addEventListener("click", startPressing);
 
 quarryBtn.addEventListener("click", startQuarry);
 
-hireFarmHandBtn.addEventListener("click", () => {
-  const cost = getFarmHandHireCost();
+hireCultivatorBtn.addEventListener("click", () => {
+  const cost = getCultivatorHireCost();
   if (state.florinCount < cost) return;
   state.florinCount -= cost;
-  state.farmHandCount += 1;
+  state.cultivatorCount += 1;
   saveGame();
   updateUI();
-  logLine(`Hired Farm Hand (#${state.farmHandCount}) for ${cost} florins.`);
+  logLine(`Hired Cultivator (#${state.cultivatorCount}) for ${cost} florins.`);
 });
 
 hireHarvesterBtn.addEventListener("click", () => {
