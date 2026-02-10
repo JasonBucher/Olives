@@ -416,8 +416,9 @@ const quarryPillCount = document.getElementById("quarry-pill-count");
 const quarryProgressContainer = document.getElementById("quarry-progress");
 const quarryProgressBar = document.getElementById("quarry-progress-bar");
 const quarryCountdown = document.getElementById("quarry-countdown");
-const quarryStoneQty = document.getElementById("quarry-stone-qty");
 const quarryNextEl = document.getElementById("quarry-next");
+const harvestNextEl = document.getElementById("harvest-next");
+const invStoneQty = document.getElementById("inv-stone-qty");
 
 const farmHandCountEl = document.getElementById("farm-hand-count");
 const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
@@ -766,8 +767,8 @@ function updateUI() {
     pressProducesEl.textContent = `Produces: ${oilPerPress.toFixed(2)} Olive Oil`;
   }
 
-  // Update stone display and quarry button state
-  quarryStoneQty.textContent = Math.floor(state.stone);
+  // Update stone inventory display and quarry button state
+  invStoneQty.textContent = getDisplayCount(state.stone);
   if (!isQuarrying) {
     quarryBtn.disabled = false;
   }
@@ -778,6 +779,7 @@ function updateUI() {
     harvestBtn.disabled = false;
     harvestActionUI.setIdle({ resetBar: false });
   }
+  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} Olives \u2022 ${TUNING.harvest.durationSeconds}s`;
 
   // Update farm hand UI
   farmHandCountEl.textContent = `x${state.farmHandCount}`;
@@ -1075,8 +1077,8 @@ function startHarvest(opts = {}) {
   // Select outcome with normalized chances (weights now represent probabilities 0..1)
   const outcome = rollWeighted(adjustedOutcomes);
   
-  // Use outcome duration directly (harvesters no longer affect speed)
-  const effectiveDurationMs = outcome.durationMs;
+  // Use fixed duration from tuning (outcome duration no longer used)
+  const effectiveDurationMs = TUNING.harvest.durationSeconds * 1000;
   
   // Start job
   isHarvesting = true;
@@ -1698,32 +1700,44 @@ function initInvestments() {
   });
 }
 
+function isInvestmentOwned(investment) {
+  if (investment.id === "arborist") return state.arboristHired;
+  if (investment.id === "foreman") return state.foremanHired;
+  if (investment.id === "pressManager") return state.pressManagerHired;
+  return !!state.upgrades[investment.id];
+}
+
+/**
+ * Compute sort bucket for an investment:
+ *   0 = purchasable now (prerequisites met + affordable)
+ *   1 = locked (prerequisites not met)
+ *   2 = unaffordable (prerequisites met but can't afford)
+ */
+function getInvestmentSortBucket(investment) {
+  if (investment.canPurchase(state, TUNING)) return 0;
+  if (investment.prerequisitesMet && !investment.prerequisitesMet(state, TUNING)) return 1;
+  return 2;
+}
+
 function updateInvestmentButtons() {
+  const container = document.getElementById("investments-container");
+
+  // Build sortable list of visible (non-owned) investments with their buttons
+  const sortable = [];
+
   INVESTMENTS.forEach(investment => {
     const btn = document.getElementById(`inv-${investment.id}`);
     if (!btn) return;
-    
-    // Hide if owned
-    let isOwned = false;
-    if (investment.id === "arborist") {
-      isOwned = state.arboristHired;
-    } else if (investment.id === "foreman") {
-      isOwned = state.foremanHired;
-    } else if (investment.id === "pressManager") {
-      isOwned = state.pressManagerHired;
-    } else {
-      isOwned = state.upgrades[investment.id];
-    }
-    
-    if (isOwned) {
+
+    if (isInvestmentOwned(investment)) {
       btn.style.display = "none";
       return;
     }
-    
+
     // Show and update disabled state
     btn.style.display = "";
     btn.disabled = !investment.canPurchase(state, TUNING);
-    
+
     // Update effect lines for state-aware previews
     const effectsEl = btn.querySelector(".inv__effects");
     if (effectsEl) {
@@ -1739,7 +1753,37 @@ function updateInvestmentButtons() {
         effectsEl.appendChild(effectEl);
       });
     }
+
+    sortable.push({ investment, btn });
   });
+
+  // Sort: bucket → group → cost → sortOrder → title → id
+  const groupRank = { manager: 0, upgrade: 1 };
+  sortable.sort((a, b) => {
+    const bucketA = getInvestmentSortBucket(a.investment);
+    const bucketB = getInvestmentSortBucket(b.investment);
+    if (bucketA !== bucketB) return bucketA - bucketB;
+
+    const rankA = groupRank[a.investment.group] ?? 999;
+    const rankB = groupRank[b.investment.group] ?? 999;
+    if (rankA !== rankB) return rankA - rankB;
+
+    const costA = a.investment.cost(TUNING, state);
+    const costB = b.investment.cost(TUNING, state);
+    if (costA !== costB) return costA - costB;
+
+    const sortOrderA = a.investment.sortOrder ?? 0;
+    const sortOrderB = b.investment.sortOrder ?? 0;
+    if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+
+    const titleCmp = a.investment.title.localeCompare(b.investment.title);
+    if (titleCmp !== 0) return titleCmp;
+
+    return a.investment.id.localeCompare(b.investment.id);
+  });
+
+  // Re-order DOM to match sort (appendChild moves existing nodes)
+  sortable.forEach(({ btn }) => container.appendChild(btn));
 }
 
 // --- Pause/Resume Logic ---

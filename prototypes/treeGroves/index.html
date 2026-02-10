@@ -119,7 +119,7 @@
                   <span id="harvest-pill" class="inv-transit-pill pill--fade is-invisible">
                     <span id="harvest-attempting-count">0</span>→
                   </span>
-                  
+
                   <!-- Progress bar inline -->
                   <div class="inv-progress" id="harvest-progress">
                     <div class="inv-progress-bar">
@@ -130,6 +130,39 @@
                 </div>
 
                 <button id="harvest-btn" class="btn btn-primary" type="button">Harvest</button>
+              </div>
+
+              <div class="press-preview" id="harvest-preview">
+                <span id="harvest-next"></span>
+              </div>
+            </div>
+
+            <div class="subhead">Quarry</div>
+
+            <div class="subsection">
+              <div class="inventory-row">
+                <div class="inv-name">Stone Quarry</div>
+                <div class="inv-qty"></div>
+
+                <div class="inv-middle">
+                  <span id="quarry-pill" class="inv-transit-pill" hidden>
+                    <span id="quarry-pill-count">1</span><span>→</span>
+                  </span>
+
+                  <!-- Progress bar inline -->
+                  <div id="quarry-progress" class="inv-progress">
+                    <div class="inv-progress-bar">
+                      <div id="quarry-progress-bar" class="inv-progress-fill"></div>
+                      <div id="quarry-countdown" class="action-countdown"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button id="quarry-btn" class="btn btn-primary" type="button">Quarry</button>
+              </div>
+
+              <div class="press-preview" id="quarry-preview">
+                <span id="quarry-next">Next: +1 Stone • 8s</span>
               </div>
             </div>
           </section>
@@ -166,32 +199,6 @@
               </div>
             </div>
 
-            <div class="subsection">
-              <div class="inventory-row">
-                <div class="inv-name">Quarry</div>
-                <div class="inv-qty">Stone: <span id="quarry-stone-qty">0</span></div>
-
-                <div class="inv-middle">
-                  <span id="quarry-pill" class="inv-transit-pill" hidden>
-                    <span id="quarry-pill-count">1</span><span>→</span>
-                  </span>
-
-                  <!-- Progress bar inline -->
-                  <div id="quarry-progress" class="inv-progress">
-                    <div class="inv-progress-bar">
-                      <div id="quarry-progress-bar" class="inv-progress-fill"></div>
-                      <div id="quarry-countdown" class="action-countdown"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <button id="quarry-btn" class="btn btn-primary" type="button">Quarry</button>
-              </div>
-
-              <div class="press-preview" id="quarry-preview">
-                <span id="quarry-next">Next: +1 Stone • 8s</span>
-              </div>
-            </div>
           </section>
 
           <section class="section">
@@ -239,6 +246,12 @@
                   </div>
 
                   <button id="ship-olive-oil-btn" class="btn btn-primary" type="button">Ship</button>
+                </div>
+
+                <div class="inventory-row" id="inv-stone-row">
+                  <div class="inv-name">Stone</div>
+                  <div class="inv-qty" id="inv-stone-qty">0</div>
+                  <div class="inv-middle"></div>
                 </div>
               </div>
             </div>

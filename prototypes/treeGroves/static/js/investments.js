@@ -289,8 +289,10 @@ export const INVESTMENTS = [
     
     isUnlocked: (state, tuning) => true,
     
+    prerequisitesMet: (state, tuning) => !!state.arboristHired,
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.quality_inspector && 
+      return !state.upgrades.quality_inspector &&
              state.arboristHired &&
              state.florinCount >= tuning.investments.costs.quality_inspector;
     },
@@ -372,6 +374,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => state.upgrades.expand_grove_1 && !state.upgrades.expand_grove_2,
 
+    prerequisitesMet: (state, tuning) => !!state.upgrades.expand_grove_1,
+
     canPurchase: (state, tuning) => {
       const tier = tuning.investments.groveExpansion[1];
       return !state.upgrades.expand_grove_2 &&
@@ -416,6 +420,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => state.upgrades.expand_grove_2 && !state.upgrades.expand_grove_3,
+
+    prerequisitesMet: (state, tuning) => !!state.upgrades.expand_grove_2,
 
     canPurchase: (state, tuning) => {
       const tier = tuning.investments.groveExpansion[2];
@@ -488,8 +494,10 @@ export const INVESTMENTS = [
     
     isUnlocked: (state, tuning) => state.upgrades.olive_ship_efficiency_1 && !state.upgrades.olive_ship_efficiency_2,
     
+    prerequisitesMet: (state, tuning) => !!state.upgrades.olive_ship_efficiency_1,
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.olive_ship_efficiency_2 && 
+      return !state.upgrades.olive_ship_efficiency_2 &&
              state.upgrades.olive_ship_efficiency_1 &&
              state.florinCount >= tuning.investments.shippingEfficiency.olives[1].cost;
     },
@@ -519,8 +527,10 @@ export const INVESTMENTS = [
     
     isUnlocked: (state, tuning) => state.upgrades.olive_ship_efficiency_2 && !state.upgrades.olive_ship_efficiency_3,
     
+    prerequisitesMet: (state, tuning) => !!state.upgrades.olive_ship_efficiency_2,
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.olive_ship_efficiency_3 && 
+      return !state.upgrades.olive_ship_efficiency_3 &&
              state.upgrades.olive_ship_efficiency_2 &&
              state.florinCount >= tuning.investments.shippingEfficiency.olives[2].cost;
     },
@@ -580,8 +590,10 @@ export const INVESTMENTS = [
     
     isUnlocked: (state, tuning) => state.upgrades.olive_oil_ship_efficiency_1 && !state.upgrades.olive_oil_ship_efficiency_2,
     
+    prerequisitesMet: (state, tuning) => !!state.upgrades.olive_oil_ship_efficiency_1,
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.olive_oil_ship_efficiency_2 && 
+      return !state.upgrades.olive_oil_ship_efficiency_2 &&
              state.upgrades.olive_oil_ship_efficiency_1 &&
              state.florinCount >= tuning.investments.shippingEfficiency.oliveOil[1].cost;
     },
@@ -611,8 +623,10 @@ export const INVESTMENTS = [
     
     isUnlocked: (state, tuning) => state.upgrades.olive_oil_ship_efficiency_2 && !state.upgrades.olive_oil_ship_efficiency_3,
     
+    prerequisitesMet: (state, tuning) => !!state.upgrades.olive_oil_ship_efficiency_2,
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.olive_oil_ship_efficiency_3 && 
+      return !state.upgrades.olive_oil_ship_efficiency_3 &&
              state.upgrades.olive_oil_ship_efficiency_2 &&
              state.florinCount >= tuning.investments.shippingEfficiency.oliveOil[2].cost;
     },

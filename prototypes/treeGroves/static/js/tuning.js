@@ -19,6 +19,7 @@ export const TUNING = {
   // Harvest: batch sizes, outcome probabilities, and modifiers
   harvest: {
     baseBatchSize: 10,
+    durationSeconds: 6,
     outcomes: BASE_HARVEST_OUTCOMES,
     // Base harvest modifiers (per harvester)
     poorWeightPerHarvester: 0.005,
