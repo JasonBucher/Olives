@@ -12,7 +12,7 @@ export const BASE_HARVEST_OUTCOMES = [
 export const TUNING = {
   // Grove: tree growth and capacity
   grove: {
-    treeCapacity: 25,
+    treeCapacity: 20,
     treeGrowthPerSec: 0.5,
   },
 
@@ -201,6 +201,11 @@ export const TUNING = {
       ladders_nets: 300,
       quality_inspector: 500,
     },
+    groveExpansion: [
+      { idSuffix: 1, florinCost: 25, stoneCost: 5, capacityBonus: 20 },
+      { idSuffix: 2, florinCost: 75, stoneCost: 12, capacityBonus: 25 },
+      { idSuffix: 3, florinCost: 200, stoneCost: 25, capacityBonus: 35 },
+    ],
     shippingEfficiency: {
       olives: [
         { idSuffix: 1, cost: 25, capacityBonus: 10 },

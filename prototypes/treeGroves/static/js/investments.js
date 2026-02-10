@@ -317,6 +317,137 @@ export const INVESTMENTS = [
     },
   },
   
+  // --- Grove Expansion Upgrades ---
+  {
+    id: "expand_grove_1",
+    title: "Expand Grove I",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.groveExpansion[0].florinCost,
+
+    costText: (tuning, state) => {
+      const tier = tuning.investments.groveExpansion[0];
+      return `${tier.florinCost} florins, ${tier.stoneCost} stone`;
+    },
+
+    isUnlocked: (state, tuning) => !state.upgrades.expand_grove_1,
+
+    canPurchase: (state, tuning) => {
+      const tier = tuning.investments.groveExpansion[0];
+      return !state.upgrades.expand_grove_1 &&
+             state.florinCount >= tier.florinCost &&
+             state.stone >= tier.stoneCost;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "expand_grove_1");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const tier = tuning.investments.groveExpansion[0];
+      state.florinCount -= tier.florinCost;
+      state.stone -= tier.stoneCost;
+      if (state.stone < 0) state.stone = 0;
+      state.upgrades.expand_grove_1 = true;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.groveExpansion[0].capacityBonus;
+      return [
+        `Grove: Max trees +${bonus}`,
+      ];
+    },
+  },
+
+  {
+    id: "expand_grove_2",
+    title: "Expand Grove II",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.groveExpansion[1].florinCost,
+
+    costText: (tuning, state) => {
+      const tier = tuning.investments.groveExpansion[1];
+      return `${tier.florinCost} florins, ${tier.stoneCost} stone`;
+    },
+
+    isUnlocked: (state, tuning) => state.upgrades.expand_grove_1 && !state.upgrades.expand_grove_2,
+
+    canPurchase: (state, tuning) => {
+      const tier = tuning.investments.groveExpansion[1];
+      return !state.upgrades.expand_grove_2 &&
+             state.upgrades.expand_grove_1 &&
+             state.florinCount >= tier.florinCost &&
+             state.stone >= tier.stoneCost;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "expand_grove_2");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const tier = tuning.investments.groveExpansion[1];
+      state.florinCount -= tier.florinCost;
+      state.stone -= tier.stoneCost;
+      if (state.stone < 0) state.stone = 0;
+      state.upgrades.expand_grove_2 = true;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.groveExpansion[1].capacityBonus;
+      const lines = [
+        `Grove: Max trees +${bonus}`,
+      ];
+      if (!state.upgrades.expand_grove_1) {
+        lines.push(`Requires: Expand Grove I`);
+      }
+      return lines;
+    },
+  },
+
+  {
+    id: "expand_grove_3",
+    title: "Expand Grove III",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.groveExpansion[2].florinCost,
+
+    costText: (tuning, state) => {
+      const tier = tuning.investments.groveExpansion[2];
+      return `${tier.florinCost} florins, ${tier.stoneCost} stone`;
+    },
+
+    isUnlocked: (state, tuning) => state.upgrades.expand_grove_2 && !state.upgrades.expand_grove_3,
+
+    canPurchase: (state, tuning) => {
+      const tier = tuning.investments.groveExpansion[2];
+      return !state.upgrades.expand_grove_3 &&
+             state.upgrades.expand_grove_2 &&
+             state.florinCount >= tier.florinCost &&
+             state.stone >= tier.stoneCost;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "expand_grove_3");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const tier = tuning.investments.groveExpansion[2];
+      state.florinCount -= tier.florinCost;
+      state.stone -= tier.stoneCost;
+      if (state.stone < 0) state.stone = 0;
+      state.upgrades.expand_grove_3 = true;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const bonus = tuning.investments.groveExpansion[2].capacityBonus;
+      const lines = [
+        `Grove: Max trees +${bonus}`,
+      ];
+      if (!state.upgrades.expand_grove_2) {
+        lines.push(`Requires: Expand Grove II`);
+      }
+      return lines;
+    },
+  },
+
   // --- Shipping Efficiency Upgrades ---
   {
     id: "olive_ship_efficiency_1",

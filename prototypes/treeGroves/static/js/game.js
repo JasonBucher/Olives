@@ -140,6 +140,18 @@ function getFarmHandCapacityBonus() {
   return Math.min(state.farmHandCount * bonusPerWorker, maxBonus);
 }
 
+function getGroveExpansionBonus() {
+  let bonus = 0;
+  const expansions = TUNING.investments.groveExpansion;
+  for (let i = 0; i < expansions.length; i++) {
+    const upgradeId = `expand_grove_${expansions[i].idSuffix}`;
+    if (state.upgrades[upgradeId]) {
+      bonus += expansions[i].capacityBonus;
+    }
+  }
+  return bonus;
+}
+
 function calculateFarmHandHirePreview() {
   const currentCount = state.farmHandCount;
   const nextCount = currentCount + 1;
@@ -656,7 +668,7 @@ function resetGame() {
 function growTrees(dt) {
   const growthMultiplier = getFarmHandGrowthMultiplier();
   const growth = state.treeGrowthPerSec * growthMultiplier * dt;
-  const currentCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+  const currentCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
   state.treeOlives = Math.min(state.treeOlives + growth, currentCapacity);
 }
 
@@ -707,7 +719,7 @@ function consumeInventory(actualValue, intAmount) {
 function updateUI() {
   florinCountEl.textContent = state.florinCount.toFixed(2);
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
-  const currentTreeCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+  const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
   treeCapacityEl.textContent = currentTreeCapacity;
   
   // Display growth rate (olives/sec)
@@ -1644,8 +1656,12 @@ function initInvestments() {
     
     const cost = document.createElement("div");
     cost.className = "inv__cost";
-    const costValue = investment.cost(TUNING, state);
-    cost.textContent = `${costValue} florins`;
+    if (investment.costText) {
+      cost.textContent = investment.costText(TUNING, state);
+    } else {
+      const costValue = investment.cost(TUNING, state);
+      cost.textContent = `${costValue} florins`;
+    }
     
     top.appendChild(title);
     top.appendChild(cost);
@@ -1824,7 +1840,7 @@ function startLoop() {
     growTrees(dt);
     
     // Auto-harvest if Arborist is active and trees are at capacity
-    const currentTreeCapacity = TUNING.grove.treeCapacity + getFarmHandCapacityBonus();
+    const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus() + getFarmHandCapacityBonus();
     if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= currentTreeCapacity) {
       startHarvest({ source: "auto" });
     }
