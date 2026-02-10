@@ -145,6 +145,12 @@ export const TUNING = {
     },
   },
 
+  // Quarry: stone production
+  quarry: {
+    durationSeconds: 8,
+    outputPerRun: 1,
+  },
+
   // Market: timing, pricing, shipping, and trading
   market: {
     tickSeconds: 12,

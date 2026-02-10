@@ -33,6 +33,7 @@ const PERSISTED_STATE_KEYS = [
   "arboristHired",
   "foremanHired",
   "pressManagerHired",
+  "stone",
   "upgrades",
   "meta",
 ];
@@ -50,6 +51,9 @@ function createDefaultState() {
     marketOliveOil: 0,
     oliveOilCount: 0,
     florinCount: 0,
+
+    // Stone
+    stone: 0,
 
     // Workers
     farmHandCount: 0,
@@ -328,6 +332,13 @@ let oliveOilShipJob = {
   stolenCount: 0,
 };
 
+// --- Quarry Job State (not persisted) ---
+let isQuarrying = false;
+let quarryJob = {
+  startTimeMs: 0,
+  durationMs: 0,
+};
+
 // --- Market Timer (not persisted) ---
 let marketTickAcc = 0;
 
@@ -386,6 +397,15 @@ const pressProgressBar = document.getElementById("press-progress-bar");
 const pressCountdown = document.getElementById("press-countdown");
 const pressConsumesEl = document.getElementById("press-consumes");
 const pressProducesEl = document.getElementById("press-produces");
+
+const quarryBtn = document.getElementById("quarry-btn");
+const quarryPill = document.getElementById("quarry-pill");
+const quarryPillCount = document.getElementById("quarry-pill-count");
+const quarryProgressContainer = document.getElementById("quarry-progress");
+const quarryProgressBar = document.getElementById("quarry-progress-bar");
+const quarryCountdown = document.getElementById("quarry-countdown");
+const quarryStoneQty = document.getElementById("quarry-stone-qty");
+const quarryNextEl = document.getElementById("quarry-next");
 
 const farmHandCountEl = document.getElementById("farm-hand-count");
 const hireFarmHandBtn = document.getElementById("hire-farm-hand-btn");
@@ -474,6 +494,15 @@ const oliveOilShipActionUI = createInlineActionController({
   progressEl: shipOliveOilProgressContainer,
   barEl: shipOliveOilProgressBar,
   countdownEl: shipOliveOilCountdown,
+  keepLayout: false,
+});
+
+const quarryActionUI = createInlineActionController({
+  pillEl: quarryPill,
+  countEl: quarryPillCount,
+  progressEl: quarryProgressContainer,
+  barEl: quarryProgressBar,
+  countdownEl: quarryCountdown,
   keepLayout: false,
 });
 
@@ -724,6 +753,13 @@ function updateUI() {
   if (pressProducesEl) {
     pressProducesEl.textContent = `Produces: ${oilPerPress.toFixed(2)} Olive Oil`;
   }
+
+  // Update stone display and quarry button state
+  quarryStoneQty.textContent = Math.floor(state.stone);
+  if (!isQuarrying) {
+    quarryBtn.disabled = false;
+  }
+  quarryNextEl.textContent = `Next: +${TUNING.quarry.outputPerRun} Stone \u2022 ${TUNING.quarry.durationSeconds}s`;
 
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
@@ -1402,6 +1438,62 @@ function updateOliveOilShipProgress() {
   }
 }
 
+// --- Quarry System ---
+function startQuarry() {
+  if (isQuarrying) return;
+
+  const durationMs = TUNING.quarry.durationSeconds * 1000;
+
+  isQuarrying = true;
+  quarryJob = {
+    startTimeMs: Date.now(),
+    durationMs,
+  };
+
+  quarryBtn.disabled = true;
+  quarryActionUI.start({ count: TUNING.quarry.outputPerRun, percent: 0 });
+
+  logLine("Quarrying stone...");
+}
+
+function completeQuarry() {
+  const output = TUNING.quarry.outputPerRun;
+  state.stone += output;
+  // Clamp tiny floating negatives
+  if (state.stone < 0) state.stone = 0;
+
+  isQuarrying = false;
+  quarryActionUI.end();
+
+  const playerText = `Quarried stone → +${output} Stone`;
+  const debugText = `Quarried stone: output=${output}, totalStone=${state.stone.toFixed(4)}`;
+
+  logEvent({
+    channel: 'farm',
+    playerText,
+    debugText,
+  });
+
+  saveGame();
+  updateUI();
+}
+
+function updateQuarryProgress() {
+  if (!isQuarrying) return;
+
+  const now = Date.now();
+  const elapsed = now - quarryJob.startTimeMs;
+  const progress = Math.min(1, elapsed / quarryJob.durationMs);
+  const remaining = Math.max(0, (quarryJob.durationMs - elapsed) / 1000);
+
+  const progressPct = Math.floor(progress * 100);
+  quarryActionUI.update({ percent: progressPct, countdownText: remaining.toFixed(2) + "s" });
+
+  if (elapsed >= quarryJob.durationMs) {
+    completeQuarry();
+  }
+}
+
 // --- Market System ---
 function runMarketTick() {
   // Check if any goods are available (only whole goods can be sold)
@@ -1661,7 +1753,11 @@ function resumeSim() {
   if (isShipping && shipJob.startTimeMs) {
     shipJob.startTimeMs += pauseDuration;
   }
-  
+
+  if (isQuarrying && quarryJob.startTimeMs) {
+    quarryJob.startTimeMs += pauseDuration;
+  }
+
   isSimPaused = false;
   pausedAtMs = 0;
   
@@ -1744,6 +1840,9 @@ function startLoop() {
     
     // Update olive oil ship progress
     updateOliveOilShipProgress();
+
+    // Update quarry progress
+    updateQuarryProgress();
     
     // Market tick accumulator
     marketTickAcc += dt;
@@ -1778,6 +1877,8 @@ harvestBtn.addEventListener("click", startHarvest);
 shipOlivesBtn.addEventListener("click", startShipping);
 shipOliveOilBtn.addEventListener("click", startShippingOliveOil);
 pressBtn.addEventListener("click", startPressing);
+
+quarryBtn.addEventListener("click", startQuarry);
 
 hireFarmHandBtn.addEventListener("click", () => {
   const cost = getFarmHandHireCost();
@@ -1840,6 +1941,14 @@ debugAddOilBtn.addEventListener("click", () => {
   state.oliveOilCount += 100;
   saveGame();
   logLine("Debug: +100 olive oil");
+});
+
+const debugAddStoneBtn = document.getElementById("debug-add-stone-btn");
+debugAddStoneBtn.addEventListener("click", () => {
+  state.stone += 100;
+  saveGame();
+  updateUI();
+  logLine("Debug: +100 stone");
 });
 
 // Close modal on outside click

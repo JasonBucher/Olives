@@ -165,6 +165,33 @@
                 <span id="press-produces">Produces: 1.00 Olive Oil</span>
               </div>
             </div>
+
+            <div class="subsection">
+              <div class="inventory-row">
+                <div class="inv-name">Quarry</div>
+                <div class="inv-qty">Stone: <span id="quarry-stone-qty">0</span></div>
+
+                <div class="inv-middle">
+                  <span id="quarry-pill" class="inv-transit-pill" hidden>
+                    <span id="quarry-pill-count">1</span><span>→</span>
+                  </span>
+
+                  <!-- Progress bar inline -->
+                  <div id="quarry-progress" class="inv-progress">
+                    <div class="inv-progress-bar">
+                      <div id="quarry-progress-bar" class="inv-progress-fill"></div>
+                      <div id="quarry-countdown" class="action-countdown"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <button id="quarry-btn" class="btn btn-primary" type="button">Quarry</button>
+              </div>
+
+              <div class="press-preview" id="quarry-preview">
+                <span id="quarry-next">Next: +1 Stone • 8s</span>
+              </div>
+            </div>
           </section>
 
           <section class="section">
@@ -406,6 +433,7 @@
           <button id="debug-add-olives-btn" class="btn" type="button">+100 Olives</button>
           <button id="debug-add-florins-btn" class="btn" type="button">+100 Florins</button>
           <button id="debug-add-oil-btn" class="btn" type="button">+100 Oil</button>
+          <button id="debug-add-stone-btn" class="btn" type="button">+100 Stone</button>
         </div>
 
         <hr class="divider" />
