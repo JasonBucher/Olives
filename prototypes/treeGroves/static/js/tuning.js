@@ -153,10 +153,29 @@ export const TUNING = {
   // Market: timing, pricing, shipping, and trading
   market: {
     tickSeconds: 12,
-    autosellRatePerSecond: 0.2,
+    autosell: {
+      baseRatePerSecond: 0.2,
+      rateUpgradeAmount: 0.15,
+      maxRateUpgrades: 3,
+    },
+    lanes: {
+      baseLanes: 1,
+      laneUpgradeAmount: 1,
+      maxAdditionalLanes: 3,
+    },
+    thief: {
+      baseWeight: 5,
+      reductionPerUpgrade: 1,
+      minWeight: 1,
+    },
     prices: {
       olivesFlorins: 1,
       oliveOilFlorins: 5,
+    },
+    price: {
+      baseMultiplier: 1.0,
+      upgradeMultiplier: 0.10,
+      maxUpgrades: 3,
     },
     shipping: {
       // Shared time outcomes for both olive and olive oil shipping
@@ -200,6 +219,17 @@ export const TUNING = {
       selective_picking: 200,
       ladders_nets: 300,
       quality_inspector: 500,
+    },
+    marketAutosell: {
+      rateUpgradeCost: { florins: 60, stone: 6 },
+      laneUpgradeCost: { florins: 90, stone: 10 },
+    },
+    marketPrice: {
+      upgradeCost: { florins: 60, stone: 6 },
+    },
+    marketThiefMitigation: {
+      florins: 35,
+      stone: 20,
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 25, stoneCost: 5, capacityBonus: 20 },

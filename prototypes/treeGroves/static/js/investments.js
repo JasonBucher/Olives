@@ -454,6 +454,197 @@ export const INVESTMENTS = [
     },
   },
 
+  // --- Market Stall Upgrades ---
+  {
+    id: "market_autosell_rate",
+    title: "Improve Market Stall",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.marketAutosell.rateUpgradeCost.florins,
+
+    costText: (tuning, state) => {
+      const cost = tuning.investments.marketAutosell.rateUpgradeCost;
+      return `${cost.florins} florins, ${cost.stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cost = tuning.investments.marketAutosell.rateUpgradeCost;
+      const current = Number(state.marketAutosellRateUpgrades) || 0;
+      return current < tuning.market.autosell.maxRateUpgrades &&
+             state.florinCount >= cost.florins &&
+             state.stone >= cost.stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "market_autosell_rate");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cost = tuning.investments.marketAutosell.rateUpgradeCost;
+      state.florinCount -= cost.florins;
+      state.stone -= cost.stone;
+      if (state.stone < 0) state.stone = 0;
+      state.marketAutosellRateUpgrades = (Number(state.marketAutosellRateUpgrades) || 0) + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const amount = tuning.market.autosell.rateUpgradeAmount;
+      const purchased = Math.min(
+        Number(state.marketAutosellRateUpgrades) || 0,
+        tuning.market.autosell.maxRateUpgrades
+      );
+      const max = tuning.market.autosell.maxRateUpgrades;
+      return [
+        `Market: Auto-selling +${amount.toFixed(2)} / s`,
+        `Purchased: ${purchased}/${max}`,
+      ];
+    },
+  },
+
+  {
+    id: "market_autosell_lane",
+    title: "Hire Vendor",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.marketAutosell.laneUpgradeCost.florins,
+
+    costText: (tuning, state) => {
+      const cost = tuning.investments.marketAutosell.laneUpgradeCost;
+      return `${cost.florins} florins, ${cost.stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cost = tuning.investments.marketAutosell.laneUpgradeCost;
+      const current = Number(state.marketLanesPurchased) || 0;
+      return current < tuning.market.lanes.maxAdditionalLanes &&
+             state.florinCount >= cost.florins &&
+             state.stone >= cost.stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "market_autosell_lane");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cost = tuning.investments.marketAutosell.laneUpgradeCost;
+      state.florinCount -= cost.florins;
+      state.stone -= cost.stone;
+      if (state.stone < 0) state.stone = 0;
+      state.marketLanesPurchased = (Number(state.marketLanesPurchased) || 0) + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const laneIncrease = tuning.market.lanes.laneUpgradeAmount;
+      const purchased = Math.min(
+        Number(state.marketLanesPurchased) || 0,
+        tuning.market.lanes.maxAdditionalLanes
+      );
+      const max = tuning.market.lanes.maxAdditionalLanes;
+      const laneLabel = laneIncrease === 1 ? "lane" : "lanes";
+      return [
+        `Market: Auto-selling +${laneIncrease} ${laneLabel}`,
+        `Purchased: ${purchased}/${max}`,
+      ];
+    },
+  },
+
+  {
+    id: "market_trade_deals",
+    title: "Better Trade Deals",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.marketPrice.upgradeCost.florins,
+
+    costText: (tuning, state) => {
+      const cost = tuning.investments.marketPrice.upgradeCost;
+      return `${cost.florins} florins, ${cost.stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cost = tuning.investments.marketPrice.upgradeCost;
+      const current = Number(state.marketPriceUpgrades) || 0;
+      return current < tuning.market.price.maxUpgrades &&
+             state.florinCount >= cost.florins &&
+             state.stone >= cost.stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "market_trade_deals");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cost = tuning.investments.marketPrice.upgradeCost;
+      state.florinCount -= cost.florins;
+      state.stone -= cost.stone;
+      if (state.stone < 0) state.stone = 0;
+      state.marketPriceUpgrades = (Number(state.marketPriceUpgrades) || 0) + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const bonusPct = tuning.market.price.upgradeMultiplier * 100;
+      const purchased = Math.min(
+        Number(state.marketPriceUpgrades) || 0,
+        tuning.market.price.maxUpgrades
+      );
+      const max = tuning.market.price.maxUpgrades;
+      return [
+        `Market: +${bonusPct.toFixed(0)}% florins per unit sold`,
+        `Purchased: ${purchased}/${max}`,
+      ];
+    },
+  },
+
+  {
+    id: "market_night_watch",
+    title: "Night Watch",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.marketThiefMitigation.florins,
+
+    costText: (tuning, state) => {
+      const cost = tuning.investments.marketThiefMitigation;
+      return `${cost.florins} florins, ${cost.stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cost = tuning.investments.marketThiefMitigation;
+      const reduction = tuning.market.thief.reductionPerUpgrade;
+      const diff = tuning.market.thief.baseWeight - tuning.market.thief.minWeight;
+      const maxLevel = reduction > 0 ? Math.max(0, Math.ceil(diff / reduction)) : 0;
+      const current = Number(state.thiefMitigationLevel) || 0;
+      return current < maxLevel &&
+             state.florinCount >= cost.florins &&
+             state.stone >= cost.stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "market_night_watch");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cost = tuning.investments.marketThiefMitigation;
+      state.florinCount -= cost.florins;
+      state.stone -= cost.stone;
+      if (state.stone < 0) state.stone = 0;
+      state.thiefMitigationLevel = (Number(state.thiefMitigationLevel) || 0) + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const reduction = tuning.market.thief.reductionPerUpgrade;
+      const diff = tuning.market.thief.baseWeight - tuning.market.thief.minWeight;
+      const maxLevel = reduction > 0 ? Math.max(0, Math.ceil(diff / reduction)) : 0;
+      const purchased = Math.min(Number(state.thiefMitigationLevel) || 0, maxLevel);
+      return [
+        `Market: Thief activity reduced (-${reduction} weight)`,
+        `Purchased: ${purchased}/${maxLevel}`,
+      ];
+    },
+  },
+
   // --- Shipping Efficiency Upgrades ---
   {
     id: "olive_ship_efficiency_1",

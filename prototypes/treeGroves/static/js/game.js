@@ -4,7 +4,7 @@ import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
-import { MARKET_EVENTS, MARKET_EVENT_SETTINGS } from './marketEvents.js';
+import { getMarketEvents, MARKET_EVENT_SETTINGS } from './marketEvents.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -25,6 +25,10 @@ const PERSISTED_STATE_KEYS = [
   "harvestedOlives",
   "marketOlives",
   "marketOliveOil",
+  "marketAutosellRateUpgrades",
+  "marketLanesPurchased",
+  "marketPriceUpgrades",
+  "thiefMitigationLevel",
   "oliveOilCount",
   "florinCount",
   "cultivatorCount",
@@ -49,6 +53,10 @@ function createDefaultState() {
     harvestedOlives: 0,
     marketOlives: 0,
     marketOliveOil: 0,
+    marketAutosellRateUpgrades: 0,
+    marketLanesPurchased: 0,
+    marketPriceUpgrades: 0,
+    thiefMitigationLevel: 0,
     oliveOilCount: 0,
     florinCount: 0,
 
@@ -1476,11 +1484,71 @@ function updateQuarryProgress() {
 
 // --- Market System ---
 function formatRatePerSecond(value) {
-  return value.toFixed(2).replace(/\.?0+$/, "");
+  return value.toFixed(2);
 }
 
 function formatFlorins(value) {
   return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatPercent(value) {
+  const abs = Math.abs(value);
+  const rounded = Math.abs(abs - Math.round(abs)) < 0.01 ? abs.toFixed(0) : abs.toFixed(1);
+  const normalized = rounded.replace(/\.0$/, "");
+  return value < 0 ? `-${normalized}` : normalized;
+}
+
+function getMaxThiefMitigationLevel() {
+  const tuning = TUNING.market.thief;
+  const reduction = tuning.reductionPerUpgrade;
+  if (reduction <= 0) return 0;
+  const diff = tuning.baseWeight - tuning.minWeight;
+  if (diff <= 0) return 0;
+  return Math.max(0, Math.ceil(diff / reduction));
+}
+
+function getThiefMitigationLevel() {
+  const count = Number(state.thiefMitigationLevel) || 0;
+  return Math.min(Math.max(0, count), getMaxThiefMitigationLevel());
+}
+
+function getMarketAutosellRateUpgrades() {
+  const count = Number(state.marketAutosellRateUpgrades) || 0;
+  return Math.min(Math.max(0, count), TUNING.market.autosell.maxRateUpgrades);
+}
+
+function getMarketLanesPurchased() {
+  const count = Number(state.marketLanesPurchased) || 0;
+  return Math.min(Math.max(0, count), TUNING.market.lanes.maxAdditionalLanes);
+}
+
+function getMarketAutosellLanes() {
+  return TUNING.market.lanes.baseLanes + getMarketLanesPurchased();
+}
+
+function getMarketPriceUpgrades() {
+  const count = Number(state.marketPriceUpgrades) || 0;
+  return Math.min(Math.max(0, count), TUNING.market.price.maxUpgrades);
+}
+
+function getMarketPermanentPriceMultiplier() {
+  const base = TUNING.market.price.baseMultiplier;
+  const upgrade = TUNING.market.price.upgradeMultiplier;
+  return base + (getMarketPriceUpgrades() * upgrade);
+}
+
+function getMarketEffectivePriceMultiplier(eventMultiplier = 1) {
+  return getMarketPermanentPriceMultiplier() * (eventMultiplier ?? 1);
+}
+
+function getMarketAutosellBaseRate() {
+  const baseRate = TUNING.market.autosell.baseRatePerSecond;
+  const upgradeRate = TUNING.market.autosell.rateUpgradeAmount * getMarketAutosellRateUpgrades();
+  return Math.max(0, baseRate + upgradeRate);
+}
+
+function getMarketAutosellRatePerSecond() {
+  return getMarketAutosellBaseRate() * getMarketAutosellLanes();
 }
 
 function getMarketInventoryCounts() {
@@ -1523,7 +1591,7 @@ function applyMarketSale({ olives, oil }, priceMultiplier = 1) {
     earned += oil * TUNING.market.prices.oliveOilFlorins;
   }
 
-  earned *= priceMultiplier;
+  earned *= getMarketEffectivePriceMultiplier(priceMultiplier);
   if (earned > 0) {
     state.florinCount += earned;
   }
@@ -1571,27 +1639,45 @@ function updateMarketAutosellUI() {
   if (!marketAutosellEl) return;
 
   const modifiers = getActiveMarketModifiers();
-  const baseRate = TUNING.market.autosellRatePerSecond;
-  const effectiveRate = modifiers.autosellPaused ? 0 : baseRate * modifiers.autosellRateMultiplier;
-
-  let text = `Auto-selling: ${formatRatePerSecond(effectiveRate)} / s`;
+  const lanes = getMarketAutosellLanes();
+  const laneLabel = lanes === 1 ? "lane" : "lanes";
 
   if (modifiers.autosellPaused) {
-    const status = modifiers.uiStatus || "Paused";
-    text = `Auto-selling: 0 / s (${status})`;
-  } else if (modifiers.uiSuffix) {
-    text += ` ${modifiers.uiSuffix}`;
+    marketAutosellEl.textContent = `Auto-selling: Paused (${lanes} ${laneLabel})`;
+    marketAutosellEl.classList.add("is-paused");
+    return;
   }
 
+  const baseRate = getMarketAutosellRatePerSecond();
+  const effectiveRate = Math.max(0, baseRate * modifiers.autosellRateMultiplier);
+
+  const priceBonuses = [];
+  const permanentBonusPct = (getMarketPermanentPriceMultiplier() - 1) * 100;
+  if (Math.abs(permanentBonusPct) > 0.01) {
+    const sign = permanentBonusPct >= 0 ? "+" : "";
+    priceBonuses.push(`${sign}${formatPercent(permanentBonusPct)}%`);
+  }
+  const eventBonusPct = ((modifiers.priceMultiplier ?? 1) - 1) * 100;
+  if (Math.abs(eventBonusPct) > 0.01) {
+    const sign = eventBonusPct >= 0 ? "+" : "";
+    priceBonuses.push(`${sign}${formatPercent(eventBonusPct)}%`);
+  }
+
+  let text = `Auto-selling: ${formatRatePerSecond(effectiveRate)} / s (${lanes} ${laneLabel}`;
+  if (priceBonuses.length > 0) {
+    text += `, ${priceBonuses.join(" ")}`;
+  }
+  text += `)`;
+
   marketAutosellEl.textContent = text;
-  marketAutosellEl.classList.toggle("is-paused", modifiers.autosellPaused);
+  marketAutosellEl.classList.remove("is-paused");
 }
 
 function runAutosellTick(dt) {
   const modifiers = getActiveMarketModifiers();
   if (modifiers.autosellPaused) return;
 
-  const baseRate = TUNING.market.autosellRatePerSecond;
+  const baseRate = getMarketAutosellRatePerSecond();
   const effectiveRate = Math.max(0, baseRate * modifiers.autosellRateMultiplier);
   if (effectiveRate <= 0) return;
 
@@ -1655,14 +1741,14 @@ function executeMarketEventAction(eventDef) {
       return { olives: 0, oil: 0, earned: 0 };
     }
     const allocation = splitMarketSaleUnits(target, olives, oil);
-    const earned = applyMarketSale(allocation, 1);
+    const earned = applyMarketSale(allocation, getActiveMarketModifiers().priceMultiplier);
     marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, false));
     return { ...allocation, earned };
   }
 
   if (action.type === "buyAll") {
     const allocation = { olives, oil };
-    const earned = applyMarketSale(allocation, 1);
+    const earned = applyMarketSale(allocation, getActiveMarketModifiers().priceMultiplier);
     marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, true));
     return { ...allocation, earned };
   }
@@ -1709,7 +1795,8 @@ function tryStartMarketEvent(nowMs) {
   if (activeMarketEvent) return;
 
   const inventory = getMarketInventoryCounts();
-  const eligible = MARKET_EVENTS.filter((eventDef) => (
+  const events = getMarketEvents(state, TUNING);
+  const eligible = events.filter((eventDef) => (
     canTriggerMarketEvent(eventDef, nowMs, inventory.total)
   ));
   if (eligible.length === 0) return;
@@ -1761,6 +1848,13 @@ function buyInvestment(id) {
     saveGame();
     updateUI();
     logLine(`Purchased: ${investment.title}`);
+    if (investment.id === "market_night_watch") {
+      marketLogLine("Night Watch hired. Thief activity reduced.");
+    }
+    if (investment.id === "market_trade_deals") {
+      const bonusPct = TUNING.market.price.upgradeMultiplier * 100;
+      marketLogLine(`Secured better trade deals \u2192 +${formatPercent(bonusPct)}% prices`);
+    }
   }
   return success;
 }
@@ -1859,6 +1953,18 @@ function isInvestmentOwned(investment) {
   if (investment.id === "arborist") return state.arboristHired;
   if (investment.id === "foreman") return state.foremanHired;
   if (investment.id === "pressManager") return state.pressManagerHired;
+  if (investment.id === "market_autosell_rate") {
+    return getMarketAutosellRateUpgrades() >= TUNING.market.autosell.maxRateUpgrades;
+  }
+  if (investment.id === "market_autosell_lane") {
+    return getMarketLanesPurchased() >= TUNING.market.lanes.maxAdditionalLanes;
+  }
+  if (investment.id === "market_trade_deals") {
+    return getMarketPriceUpgrades() >= TUNING.market.price.maxUpgrades;
+  }
+  if (investment.id === "market_night_watch") {
+    return getThiefMitigationLevel() >= getMaxThiefMitigationLevel();
+  }
   return !!state.upgrades[investment.id];
 }
 
@@ -1892,6 +1998,17 @@ function updateInvestmentButtons() {
     // Show and update disabled state
     btn.style.display = "";
     btn.disabled = !investment.canPurchase(state, TUNING);
+
+    // Update cost text for dynamic costs
+    const costEl = btn.querySelector(".inv__cost");
+    if (costEl) {
+      if (investment.costText) {
+        costEl.textContent = investment.costText(TUNING, state);
+      } else {
+        const costValue = investment.cost(TUNING, state);
+        costEl.textContent = `${costValue} florins`;
+      }
+    }
 
     // Update effect lines for state-aware previews
     const effectsEl = btn.querySelector(".inv__effects");
