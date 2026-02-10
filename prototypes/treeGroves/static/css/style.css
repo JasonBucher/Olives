@@ -261,6 +261,17 @@ h1 {
   flex-wrap: wrap;
 }
 
+.market-autosell {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-autosell.is-paused {
+  color: var(--danger);
+}
+
 .market-log-compact {
   max-height: 150px;
 }

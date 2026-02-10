@@ -4,6 +4,7 @@ import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
+import { MARKET_EVENTS, MARKET_EVENT_SETTINGS } from './marketEvents.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -329,8 +330,14 @@ let quarryJob = {
   durationMs: 0,
 };
 
-// --- Market Timer (not persisted) ---
-let marketTickAcc = 0;
+// --- Market Loop State (not persisted) ---
+const MARKET_LOOP_MS = 1000;
+let marketLoopInterval = null;
+let marketLoopLastMs = 0;
+let autosellProgress = 0;
+let marketEventAcc = 0;
+let activeMarketEvent = null;
+const marketEventCooldowns = {};
 
 // --- Arborist Active State (computed each tick) ---
 let arboristIsActive = false;
@@ -342,6 +349,7 @@ const treeCapacityEl = document.getElementById("tree-capacity");
 const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
+const marketAutosellEl = document.getElementById("market-autosell");
 
 // Log containers
 const farmLogPlayerEl = document.getElementById("farmLogPlayer");
@@ -636,6 +644,7 @@ function resetGame() {
 
   isResetting = true;
   if (mainLoopInterval) clearInterval(mainLoopInterval);
+  stopMarketLoop();
 
   localStorage.removeItem(STORAGE_KEY);
 
@@ -710,6 +719,7 @@ function updateUI() {
   invOliveOilQty.textContent = getDisplayCount(state.oliveOilCount || 0);
   marketOliveCountEl.textContent = getDisplayCount(state.marketOlives);
   marketOilCountEl.textContent = getDisplayCount(state.marketOliveOil || 0);
+  updateMarketAutosellUI();
   
   // Update ship button state based on inventory (only whole goods can be shipped)
   if (!isShipping) {
@@ -1465,91 +1475,280 @@ function updateQuarryProgress() {
 }
 
 // --- Market System ---
-function runMarketTick() {
-  // Check if any goods are available (only whole goods can be sold)
-  const hasOlives = getShippableCount(state.marketOlives) > 0;
-  const hasOil = getShippableCount(state.marketOliveOil || 0) > 0;
-  
-  if (!hasOlives && !hasOil) return;
-  
-  // Randomly choose which good to process this tick
-  let goodType;
-  if (hasOlives && hasOil) {
-    // Both available, randomly pick one
-    goodType = Math.random() < 0.5 ? 'olives' : 'oil';
-  } else {
-    // Only one available
-    goodType = hasOlives ? 'olives' : 'oil';
+function formatRatePerSecond(value) {
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatFlorins(value) {
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function getMarketInventoryCounts() {
+  const olives = getShippableCount(state.marketOlives);
+  const oil = getShippableCount(state.marketOliveOil || 0);
+  return { olives, oil, total: olives + oil };
+}
+
+function splitMarketSaleUnits(totalUnits, olivesAvailable, oilAvailable) {
+  if (totalUnits <= 0) return { olives: 0, oil: 0 };
+  if (olivesAvailable <= 0) return { olives: 0, oil: Math.min(oilAvailable, totalUnits) };
+  if (oilAvailable <= 0) return { olives: Math.min(olivesAvailable, totalUnits), oil: 0 };
+
+  const totalAvailable = olivesAvailable + oilAvailable;
+  let oilUnits = Math.floor((totalUnits * oilAvailable) / totalAvailable);
+  let oliveUnits = totalUnits - oilUnits;
+
+  if (oliveUnits > olivesAvailable) {
+    oliveUnits = olivesAvailable;
+    oilUnits = Math.min(oilAvailable, totalUnits - oliveUnits);
   }
-  
-  // Get inventory (floor'd for market operations) and price for chosen good
-  const inventory = goodType === 'olives' ? getShippableCount(state.marketOlives) : getShippableCount(state.marketOliveOil || 0);
-  const price = goodType === 'olives' ? TUNING.market.prices.olivesFlorins : TUNING.market.prices.oliveOilFlorins;
-  const goodName = goodType === 'olives' ? 'olives' : 'olive oil';
-  
-  // Buyer step
-  const buyer = rollWeighted(TUNING.market.buyerOutcomes);
-  let buyCount;
-  
-  if (buyer.buyAll) {
-    buyCount = inventory;
-  } else {
-    // Random int between buyMin and buyMax
-    buyCount = Math.floor(Math.random() * (buyer.buyMax - buyer.buyMin + 1)) + buyer.buyMin;
-    buyCount = Math.min(buyCount, inventory);
+  if (oilUnits > oilAvailable) {
+    oilUnits = oilAvailable;
+    oliveUnits = Math.min(olivesAvailable, totalUnits - oilUnits);
   }
-  
-  // Deduct integer amount from float inventory (preserves remainder)
-  if (goodType === 'olives') {
-    state.marketOlives = consumeInventory(state.marketOlives, buyCount);
-  } else {
-    state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, buyCount);
+
+  return { olives: oliveUnits, oil: oilUnits };
+}
+
+function applyMarketSale({ olives, oil }, priceMultiplier = 1) {
+  let earned = 0;
+
+  if (olives > 0) {
+    state.marketOlives = consumeInventory(state.marketOlives, olives);
+    earned += olives * TUNING.market.prices.olivesFlorins;
   }
-  const earned = buyCount * price;
-  state.florinCount += earned;
-  
-  // Capitalize buyer name for display
-  const buyerName = buyer.key.charAt(0).toUpperCase() + buyer.key.slice(1);
-  marketLogLine(`Buyer (${buyerName}) bought ${buyCount} ${goodName} (+${earned} florins).`);
-  
-  // Mishap step (only if goods remain - check floor'd amount)
-  const remainingInventory = goodType === 'olives' ? getShippableCount(state.marketOlives) : getShippableCount(state.marketOliveOil || 0);
-  if (remainingInventory <= 0) return;
-  
-  const mishap = rollWeighted(TUNING.market.mishapOutcomes);
-  
-  if (mishap.key === "none") {
-    // No mishap, no log
+
+  if (oil > 0) {
+    state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, oil);
+    earned += oil * TUNING.market.prices.oliveOilFlorins;
+  }
+
+  earned *= priceMultiplier;
+  if (earned > 0) {
+    state.florinCount += earned;
+  }
+
+  return earned;
+}
+
+function resolveMarketEventDurationSeconds(eventDef) {
+  const duration = eventDef.durationSeconds;
+  if (duration === undefined || duration === null) return 0;
+  if (typeof duration === "number") return duration;
+  if (typeof duration === "object") {
+    const min = duration.min ?? 0;
+    const max = duration.max ?? min;
+    if (max <= min) return min;
+    return min + Math.random() * (max - min);
+  }
+  return 0;
+}
+
+function getActiveMarketModifiers() {
+  const defaults = {
+    autosellPaused: false,
+    autosellRateMultiplier: 1,
+    priceMultiplier: 1,
+    uiStatus: null,
+    uiSuffix: null,
+  };
+
+  if (!activeMarketEvent) return defaults;
+
+  const modifiers = activeMarketEvent.def.modifiers || {};
+  const ui = activeMarketEvent.def.ui || {};
+
+  return {
+    autosellPaused: !!modifiers.autosellPaused,
+    autosellRateMultiplier: modifiers.autosellRateMultiplier ?? 1,
+    priceMultiplier: modifiers.priceMultiplier ?? 1,
+    uiStatus: ui.status || null,
+    uiSuffix: ui.suffix || null,
+  };
+}
+
+function updateMarketAutosellUI() {
+  if (!marketAutosellEl) return;
+
+  const modifiers = getActiveMarketModifiers();
+  const baseRate = TUNING.market.autosellRatePerSecond;
+  const effectiveRate = modifiers.autosellPaused ? 0 : baseRate * modifiers.autosellRateMultiplier;
+
+  let text = `Auto-selling: ${formatRatePerSecond(effectiveRate)} / s`;
+
+  if (modifiers.autosellPaused) {
+    const status = modifiers.uiStatus || "Paused";
+    text = `Auto-selling: 0 / s (${status})`;
+  } else if (modifiers.uiSuffix) {
+    text += ` ${modifiers.uiSuffix}`;
+  }
+
+  marketAutosellEl.textContent = text;
+  marketAutosellEl.classList.toggle("is-paused", modifiers.autosellPaused);
+}
+
+function runAutosellTick(dt) {
+  const modifiers = getActiveMarketModifiers();
+  if (modifiers.autosellPaused) return;
+
+  const baseRate = TUNING.market.autosellRatePerSecond;
+  const effectiveRate = Math.max(0, baseRate * modifiers.autosellRateMultiplier);
+  if (effectiveRate <= 0) return;
+
+  const { olives, oil, total } = getMarketInventoryCounts();
+  if (total <= 0) {
+    autosellProgress = 0;
     return;
   }
-  
-  if (mishap.key === "urchin" || mishap.key === "crow") {
-    // Stolen mishap
-    const stolenCount = Math.floor(Math.random() * (mishap.stolenMax - mishap.stolenMin + 1)) + mishap.stolenMin;
-    const actualStolen = Math.min(stolenCount, remainingInventory);
-    const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
-    
-    // Deduct integer amount from float inventory
-    if (goodType === 'olives') {
-      state.marketOlives = consumeInventory(state.marketOlives, actualStolen);
-    } else {
-      state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, actualStolen);
-    }
-    marketLogLine(`Mishap (${mishapName}): ${actualStolen} ${goodName} stolen.`);
-  } else if (mishap.key === "spoil") {
-    // Rotted mishap
-    const rottedCount = Math.floor(Math.random() * (mishap.rottedMax - mishap.rottedMin + 1)) + mishap.rottedMin;
-    const actualRotted = Math.min(rottedCount, remainingInventory);
-    const mishapName = mishap.key.charAt(0).toUpperCase() + mishap.key.slice(1);
-    
-    // Deduct integer amount from float inventory
-    if (goodType === 'olives') {
-      state.marketOlives = consumeInventory(state.marketOlives, actualRotted);
-    } else {
-      state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, actualRotted);
-    }
-    marketLogLine(`Mishap (${mishapName}): ${actualRotted} ${goodName} rotted.`);
+
+  autosellProgress += effectiveRate * dt;
+  const unitsToSell = Math.min(total, Math.floor(autosellProgress));
+  if (unitsToSell <= 0) return;
+
+  const allocation = splitMarketSaleUnits(unitsToSell, olives, oil);
+  applyMarketSale(allocation, modifiers.priceMultiplier);
+  autosellProgress -= unitsToSell;
+  saveGame();
+}
+
+function canTriggerMarketEvent(eventDef, nowMs, totalInventory) {
+  const lastTriggered = marketEventCooldowns[eventDef.id] || 0;
+  const cooldownMs = (eventDef.cooldownSeconds || 0) * 1000;
+  if (cooldownMs > 0 && nowMs - lastTriggered < cooldownMs) return false;
+  if (eventDef.requiresInventory && totalInventory <= 0) return false;
+  return true;
+}
+
+function logMarketEventStart(eventDef) {
+  if (!eventDef.log || !eventDef.log.start) return;
+  logEvent({ channel: "market", playerText: eventDef.log.start, debugText: eventDef.log.start });
+}
+
+function logMarketEventEnd(eventDef) {
+  if (!eventDef.log || !eventDef.log.end) return;
+  logEvent({ channel: "market", playerText: eventDef.log.end, debugText: eventDef.log.end });
+}
+
+function formatMarketPurchaseLine(buyerName, olives, oil, earned, boughtAll = false) {
+  const parts = [];
+  if (olives > 0) parts.push(`${olives} olives`);
+  if (oil > 0) parts.push(`${oil} olive oil`);
+  const goodsText = parts.length ? parts.join(" and ") : "nothing";
+  const prefix = boughtAll ? `${buyerName} purchased all market goods` : `${buyerName} purchased`;
+  return `${prefix}: ${goodsText} (+${formatFlorins(earned)} florins).`;
+}
+
+function executeMarketEventAction(eventDef) {
+  const action = eventDef.action;
+  if (!action) return null;
+
+  const { olives, oil, total } = getMarketInventoryCounts();
+  if (total <= 0) {
+    marketLogLine(`${eventDef.name} found nothing to buy.`);
+    return { olives: 0, oil: 0, earned: 0 };
   }
+
+  if (action.type === "bulkBuy") {
+    const target = Math.min(action.quantity || 0, total);
+    if (target <= 0) {
+      marketLogLine(`${eventDef.name} found nothing to buy.`);
+      return { olives: 0, oil: 0, earned: 0 };
+    }
+    const allocation = splitMarketSaleUnits(target, olives, oil);
+    const earned = applyMarketSale(allocation, 1);
+    marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, false));
+    return { ...allocation, earned };
+  }
+
+  if (action.type === "buyAll") {
+    const allocation = { olives, oil };
+    const earned = applyMarketSale(allocation, 1);
+    marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, true));
+    return { ...allocation, earned };
+  }
+
+  return null;
+}
+
+function startMarketEvent(eventDef, nowMs) {
+  const durationSeconds = resolveMarketEventDurationSeconds(eventDef);
+  activeMarketEvent = {
+    def: eventDef,
+    startedAtMs: nowMs,
+    endsAtMs: nowMs + (durationSeconds * 1000),
+  };
+
+  marketEventCooldowns[eventDef.id] = nowMs;
+  marketEventAcc = 0;
+
+  logMarketEventStart(eventDef);
+
+  if (eventDef.action) {
+    executeMarketEventAction(eventDef);
+  }
+
+  updateMarketAutosellUI();
+
+  if (durationSeconds <= 0) {
+    endMarketEvent();
+  }
+}
+
+function endMarketEvent() {
+  if (!activeMarketEvent) return;
+  const eventDef = activeMarketEvent.def;
+
+  activeMarketEvent = null;
+  marketEventAcc = 0;
+
+  logMarketEventEnd(eventDef);
+  updateMarketAutosellUI();
+}
+
+function tryStartMarketEvent(nowMs) {
+  if (activeMarketEvent) return;
+
+  const inventory = getMarketInventoryCounts();
+  const eligible = MARKET_EVENTS.filter((eventDef) => (
+    canTriggerMarketEvent(eventDef, nowMs, inventory.total)
+  ));
+  if (eligible.length === 0) return;
+
+  if (Math.random() > MARKET_EVENT_SETTINGS.spawnChance) return;
+
+  const selected = rollWeighted(eligible);
+  startMarketEvent(selected, nowMs);
+}
+
+function startMarketLoop() {
+  if (marketLoopInterval) return;
+
+  marketLoopLastMs = Date.now();
+  marketLoopInterval = setInterval(() => {
+    const now = Date.now();
+    const dt = (now - marketLoopLastMs) / 1000;
+    marketLoopLastMs = now;
+
+    if (activeMarketEvent && now >= activeMarketEvent.endsAtMs) {
+      endMarketEvent();
+    }
+
+    if (!activeMarketEvent) {
+      marketEventAcc += dt;
+      if (marketEventAcc >= MARKET_EVENT_SETTINGS.checkEverySeconds) {
+        marketEventAcc -= MARKET_EVENT_SETTINGS.checkEverySeconds;
+        tryStartMarketEvent(now);
+      }
+    }
+
+    runAutosellTick(dt);
+  }, MARKET_LOOP_MS);
+}
+
+function stopMarketLoop() {
+  if (!marketLoopInterval) return;
+  clearInterval(marketLoopInterval);
+  marketLoopInterval = null;
 }
 
 // --- Investment System ---
@@ -1753,6 +1952,7 @@ function pauseSim() {
     clearInterval(mainLoopInterval);
     mainLoopInterval = null;
   }
+  stopMarketLoop();
 }
 
 function resumeSim() {
@@ -1779,6 +1979,7 @@ function resumeSim() {
   
   // Restart the loop
   startLoop();
+  startMarketLoop();
 }
 
 // --- Main Loop ---
@@ -1860,13 +2061,6 @@ function startLoop() {
     // Update quarry progress
     updateQuarryProgress();
     
-    // Market tick accumulator
-    marketTickAcc += dt;
-    while (marketTickAcc >= TUNING.market.tickSeconds) {
-      marketTickAcc -= TUNING.market.tickSeconds;
-      runMarketTick();
-    }
-
     // UI refresh
     updateUI();
 
@@ -2037,4 +2231,5 @@ const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
 pressManagerSalaryEl.textContent = "-" + pressManagerSalary.toFixed(2) + " fl/min";
 
 startLoop();
+startMarketLoop();
 logLine("Tree Groves prototype loaded. Trees grow olives automatically.");

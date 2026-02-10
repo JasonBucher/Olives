@@ -153,6 +153,7 @@ export const TUNING = {
   // Market: timing, pricing, shipping, and trading
   market: {
     tickSeconds: 12,
+    autosellRatePerSecond: 0.2,
     prices: {
       olivesFlorins: 1,
       oliveOilFlorins: 5,
