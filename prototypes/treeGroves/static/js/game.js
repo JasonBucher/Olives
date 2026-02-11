@@ -37,6 +37,8 @@ const PERSISTED_STATE_KEYS = [
   "foremanHired",
   "pressManagerHired",
   "olivePressCount",
+  "quarryPickLevel",
+  "quarryCartLevel",
   "stone",
   "upgrades",
   "meta",
@@ -70,6 +72,8 @@ function createDefaultState() {
     foremanHired: false,
     pressManagerHired: false,
     olivePressCount: 1,
+    quarryPickLevel: 0,
+    quarryCartLevel: 0,
 
     // Upgrades
     upgrades: {},
@@ -287,6 +291,19 @@ function getOliveOilShippingCapacity() {
   }
   
   return capacity;
+}
+
+// --- Quarry Helpers ---
+function getQuarryDurationSeconds() {
+  const level = state.quarryCartLevel || 0;
+  const reduction = level * TUNING.investments.pulleyCart.reductionPerLevel;
+  return TUNING.quarry.durationSeconds * (1 - reduction);
+}
+
+// --- Quarry Output Helper ---
+function getQuarryOutput() {
+  const bonus = (state.quarryPickLevel || 0) * TUNING.investments.sharpenedPicks.bonusPerLevel;
+  return TUNING.quarry.outputPerRun + bonus;
 }
 
 // --- Olive Press Scaling Helper ---
@@ -779,7 +796,7 @@ function updateUI() {
   if (!isQuarrying) {
     quarryBtn.disabled = false;
   }
-  quarryNextEl.textContent = `Next: +${TUNING.quarry.outputPerRun} Stone \u2022 ${TUNING.quarry.durationSeconds}s`;
+  quarryNextEl.textContent = `Next: +${getQuarryOutput()} Stone \u2022 ${getQuarryDurationSeconds()}s`;
 
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
@@ -1439,7 +1456,7 @@ function updateOliveOilShipProgress() {
 function startQuarry() {
   if (isQuarrying) return;
 
-  const durationMs = TUNING.quarry.durationSeconds * 1000;
+  const durationMs = getQuarryDurationSeconds() * 1000;
 
   isQuarrying = true;
   quarryJob = {
@@ -1448,13 +1465,13 @@ function startQuarry() {
   };
 
   quarryBtn.disabled = true;
-  quarryActionUI.start({ count: TUNING.quarry.outputPerRun, percent: 0 });
+  quarryActionUI.start({ count: getQuarryOutput(), percent: 0 });
 
   logLine("Quarrying stone...");
 }
 
 function completeQuarry() {
-  const output = TUNING.quarry.outputPerRun;
+  const output = getQuarryOutput();
   state.stone += output;
   // Clamp tiny floating negatives
   if (state.stone < 0) state.stone = 0;
@@ -1982,6 +1999,12 @@ function isInvestmentOwned(investment) {
   }
   if (investment.id === "market_trade_deals") {
     return getMarketPriceUpgrades() >= TUNING.market.price.maxUpgrades;
+  }
+  if (investment.id === "pulley_cart") {
+    return (state.quarryCartLevel || 0) >= TUNING.investments.pulleyCart.maxLevel;
+  }
+  if (investment.id === "sharpened_picks") {
+    return (state.quarryPickLevel || 0) >= TUNING.investments.sharpenedPicks.maxLevel;
   }
   if (investment.id === "build_olive_press") {
     return (state.olivePressCount || 1) - 1 >= TUNING.investments.olivePressExpansion.maxAdditionalPresses;

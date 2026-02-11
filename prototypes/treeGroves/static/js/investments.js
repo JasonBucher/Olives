@@ -578,6 +578,116 @@ export const INVESTMENTS = [
     },
   },
 
+  // --- Quarry Upgrades ---
+  {
+    id: "pulley_cart",
+    title: "Pulley & Cart",
+    group: "upgrade",
+
+    cost: (tuning, state) => {
+      const cfg = tuning.investments.pulleyCart;
+      const level = state.quarryCartLevel || 0;
+      return cfg.baseCost.florins + level * cfg.costScale.florins;
+    },
+
+    costText: (tuning, state) => {
+      const cfg = tuning.investments.pulleyCart;
+      const level = state.quarryCartLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return `${florins} florins, ${stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cfg = tuning.investments.pulleyCart;
+      const level = state.quarryCartLevel || 0;
+      if (level >= cfg.maxLevel) return false;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return state.florinCount >= florins && state.stone >= stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "pulley_cart");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cfg = tuning.investments.pulleyCart;
+      const level = state.quarryCartLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      state.florinCount -= florins;
+      state.stone -= stone;
+      if (state.stone < 0) state.stone = 0;
+      state.quarryCartLevel = level + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const cfg = tuning.investments.pulleyCart;
+      const level = state.quarryCartLevel || 0;
+      const reductionPct = (cfg.reductionPerLevel * 100).toFixed(0);
+      return [
+        `Quarry: -${reductionPct}% duration`,
+        `Purchased: ${level}/${cfg.maxLevel}`,
+      ];
+    },
+  },
+
+  {
+    id: "sharpened_picks",
+    title: "Sharpened Picks",
+    group: "upgrade",
+
+    cost: (tuning, state) => {
+      const cfg = tuning.investments.sharpenedPicks;
+      const level = state.quarryPickLevel || 0;
+      return cfg.baseCost.florins + level * cfg.costScale.florins;
+    },
+
+    costText: (tuning, state) => {
+      const cfg = tuning.investments.sharpenedPicks;
+      const level = state.quarryPickLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return `${florins} florins, ${stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cfg = tuning.investments.sharpenedPicks;
+      const level = state.quarryPickLevel || 0;
+      if (level >= cfg.maxLevel) return false;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return state.florinCount >= florins && state.stone >= stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "sharpened_picks");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cfg = tuning.investments.sharpenedPicks;
+      const level = state.quarryPickLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      state.florinCount -= florins;
+      state.stone -= stone;
+      if (state.stone < 0) state.stone = 0;
+      state.quarryPickLevel = level + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const cfg = tuning.investments.sharpenedPicks;
+      const level = state.quarryPickLevel || 0;
+      return [
+        `Quarry: +${cfg.bonusPerLevel} stone per run`,
+        `Purchased: ${level}/${cfg.maxLevel}`,
+      ];
+    },
+  },
+
   // --- Shipping Efficiency Upgrades ---
   {
     id: "olive_ship_efficiency_1",

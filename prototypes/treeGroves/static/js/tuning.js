@@ -140,8 +140,8 @@ export const TUNING = {
 
   // Quarry: stone production
   quarry: {
-    durationSeconds: 8,
-    outputPerRun: 1,
+    durationSeconds: 20,
+    outputPerRun: 4,
   },
 
   // Market: timing, pricing, shipping, and trading
@@ -207,6 +207,18 @@ export const TUNING = {
     },
     marketPrice: {
       upgradeCost: { florins: 90, stone: 12 },
+    },
+    pulleyCart: {
+      baseCost: { florins: 50, stone: 30 },
+      costScale: { florins: 40, stone: 20 },
+      maxLevel: 3,
+      reductionPerLevel: 0.20,
+    },
+    sharpenedPicks: {
+      baseCost: { stone: 25, florins: 40 },
+      costScale: { stone: 20, florins: 40 },
+      maxLevel: 6,
+      bonusPerLevel: 1,
     },
     olivePressExpansion: {
       baseCost: { florins: 120, stone: 40 },
