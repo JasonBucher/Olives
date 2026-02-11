@@ -797,7 +797,7 @@ function updateUI() {
   if (!isQuarrying) {
     quarryBtn.disabled = false;
   }
-  quarryNextEl.textContent = `Next: +${getQuarryOutput()} Stone \u2022 ${getQuarryDurationSeconds()}s`;
+  quarryNextEl.textContent = `Next: +${getQuarryOutput()} Stone \u2022 ${parseFloat(getQuarryDurationSeconds().toFixed(2))}s`;
 
   // Update harvest button state and pill visibility
   if (!isHarvesting) {
