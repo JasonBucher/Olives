@@ -13,7 +13,7 @@ export const TUNING = {
   // Grove: tree growth and capacity
   grove: {
     treeCapacity: 20,
-    treeGrowthPerSec: 0.5,
+    treeGrowthPerSec: 0.75,
   },
 
   // Harvest: batch sizes, outcome probabilities, and modifiers
@@ -214,11 +214,11 @@ export const TUNING = {
   // Investments: costs for managers and upgrades
   investments: {
     costs: {
-      standardized_tools: 75,
-      training_program: 150,
-      selective_picking: 200,
-      ladders_nets: 300,
-      quality_inspector: 500,
+      standardized_tools: 5,
+      training_program: 15,
+      selective_picking: 20,
+      ladders_nets: 30,
+      quality_inspector: 50,
     },
     marketAutosell: {
       rateUpgradeCost: { florins: 60, stone: 6 },
