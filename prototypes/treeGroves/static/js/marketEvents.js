@@ -4,32 +4,7 @@ export const MARKET_EVENT_SETTINGS = {
 };
 
 export function getMarketEvents(state, tuning) {
-  const thiefTuning = tuning.market.thief;
-  const mitigation = Math.max(0, Number(state.thiefMitigationLevel) || 0);
-  const effectiveThiefWeight = Math.max(
-    thiefTuning.minWeight,
-    thiefTuning.baseWeight - (mitigation * thiefTuning.reductionPerUpgrade)
-  );
-
   return [
-    {
-      id: "thief",
-      name: "Thief",
-      weight: effectiveThiefWeight,
-      cooldownSeconds: 60,
-      durationSeconds: { min: 10, max: 15 },
-      modifiers: {
-        autosellPaused: true,
-        autosellRateMultiplier: 0,
-      },
-      ui: {
-        status: "Paused",
-      },
-      log: {
-        start: "Thief! Auto-selling paused.",
-        end: "The thief fled. Auto-selling resumes.",
-      },
-    },
     {
       id: "busyMarket",
       name: "Busy Market",

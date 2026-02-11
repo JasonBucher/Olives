@@ -79,7 +79,7 @@ function normalizeOutcomes(outcomes, baseOutcomes) {
  * @param {Array} params.outcomes - Base harvest outcomes with weights
  * @param {number} params.harvesterCount - Number of harvesters (affects poor weight)
  * @param {boolean} params.arboristIsActive - Whether arborist is active (reduces poor, boosts efficient)
- * @param {Object} params.upgrades - Upgrade flags (standardized_tools, training_program, etc.)
+ * @param {Object} params.upgrades - Upgrade flags (selective_picking, ladders_nets, etc.)
  * @param {Object} params.tuning - Harvest tuning constants (deltas, caps, multipliers)
  * @returns {Array} Adjusted outcomes with modified weights (NOT normalized - internal use only)
  */
@@ -87,8 +87,6 @@ function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActi
   // Extract values from new nested structure
   const poorWeightPerHarvester = tuning.poorWeightPerHarvester;
   const poorArboristMultiplier = tuning.arborist?.poorReductionMult ?? 0.5;
-  const poorTrainingMultiplier = tuning.upgrades?.training_program?.poorMultiplierReduction ?? 0.5;
-  const poorStandardizedToolsReduction = tuning.upgrades?.standardized_tools?.poorFlatReduction ?? 0.08;
   const efficientArboristBonus = tuning.arborist?.efficientBonus ?? 0.05;
   const efficientSelectivePickingBonus = tuning.upgrades?.selective_picking?.efficientBonus ?? 0.06;
   const efficientLaddersNetsPerHarvester = tuning.upgrades?.ladders_nets?.efficientPerHarvester ?? 0.01;
@@ -98,16 +96,8 @@ function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActi
   // Calculate deltas for poor weight
   // Base: +per harvester
   // Arborist: reduces multiplier
-  // training_program: further reduces multiplier
-  let multiplier = arboristIsActive ? poorArboristMultiplier : 1;
-  if (upgrades.training_program) {
-    multiplier *= poorTrainingMultiplier;
-  }
-  const poorWeightDelta = harvesterCount * poorWeightPerHarvester * multiplier;
-
-  // standardized_tools provides flat reduction to poor weight
-  const poorFlatReduction = upgrades.standardized_tools ? poorStandardizedToolsReduction : 0;
-  const deltaPoor = poorWeightDelta - poorFlatReduction;
+  const multiplier = arboristIsActive ? poorArboristMultiplier : 1;
+  const deltaPoor = harvesterCount * poorWeightPerHarvester * multiplier;
 
   // Calculate bonuses for efficient weight
   let efficientBonus = 0;
@@ -177,7 +167,7 @@ function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActi
  * @param {Array} params.outcomes - Base harvest outcomes with weights
  * @param {number} params.harvesterCount - Number of harvesters (affects poor weight)
  * @param {boolean} params.arboristIsActive - Whether arborist is active (reduces poor, boosts efficient)
- * @param {Object} params.upgrades - Upgrade flags (standardized_tools, training_program, etc.)
+ * @param {Object} params.upgrades - Upgrade flags (selective_picking, ladders_nets, etc.)
  * @param {Object} params.tuning - Harvest tuning constants (deltas, caps, multipliers)
  * @returns {Array} Outcomes where weight property is normalized chance (0..1, sums to 1)
  */

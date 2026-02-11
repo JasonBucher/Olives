@@ -126,80 +126,6 @@ export const INVESTMENTS = [
   
   // --- Upgrades ---
   {
-    id: "standardized_tools",
-    title: "Standardized Tools",
-    group: "upgrade",
-    
-    cost: (tuning, state) => tuning.investments.costs.standardized_tools,
-    
-    isUnlocked: (state, tuning) => true,
-    
-    canPurchase: (state, tuning) => {
-      return !state.upgrades.standardized_tools && 
-             state.florinCount >= tuning.investments.costs.standardized_tools;
-    },
-    
-    purchase: (state, tuning) => {
-      const inv = INVESTMENTS.find(i => i.id === "standardized_tools");
-      if (!inv.canPurchase(state, tuning)) return false;
-      state.florinCount -= tuning.investments.costs.standardized_tools;
-      state.upgrades.standardized_tools = true;
-      return true;
-    },
-    
-    effectLines: (state, tuning) => {
-      const reduction = tuning.harvest.upgrades.standardized_tools.poorFlatReduction;
-      return [
-        `Harvest: Poor -${reduction.toFixed(2)}`,
-      ];
-    },
-  },
-  
-  {
-    id: "training_program",
-    title: "Training Program",
-    group: "upgrade",
-    
-    cost: (tuning, state) => tuning.investments.costs.training_program,
-    
-    isUnlocked: (state, tuning) => true,
-    
-    canPurchase: (state, tuning) => {
-      return !state.upgrades.training_program && 
-             state.florinCount >= tuning.investments.costs.training_program;
-    },
-    
-    purchase: (state, tuning) => {
-      const inv = INVESTMENTS.find(i => i.id === "training_program");
-      if (!inv.canPurchase(state, tuning)) return false;
-      state.florinCount -= tuning.investments.costs.training_program;
-      state.upgrades.training_program = true;
-      return true;
-    },
-    
-    effectLines: (state, tuning) => {
-      const mult = tuning.harvest.upgrades.training_program.poorMultiplierReduction;
-      
-      // State-aware preview: compute effective multiplier given current arborist status
-      let effectiveMult = 1.0;
-      if (state.arboristHired) {
-        effectiveMult *= tuning.harvest.arborist.poorReductionMult;
-      }
-      const afterMult = effectiveMult * mult;
-      
-      if (state.arboristHired) {
-        return [
-          `Harvest: Poor multiplier ×${mult} (effective ×${afterMult.toFixed(2)} with Arborist)`,
-        ];
-      } else {
-        return [
-          `Harvest: Poor multiplier ×${mult}`,
-        ];
-      }
-    },
-  },
-  
-  {
     id: "selective_picking",
     title: "Selective Picking",
     group: "upgrade",
@@ -593,54 +519,6 @@ export const INVESTMENTS = [
       return [
         `Market: +${bonusPct.toFixed(0)}% florins per unit sold`,
         `Purchased: ${purchased}/${max}`,
-      ];
-    },
-  },
-
-  {
-    id: "market_night_watch",
-    title: "Night Watch",
-    group: "upgrade",
-
-    cost: (tuning, state) => tuning.investments.marketThiefMitigation.florins,
-
-    costText: (tuning, state) => {
-      const cost = tuning.investments.marketThiefMitigation;
-      return `${cost.florins} florins, ${cost.stone} stone`;
-    },
-
-    isUnlocked: (state, tuning) => true,
-
-    canPurchase: (state, tuning) => {
-      const cost = tuning.investments.marketThiefMitigation;
-      const reduction = tuning.market.thief.reductionPerUpgrade;
-      const diff = tuning.market.thief.baseWeight - tuning.market.thief.minWeight;
-      const maxLevel = reduction > 0 ? Math.max(0, Math.ceil(diff / reduction)) : 0;
-      const current = Number(state.thiefMitigationLevel) || 0;
-      return current < maxLevel &&
-             state.florinCount >= cost.florins &&
-             state.stone >= cost.stone;
-    },
-
-    purchase: (state, tuning) => {
-      const inv = INVESTMENTS.find(i => i.id === "market_night_watch");
-      if (!inv.canPurchase(state, tuning)) return false;
-      const cost = tuning.investments.marketThiefMitigation;
-      state.florinCount -= cost.florins;
-      state.stone -= cost.stone;
-      if (state.stone < 0) state.stone = 0;
-      state.thiefMitigationLevel = (Number(state.thiefMitigationLevel) || 0) + 1;
-      return true;
-    },
-
-    effectLines: (state, tuning) => {
-      const reduction = tuning.market.thief.reductionPerUpgrade;
-      const diff = tuning.market.thief.baseWeight - tuning.market.thief.minWeight;
-      const maxLevel = reduction > 0 ? Math.max(0, Math.ceil(diff / reduction)) : 0;
-      const purchased = Math.min(Number(state.thiefMitigationLevel) || 0, maxLevel);
-      return [
-        `Market: Thief activity reduced (-${reduction} weight)`,
-        `Purchased: ${purchased}/${maxLevel}`,
       ];
     },
   },

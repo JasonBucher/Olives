@@ -28,7 +28,6 @@ const PERSISTED_STATE_KEYS = [
   "marketAutosellRateUpgrades",
   "marketLanesPurchased",
   "marketPriceUpgrades",
-  "thiefMitigationLevel",
   "oliveOilCount",
   "florinCount",
   "cultivatorCount",
@@ -56,7 +55,6 @@ function createDefaultState() {
     marketAutosellRateUpgrades: 0,
     marketLanesPurchased: 0,
     marketPriceUpgrades: 0,
-    thiefMitigationLevel: 0,
     oliveOilCount: 0,
     florinCount: 0,
 
@@ -1498,20 +1496,6 @@ function formatPercent(value) {
   return value < 0 ? `-${normalized}` : normalized;
 }
 
-function getMaxThiefMitigationLevel() {
-  const tuning = TUNING.market.thief;
-  const reduction = tuning.reductionPerUpgrade;
-  if (reduction <= 0) return 0;
-  const diff = tuning.baseWeight - tuning.minWeight;
-  if (diff <= 0) return 0;
-  return Math.max(0, Math.ceil(diff / reduction));
-}
-
-function getThiefMitigationLevel() {
-  const count = Number(state.thiefMitigationLevel) || 0;
-  return Math.min(Math.max(0, count), getMaxThiefMitigationLevel());
-}
-
 function getMarketAutosellRateUpgrades() {
   const count = Number(state.marketAutosellRateUpgrades) || 0;
   return Math.min(Math.max(0, count), TUNING.market.autosell.maxRateUpgrades);
@@ -1692,8 +1676,24 @@ function runAutosellTick(dt) {
   if (unitsToSell <= 0) return;
 
   const allocation = splitMarketSaleUnits(unitsToSell, olives, oil);
-  applyMarketSale(allocation, modifiers.priceMultiplier);
+  const earned = applyMarketSale(allocation, modifiers.priceMultiplier);
   autosellProgress -= unitsToSell;
+
+  // Log auto-sell details
+  const priceMult = getMarketEffectivePriceMultiplier(modifiers.priceMultiplier);
+  const parts = [];
+  if (allocation.olives > 0) {
+    const unitPrice = TUNING.market.prices.olivesFlorins * priceMult;
+    parts.push(`${allocation.olives} olives @ ${unitPrice.toFixed(2)} fl`);
+  }
+  if (allocation.oil > 0) {
+    const unitPrice = TUNING.market.prices.oliveOilFlorins * priceMult;
+    parts.push(`${allocation.oil} oil @ ${unitPrice.toFixed(2)} fl`);
+  }
+  const playerText = `Sold ${parts.join(", ")} = ${earned.toFixed(2)} fl`;
+  const debugText = `Auto-sell: ${parts.join(", ")} | total ${earned.toFixed(2)} fl | priceMult ×${priceMult.toFixed(2)}`;
+  logEvent({ channel: "market", playerText, debugText });
+
   saveGame();
 }
 
@@ -1848,9 +1848,6 @@ function buyInvestment(id) {
     saveGame();
     updateUI();
     logLine(`Purchased: ${investment.title}`);
-    if (investment.id === "market_night_watch") {
-      marketLogLine("Night Watch hired. Thief activity reduced.");
-    }
     if (investment.id === "market_trade_deals") {
       const bonusPct = TUNING.market.price.upgradeMultiplier * 100;
       marketLogLine(`Secured better trade deals \u2192 +${formatPercent(bonusPct)}% prices`);
@@ -1961,9 +1958,6 @@ function isInvestmentOwned(investment) {
   }
   if (investment.id === "market_trade_deals") {
     return getMarketPriceUpgrades() >= TUNING.market.price.maxUpgrades;
-  }
-  if (investment.id === "market_night_watch") {
-    return getThiefMitigationLevel() >= getMaxThiefMitigationLevel();
   }
   return !!state.upgrades[investment.id];
 }

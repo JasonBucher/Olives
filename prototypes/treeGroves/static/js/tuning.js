@@ -30,12 +30,6 @@ export const TUNING = {
     },
     // Upgrade effects
     upgrades: {
-      standardized_tools: {
-        poorFlatReduction: 0.08,  // Flat reduction to poor weight (positive value gets subtracted)
-      },
-      training_program: {
-        poorMultiplierReduction: 0.5,  // Multiplies poor accumulation rate
-      },
       selective_picking: {
         efficientBonus: 0.06,      // Flat bonus to efficient weight
       },
@@ -163,11 +157,6 @@ export const TUNING = {
       laneUpgradeAmount: 1,
       maxAdditionalLanes: 3,
     },
-    thief: {
-      baseWeight: 5,
-      reductionPerUpgrade: 1,
-      minWeight: 1,
-    },
     prices: {
       olivesFlorins: 1,
       oliveOilFlorins: 5,
@@ -203,19 +192,11 @@ export const TUNING = {
       { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
       { key: "giuseppe", weight: 0.15, buyAll: true },
     ],
-    mishapOutcomes: [
-      { key: "none", weight: 0.70 },
-      { key: "urchin", weight: 0.15, stolenMin: 1, stolenMax: 3 },
-      { key: "crow", weight: 0.10, stolenMin: 1, stolenMax: 2 },
-      { key: "spoil", weight: 0.05, rottedMin: 1, rottedMax: 4 },
-    ],
   },
 
   // Investments: costs for managers and upgrades
   investments: {
     costs: {
-      standardized_tools: 5,
-      training_program: 15,
       selective_picking: 20,
       ladders_nets: 30,
       quality_inspector: 50,
@@ -226,10 +207,6 @@ export const TUNING = {
     },
     marketPrice: {
       upgradeCost: { florins: 60, stone: 6 },
-    },
-    marketThiefMitigation: {
-      florins: 35,
-      stone: 20,
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 25, stoneCost: 5, capacityBonus: 20 },
