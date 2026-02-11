@@ -308,11 +308,12 @@ function getQuarryOutput() {
 
 // --- Olive Press Scaling Helper ---
 function getOlivesToPress() {
+  const olivesPerPress = TUNING.press.olivesPerPress;
   const pressCount = state.olivePressCount || 1;
   const pressableOlives = getShippableCount(state.harvestedOlives);
-  const availableMultiples = Math.floor(pressableOlives / 3);
+  const availableMultiples = Math.floor(pressableOlives / olivesPerPress);
   const multiplesToRun = Math.min(availableMultiples, pressCount);
-  return multiplesToRun * 3;
+  return multiplesToRun * olivesPerPress;
 }
 
 // --- Harvest Job State (not persisted) ---
@@ -778,7 +779,7 @@ function updateUI() {
   // Update press button state based on inventory (only whole goods can be pressed)
   const olivesToPress = getOlivesToPress();
   if (!isPressing) {
-    pressBtn.disabled = olivesToPress < 3;
+    pressBtn.disabled = olivesToPress < TUNING.press.olivesPerPress;
     pressBtn.textContent = `Press (${olivesToPress})`;
   }
 
@@ -1292,7 +1293,7 @@ function startPressing() {
 
   const olivesToPress = getOlivesToPress();
 
-  if (olivesToPress < 3) {
+  if (olivesToPress < TUNING.press.olivesPerPress) {
     logLine("Not enough olives to press");
     return;
   }
