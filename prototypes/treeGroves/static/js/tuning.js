@@ -206,7 +206,7 @@ export const TUNING = {
       laneUpgradeCost: { florins: 90, stone: 10 },
     },
     marketPrice: {
-      upgradeCost: { florins: 60, stone: 6 },
+      upgradeCost: { florins: 90, stone: 12 },
     },
     olivePressExpansion: {
       baseCost: { florins: 120, stone: 40 },
@@ -222,7 +222,7 @@ export const TUNING = {
       olives: [
         { idSuffix: 1, cost: 25, capacityBonus: 10 },
         { idSuffix: 2, cost: 50, capacityBonus: 10 },
-        { idSuffix: 3, cost: 100, capacityBonus: 5 },
+        { idSuffix: 3, cost: 100, capacityBonus: 10 },
       ],
       oliveOil: [
         { idSuffix: 1, cost: 100, capacityBonus: 10 },
