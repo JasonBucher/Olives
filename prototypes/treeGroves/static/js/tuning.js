@@ -56,12 +56,12 @@ export const TUNING = {
       costScaleLow: 2,           // Cost increase per cultivator (0-30)
       costScaleHigh: 8,          // Cost increase per cultivator (30+)
       costScaleThreshold: 30,    // When cost scaling increases
-      olivesPerSecondPerCultivator: 0.02,
+      olivesPerSecondPerCultivator: 0.05,
     },
     harvester: {
       baseCost: 10,
       costScale: 5,              // Cost increase per harvester hired
-      olivesPerHarvest: 0.6,     // Flat olives bonus per harvester (floating point)
+      olivesPerHarvest: 0.8,     // Flat olives bonus per harvester (floating point)
       // Legacy effects (disabled)
       attemptBonusTiers: {       // DEPRECATED: No longer used
         tier1: { max: 5, bonus: 1 },
