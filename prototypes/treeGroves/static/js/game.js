@@ -1675,7 +1675,20 @@ function runAutosellTick(dt) {
   const unitsToSell = Math.min(total, Math.floor(autosellProgress));
   if (unitsToSell <= 0) return;
 
-  const allocation = splitMarketSaleUnits(unitsToSell, olives, oil);
+  // Randomly allocate each unit to an available good
+  let olivesRemaining = olives;
+  let oilRemaining = oil;
+  const allocation = { olives: 0, oil: 0 };
+  for (let i = 0; i < unitsToSell; i++) {
+    const available = [];
+    if (olivesRemaining > 0) available.push("olives");
+    if (oilRemaining > 0) available.push("oil");
+    if (available.length === 0) break;
+    const pick = available[Math.floor(Math.random() * available.length)];
+    if (pick === "olives") { allocation.olives++; olivesRemaining--; }
+    else { allocation.oil++; oilRemaining--; }
+  }
+
   const earned = applyMarketSale(allocation, modifiers.priceMultiplier);
   autosellProgress -= unitsToSell;
 
@@ -1969,9 +1982,7 @@ function isInvestmentOwned(investment) {
  *   2 = unaffordable (prerequisites met but can't afford)
  */
 function getInvestmentSortBucket(investment) {
-  if (investment.canPurchase(state, TUNING)) return 0;
-  if (investment.prerequisitesMet && !investment.prerequisitesMet(state, TUNING)) return 1;
-  return 2;
+  return investment.canPurchase(state, TUNING) ? 0 : 1;
 }
 
 function updateInvestmentButtons() {
@@ -2021,27 +2032,15 @@ function updateInvestmentButtons() {
     sortable.push({ investment, btn });
   });
 
-  // Sort: bucket → group → cost → sortOrder → title → id
-  const groupRank = { manager: 0, upgrade: 1 };
+  // Sort: purchasable first, then by cost within each group
   sortable.sort((a, b) => {
     const bucketA = getInvestmentSortBucket(a.investment);
     const bucketB = getInvestmentSortBucket(b.investment);
     if (bucketA !== bucketB) return bucketA - bucketB;
 
-    const rankA = groupRank[a.investment.group] ?? 999;
-    const rankB = groupRank[b.investment.group] ?? 999;
-    if (rankA !== rankB) return rankA - rankB;
-
     const costA = a.investment.cost(TUNING, state);
     const costB = b.investment.cost(TUNING, state);
     if (costA !== costB) return costA - costB;
-
-    const sortOrderA = a.investment.sortOrder ?? 0;
-    const sortOrderB = b.investment.sortOrder ?? 0;
-    if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
-
-    const titleCmp = a.investment.title.localeCompare(b.investment.title);
-    if (titleCmp !== 0) return titleCmp;
 
     return a.investment.id.localeCompare(b.investment.id);
   });
