@@ -214,7 +214,7 @@ export const TUNING = {
       maxAdditionalPresses: 5,
     },
     groveExpansion: [
-      { idSuffix: 1, florinCost: 25, stoneCost: 5, capacityBonus: 20 },
+      { idSuffix: 1, florinCost: 45, stoneCost: 5, capacityBonus: 20 },
       { idSuffix: 2, florinCost: 75, stoneCost: 12, capacityBonus: 25 },
       { idSuffix: 3, florinCost: 200, stoneCost: 25, capacityBonus: 35 },
     ],
