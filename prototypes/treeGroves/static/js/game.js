@@ -1999,31 +1999,29 @@ function updateInvestmentButtons() {
     btn.style.display = "";
     btn.disabled = !investment.canPurchase(state, TUNING);
 
-    // Update cost text for dynamic costs
+    // Update cost text for dynamic costs (only if changed)
     const costEl = btn.querySelector(".inv__cost");
     if (costEl) {
-      if (investment.costText) {
-        costEl.textContent = investment.costText(TUNING, state);
-      } else {
-        const costValue = investment.cost(TUNING, state);
-        costEl.textContent = `${costValue} florins`;
+      const newCostText = investment.costText
+        ? investment.costText(TUNING, state)
+        : `${investment.cost(TUNING, state)} florins`;
+      if (costEl.textContent !== newCostText) {
+        costEl.textContent = newCostText;
       }
     }
 
-    // Update effect lines for state-aware previews
+    // Update effect lines for state-aware previews (only if changed)
     const effectsEl = btn.querySelector(".inv__effects");
     if (effectsEl) {
-      effectsEl.innerHTML = "";
       const effectLines = investment.effectLines(state, TUNING);
-      effectLines.forEach(line => {
-        const effectEl = document.createElement("div");
-        effectEl.className = "inv__effect";
-        if (line.startsWith("Requires:") || line.startsWith("Ongoing:")) {
-          effectEl.classList.add("inv__effect--muted");
-        }
-        effectEl.textContent = line;
-        effectsEl.appendChild(effectEl);
-      });
+      const newHTML = effectLines.map(line => {
+        const muted = line.startsWith("Requires:") || line.startsWith("Ongoing:");
+        const cls = muted ? "inv__effect inv__effect--muted" : "inv__effect";
+        return `<div class="${cls}">${line}</div>`;
+      }).join("");
+      if (effectsEl.innerHTML !== newHTML) {
+        effectsEl.innerHTML = newHTML;
+      }
     }
 
     sortable.push({ investment, btn });
@@ -2054,8 +2052,18 @@ function updateInvestmentButtons() {
     return a.investment.id.localeCompare(b.investment.id);
   });
 
-  // Re-order DOM to match sort (appendChild moves existing nodes)
-  sortable.forEach(({ btn }) => container.appendChild(btn));
+  // Re-order DOM only if the visible order actually changed
+  const desiredOrder = sortable.map(({ btn }) => btn);
+  const currentVisible = Array.from(container.children).filter(el => el.style.display !== "none");
+  let needsReorder = desiredOrder.length !== currentVisible.length;
+  if (!needsReorder) {
+    for (let i = 0; i < desiredOrder.length; i++) {
+      if (currentVisible[i] !== desiredOrder[i]) { needsReorder = true; break; }
+    }
+  }
+  if (needsReorder) {
+    desiredOrder.forEach(btn => container.appendChild(btn));
+  }
 }
 
 // --- Pause/Resume Logic ---
