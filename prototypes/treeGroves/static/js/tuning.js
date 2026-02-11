@@ -93,7 +93,7 @@ export const TUNING = {
       growthMultiplier: 1.25,    // 25% increase to farm hand growth bonus
     },
     pressManager: {
-      hireCost: 150,
+      hireCost: 50,
       salaryPerMin: 0.75,        // Florins per minute
       poorMultiplier: 0.6,       // Reduces poor outcome weight
       masterworkBonus: 0.03,     // Adds weight to masterwork outcome
@@ -207,6 +207,11 @@ export const TUNING = {
     },
     marketPrice: {
       upgradeCost: { florins: 60, stone: 6 },
+    },
+    olivePressExpansion: {
+      baseCost: { florins: 120, stone: 40 },
+      costScale: { florins: 90, stone: 30 },
+      maxAdditionalPresses: 5,
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 25, stoneCost: 5, capacityBonus: 20 },

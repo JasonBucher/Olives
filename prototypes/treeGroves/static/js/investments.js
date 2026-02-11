@@ -523,6 +523,61 @@ export const INVESTMENTS = [
     },
   },
 
+  // --- Olive Press Expansion ---
+  {
+    id: "build_olive_press",
+    title: "Build Olive Press",
+    group: "upgrade",
+
+    cost: (tuning, state) => {
+      const cfg = tuning.investments.olivePressExpansion;
+      const additional = (state.olivePressCount || 1) - 1;
+      return cfg.baseCost.florins + additional * cfg.costScale.florins;
+    },
+
+    costText: (tuning, state) => {
+      const cfg = tuning.investments.olivePressExpansion;
+      const additional = (state.olivePressCount || 1) - 1;
+      const florins = cfg.baseCost.florins + additional * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + additional * cfg.costScale.stone;
+      return `${florins} florins, ${stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cfg = tuning.investments.olivePressExpansion;
+      const additional = (state.olivePressCount || 1) - 1;
+      if (additional >= cfg.maxAdditionalPresses) return false;
+      const florins = cfg.baseCost.florins + additional * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + additional * cfg.costScale.stone;
+      return state.florinCount >= florins && state.stone >= stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "build_olive_press");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cfg = tuning.investments.olivePressExpansion;
+      const additional = (state.olivePressCount || 1) - 1;
+      const florins = cfg.baseCost.florins + additional * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + additional * cfg.costScale.stone;
+      state.florinCount -= florins;
+      state.stone -= stone;
+      if (state.stone < 0) state.stone = 0;
+      state.olivePressCount = (state.olivePressCount || 1) + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const cfg = tuning.investments.olivePressExpansion;
+      const additional = (state.olivePressCount || 1) - 1;
+      return [
+        `Production: Olive Presses +1`,
+        `Purchased: ${additional}/${cfg.maxAdditionalPresses}`,
+      ];
+    },
+  },
+
   // --- Shipping Efficiency Upgrades ---
   {
     id: "olive_ship_efficiency_1",

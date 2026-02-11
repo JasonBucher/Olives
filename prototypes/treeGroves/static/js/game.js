@@ -36,6 +36,7 @@ const PERSISTED_STATE_KEYS = [
   "arboristHired",
   "foremanHired",
   "pressManagerHired",
+  "olivePressCount",
   "stone",
   "upgrades",
   "meta",
@@ -68,6 +69,7 @@ function createDefaultState() {
     arboristHired: false,
     foremanHired: false,
     pressManagerHired: false,
+    olivePressCount: 1,
 
     // Upgrades
     upgrades: {},
@@ -287,6 +289,15 @@ function getOliveOilShippingCapacity() {
   return capacity;
 }
 
+// --- Olive Press Scaling Helper ---
+function getOlivesToPress() {
+  const pressCount = state.olivePressCount || 1;
+  const pressableOlives = getShippableCount(state.harvestedOlives);
+  const availableMultiples = Math.floor(pressableOlives / 3);
+  const multiplesToRun = Math.min(availableMultiples, pressCount);
+  return multiplesToRun * 3;
+}
+
 // --- Harvest Job State (not persisted) ---
 let isHarvesting = false;
 let harvestJob = {
@@ -393,6 +404,7 @@ const shipOliveOilCountdown = document.getElementById("ship-olive-oil-countdown"
 const shipOliveOilProgressContainer = document.getElementById("ship-olive-oil-progress");
 const shipOliveOilBtn = document.getElementById("ship-olive-oil-btn");
 
+const olivePressCountEl = document.getElementById("olive-press-count");
 const pressBtn = document.getElementById("press-btn");
 const pressPill = document.getElementById("press-pill");
 const pressPillCount = document.getElementById("press-pill-count");
@@ -743,22 +755,23 @@ function updateUI() {
     shipOliveOilBtn.textContent = `Ship (up to ${maxShipOil})`;
   }
 
+  // Update olive press count display
+  olivePressCountEl.textContent = "x" + (state.olivePressCount || 1);
+
   // Update press button state based on inventory (only whole goods can be pressed)
-  const olivesPerPress = TUNING.press.olivesPerPress;
+  const olivesToPress = getOlivesToPress();
   if (!isPressing) {
-    const pressableOlives = getShippableCount(state.harvestedOlives);
-    pressBtn.disabled = pressableOlives < olivesPerPress;
-    pressBtn.textContent = `Press (${olivesPerPress})`;
+    pressBtn.disabled = olivesToPress < 3;
+    pressBtn.textContent = `Press (${olivesToPress})`;
   }
 
   // Update press preview (deterministic output per press)
   const oilPerOlive = getTotalOilPerOlive();
-  const oilPerPress = olivesPerPress * oilPerOlive;
   if (pressConsumesEl) {
-    pressConsumesEl.textContent = `Consumes: ${olivesPerPress} Olives`;
+    pressConsumesEl.textContent = `Consumes: ${olivesToPress} Olives`;
   }
   if (pressProducesEl) {
-    pressProducesEl.textContent = `Produces: ${oilPerPress.toFixed(2)} Olive Oil`;
+    pressProducesEl.textContent = `Produces: ${(olivesToPress * oilPerOlive).toFixed(2)} Olive Oil`;
   }
 
   // Update stone inventory display and quarry button state
@@ -852,8 +865,9 @@ function updateUI() {
   
   // Update presser stats and preview (conversion bonus)
   const oilBonusPerPresser = TUNING.workers.presser.oilPerOlivePerPresser;
-  const currentOilBonus = olivesPerPress * state.presserCount * oilBonusPerPresser;
-  const nextOilBonus = olivesPerPress * oilBonusPerPresser;
+  const maxOlivesPerAction = (state.olivePressCount || 1) * TUNING.press.olivesPerPress;
+  const currentOilBonus = maxOlivesPerAction * state.presserCount * oilBonusPerPresser;
+  const nextOilBonus = maxOlivesPerAction * oilBonusPerPresser;
   
   // Top row: Current bonus per press
   if (state.presserCount > 0) {
@@ -1258,16 +1272,13 @@ function updateShipProgress() {
 // --- Olive Press ---
 function startPressing() {
   if (isPressing) return;
-  
-  // Only whole goods can be pressed
-  const pressableOlives = getShippableCount(state.harvestedOlives);
-  const olivesPerPress = TUNING.press.olivesPerPress;
-  
-  if (pressableOlives < olivesPerPress) {
+
+  const olivesToPress = getOlivesToPress();
+
+  if (olivesToPress < 3) {
     logLine("Not enough olives to press");
     return;
   }
-  const olivesToPress = olivesPerPress;
   const oilPerOlive = getTotalOilPerOlive();
   
   // Deduct integer amount from float inventory (preserves remainder)
@@ -1971,6 +1982,9 @@ function isInvestmentOwned(investment) {
   }
   if (investment.id === "market_trade_deals") {
     return getMarketPriceUpgrades() >= TUNING.market.price.maxUpgrades;
+  }
+  if (investment.id === "build_olive_press") {
+    return (state.olivePressCount || 1) - 1 >= TUNING.investments.olivePressExpansion.maxAdditionalPresses;
   }
   return !!state.upgrades[investment.id];
 }
