@@ -691,7 +691,7 @@ export const INVESTMENTS = [
   // --- Shipping Efficiency Upgrades ---
   {
     id: "olive_ship_efficiency_1",
-    title: "Olive Ship Efficiency I",
+    title: "Cart Upgrade I",
     group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[0].cost,
@@ -714,14 +714,14 @@ export const INVESTMENTS = [
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.shippingEfficiency.olives[0].capacityBonus;
       return [
-        `Market: Olive shipping capacity +${bonus}`,
+        `Market: Shipping capacity +${bonus}`,
       ];
     },
   },
   
   {
     id: "olive_ship_efficiency_2",
-    title: "Olive Ship Efficiency II",
+    title: "Cart Upgrade II",
     group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[1].cost,
@@ -747,14 +747,14 @@ export const INVESTMENTS = [
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.shippingEfficiency.olives[1].capacityBonus;
       return [
-        `Market: Olive shipping capacity +${bonus}`,
+        `Market: Shipping capacity +${bonus}`,
       ];
     },
   },
   
   {
     id: "olive_ship_efficiency_3",
-    title: "Olive Ship Efficiency III",
+    title: "Cart Upgrade III",
     group: "upgrade",
     
     cost: (tuning, state) => tuning.investments.shippingEfficiency.olives[2].cost,
@@ -780,7 +780,7 @@ export const INVESTMENTS = [
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.shippingEfficiency.olives[2].capacityBonus;
       return [
-        `Market: Olive shipping capacity +${bonus}`,
+        `Market: Shipping capacity +${bonus}`,
       ];
     },
   },

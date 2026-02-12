@@ -280,16 +280,25 @@ function getOliveShippingCapacity() {
  */
 function getOliveOilShippingCapacity() {
   let capacity = TUNING.market.shipping.oliveOil.baseBatchSize;
-  
-  // Add bonuses from purchased upgrades
-  const upgrades = TUNING.investments.shippingEfficiency.oliveOil;
-  for (let i = 0; i < upgrades.length; i++) {
-    const upgradeId = `olive_oil_ship_efficiency_${upgrades[i].idSuffix}`;
+
+  // Add bonuses from general cart upgrades (shared with olives)
+  const cartUpgrades = TUNING.investments.shippingEfficiency.olives;
+  for (let i = 0; i < cartUpgrades.length; i++) {
+    const upgradeId = `olive_ship_efficiency_${cartUpgrades[i].idSuffix}`;
     if (state.upgrades[upgradeId]) {
-      capacity += upgrades[i].capacityBonus;
+      capacity += cartUpgrades[i].capacityBonus;
     }
   }
-  
+
+  // Add bonuses from oil-specific upgrades
+  const oilUpgrades = TUNING.investments.shippingEfficiency.oliveOil;
+  for (let i = 0; i < oilUpgrades.length; i++) {
+    const upgradeId = `olive_oil_ship_efficiency_${oilUpgrades[i].idSuffix}`;
+    if (state.upgrades[upgradeId]) {
+      capacity += oilUpgrades[i].capacityBonus;
+    }
+  }
+
   return capacity;
 }
 

@@ -197,8 +197,8 @@ export const TUNING = {
   // Investments: costs for managers and upgrades
   investments: {
     costs: {
-      selective_picking: 20,
-      ladders_nets: 30,
+      selective_picking: 5,
+      ladders_nets: 10,
       quality_inspector: 50,
     },
     marketAutosell: {
