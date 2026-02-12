@@ -124,6 +124,38 @@ export const INVESTMENTS = [
     },
   },
   
+  {
+    id: "quarryManager",
+    title: "Hire a Quarry Manager",
+    group: "manager",
+
+    cost: (tuning, state) => tuning.managers.quarryManager.hireCost,
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      return !state.quarryManagerHired &&
+             state.florinCount >= tuning.managers.quarryManager.hireCost;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "quarryManager");
+      if (!inv.canPurchase(state, tuning)) return false;
+      state.florinCount -= tuning.managers.quarryManager.hireCost;
+      state.quarryManagerHired = true;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const salary = tuning.managers.quarryManager.salaryPerMin;
+
+      return [
+        `Behavior: Auto-quarry continuously`,
+        `Ongoing: Salary ${salary} florins/min`,
+      ];
+    },
+  },
+
   // --- Upgrades ---
   {
     id: "selective_picking",

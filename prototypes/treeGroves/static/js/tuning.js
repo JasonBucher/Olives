@@ -92,6 +92,10 @@ export const TUNING = {
       salaryPerMin: 0.2,         // Florins per minute
       growthMultiplier: 1.25,    // 25% increase to farm hand growth bonus
     },
+    quarryManager: {
+      hireCost: 60,
+      salaryPerMin: 0.3,         // Florins per minute
+    },
     pressManager: {
       hireCost: 50,
       salaryPerMin: 0.75,        // Florins per minute

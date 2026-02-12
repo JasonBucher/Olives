@@ -36,6 +36,7 @@ const PERSISTED_STATE_KEYS = [
   "arboristHired",
   "foremanHired",
   "pressManagerHired",
+  "quarryManagerHired",
   "olivePressCount",
   "quarryPickLevel",
   "quarryCartLevel",
@@ -71,6 +72,7 @@ function createDefaultState() {
     arboristHired: false,
     foremanHired: false,
     pressManagerHired: false,
+    quarryManagerHired: false,
     olivePressCount: 1,
     quarryPickLevel: 0,
     quarryCartLevel: 0,
@@ -198,6 +200,9 @@ function getPresserHireCost() {
 // --- Presser Effects ---
 // Active state for Press Manager (computed each tick)
 let pressManagerIsActive = false;
+
+// Active state for Quarry Manager (computed each tick)
+let quarryManagerIsActive = false;
 
 // Active state for Foreman (computed each tick)
 let foremanIsActive = false;
@@ -485,6 +490,9 @@ const managersArboristWrap = document.getElementById("managers-arborist");
 const managersPressMgrWrap = document.getElementById("managers-press-manager");
 const pressManagerNameEl = document.getElementById("press-manager-name");
 const pressManagerSalaryEl = document.getElementById("press-manager-salary");
+const managersQuarryMgrWrap = document.getElementById("managers-quarry-manager");
+const quarryManagerNameEl = document.getElementById("quarry-manager-name");
+const quarryManagerSalaryEl = document.getElementById("quarry-manager-salary");
 const managersForemanWrap = document.getElementById("managers-foreman");
 const foremanNameEl = document.getElementById("foreman-name");
 const foremanSalaryEl = document.getElementById("foreman-salary");
@@ -925,7 +933,7 @@ function updateUI() {
   presserBadgeExtra.style.visibility = "hidden";
 
   // Toggle Managers section
-  const anyManagerHired = state.arboristHired || state.foremanHired || state.pressManagerHired;
+  const anyManagerHired = state.arboristHired || state.foremanHired || state.quarryManagerHired || state.pressManagerHired;
   managersEmptyEl.hidden = anyManagerHired;
   
   if (state.arboristHired) {
@@ -956,6 +964,19 @@ function updateUI() {
     managersForemanWrap.hidden = true;
   }
   
+  if (state.quarryManagerHired) {
+    managersQuarryMgrWrap.hidden = false;
+    if (quarryManagerIsActive) {
+      quarryManagerNameEl.classList.add("mgr-name--active");
+      quarryManagerNameEl.classList.remove("mgr-name--inactive");
+    } else {
+      quarryManagerNameEl.classList.add("mgr-name--inactive");
+      quarryManagerNameEl.classList.remove("mgr-name--active");
+    }
+  } else {
+    managersQuarryMgrWrap.hidden = true;
+  }
+
   if (state.pressManagerHired) {
     managersPressMgrWrap.hidden = false;
     // Toggle active/inactive styling on manager name
@@ -978,6 +999,9 @@ function updateUI() {
     }
     if (foremanIsActive) {
       totalCost += TUNING.managers.foreman.salaryPerMin;
+    }
+    if (quarryManagerIsActive) {
+      totalCost += TUNING.managers.quarryManager.salaryPerMin;
     }
     if (pressManagerIsActive) {
       totalCost += TUNING.managers.pressManager.salaryPerMin;
@@ -2001,6 +2025,7 @@ function isInvestmentOwned(investment) {
   if (investment.id === "arborist") return state.arboristHired;
   if (investment.id === "foreman") return state.foremanHired;
   if (investment.id === "pressManager") return state.pressManagerHired;
+  if (investment.id === "quarryManager") return state.quarryManagerHired;
   if (investment.id === "market_autosell_rate") {
     return getMarketAutosellRateUpgrades() >= TUNING.market.autosell.maxRateUpgrades;
   }
@@ -2188,6 +2213,20 @@ function startLoop() {
       pressManagerIsActive = false;
     }
 
+    // Quarry Manager salary drain
+    if (state.quarryManagerHired) {
+      const salaryPerSec = TUNING.managers.quarryManager.salaryPerMin / 60;
+      const costThisTick = salaryPerSec * dt;
+      if (state.florinCount >= costThisTick) {
+        state.florinCount -= costThisTick;
+        quarryManagerIsActive = true;
+      } else {
+        quarryManagerIsActive = false;
+      }
+    } else {
+      quarryManagerIsActive = false;
+    }
+
     // Foreman salary drain
     if (state.foremanHired) {
       const salaryPerSec = TUNING.managers.foreman.salaryPerMin / 60;
@@ -2225,6 +2264,11 @@ function startLoop() {
 
     // Update quarry progress
     updateQuarryProgress();
+
+    // Auto-quarry if Quarry Manager is active
+    if (state.quarryManagerHired && quarryManagerIsActive && !isQuarrying) {
+      startQuarry();
+    }
     
     // UI refresh
     updateUI();
@@ -2390,6 +2434,10 @@ arboristSalaryEl.textContent = "-" + arboristSalary.toFixed(2) + " fl/min";
 // Set foreman salary from TUNING (display as negative cost)
 const foremanSalary = TUNING.managers.foreman.salaryPerMin;
 foremanSalaryEl.textContent = "-" + foremanSalary.toFixed(2) + " fl/min";
+
+// Set quarry manager salary from TUNING (display as negative cost)
+const quarryManagerSalary = TUNING.managers.quarryManager.salaryPerMin;
+quarryManagerSalaryEl.textContent = "-" + quarryManagerSalary.toFixed(2) + " fl/min";
 
 // Set press manager salary from TUNING (display as negative cost)
 const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
