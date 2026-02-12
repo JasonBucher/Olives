@@ -152,7 +152,7 @@ export const TUNING = {
   market: {
     tickSeconds: 12,
     autosell: {
-      baseRatePerSecond: 0.2,
+      baseRatePerSecond: 0.35,
       rateUpgradeAmount: 0.15,
       maxRateUpgrades: 3,
     },
