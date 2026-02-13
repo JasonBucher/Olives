@@ -48,7 +48,7 @@ export const INVESTMENTS = [
       const efficientBonus = tuning.harvest.arborist.efficientBonus;
       
       return [
-        `Behavior: Auto-harvest Olive Trees at capacity`,
+        `Behavior: Auto-harvest when grove is full`,
         `Harvest (while paid): Poor multiplier ×${poorMult}, Efficient +${efficientBonus.toFixed(2)}`,
         `Ongoing: Salary ${salary} florins/min`,
       ];
@@ -312,8 +312,18 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[0].capacityBonus;
+      const baseCap = tuning.grove.treeCapacity;
+      let groveBonus = 0;
+      for (const exp of tuning.investments.groveExpansion) {
+        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
+      }
+      const currentCap = baseCap + groveBonus;
+      const baseBatch = tuning.harvest.baseBatchSize;
+      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
+      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       return [
         `Grove: Max trees +${bonus}`,
+        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
     },
   },
@@ -355,8 +365,18 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[1].capacityBonus;
+      const baseCap = tuning.grove.treeCapacity;
+      let groveBonus = 0;
+      for (const exp of tuning.investments.groveExpansion) {
+        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
+      }
+      const currentCap = baseCap + groveBonus;
+      const baseBatch = tuning.harvest.baseBatchSize;
+      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
+      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       const lines = [
         `Grove: Max trees +${bonus}`,
+        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
       if (!state.upgrades.expand_grove_1) {
         lines.push(`Requires: Expand Grove I`);
@@ -402,8 +422,18 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[2].capacityBonus;
+      const baseCap = tuning.grove.treeCapacity;
+      let groveBonus = 0;
+      for (const exp of tuning.investments.groveExpansion) {
+        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
+      }
+      const currentCap = baseCap + groveBonus;
+      const baseBatch = tuning.harvest.baseBatchSize;
+      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
+      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       const lines = [
         `Grove: Max trees +${bonus}`,
+        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
       if (!state.upgrades.expand_grove_2) {
         lines.push(`Requires: Expand Grove II`);
