@@ -77,7 +77,7 @@ export const TUNING = {
       baseCapacity: 3,           // Minimum olives that can be pressed
       logScale: 4.4,             // Logarithmic scaling factor (higher = slower growth)
       capacityPerLog: 5,         // Capacity added per log unit
-      oilPerOlivePerPresser: 0.005, // Linear oil bonus per presser per olive pressed
+      oilPerOlivePerPresser: 0.02, // Linear oil bonus per presser per olive pressed
     },
   },
 
