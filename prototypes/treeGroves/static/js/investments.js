@@ -113,12 +113,9 @@ export const INVESTMENTS = [
     
     effectLines: (state, tuning) => {
       const salary = tuning.managers.pressManager.salaryPerMin;
-      const poorMult = tuning.managers.pressManager.poorMultiplier;
-      const masterworkBonus = tuning.managers.pressManager.masterworkBonus;
-      const poorReduction = ((1 - poorMult) * 100).toFixed(0);
-      
+
       return [
-        `Press (while paid): Poor outcomes reduced by ${poorReduction}%, enables Masterwork outcome (+${(masterworkBonus * 100).toFixed(0)}%)`,
+        `Unlocks: Automate Press, Automate Oil Shipments`,
         `Ongoing: Salary ${salary} florins/min`,
       ];
     },

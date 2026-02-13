@@ -62,21 +62,10 @@ export const TUNING = {
       baseCost: 10,
       costScale: 5,              // Cost increase per harvester hired
       olivesPerHarvest: 0.8,     // Flat olives bonus per harvester (floating point)
-      // Legacy effects (disabled)
-      attemptBonusTiers: {       // DEPRECATED: No longer used
-        tier1: { max: 5, bonus: 1 },
-        tier2: { max: 10, bonus: 0.5 },
-        tier3: { bonus: 0.25 },
-      },
-      durationReductionPct: 0,   // DISABLED: Was 0.04
-      durationReductionCap: 0,   // DISABLED: Was 0.25
     },
     presser: {
       baseCost: 12,
       costScale: 6,              // Cost increase per presser hired
-      baseCapacity: 3,           // Minimum olives that can be pressed
-      logScale: 4.4,             // Logarithmic scaling factor (higher = slower growth)
-      capacityPerLog: 5,         // Capacity added per log unit
       oilPerOlivePerPresser: 0.02, // Linear oil bonus per presser per olive pressed
     },
   },
@@ -99,9 +88,6 @@ export const TUNING = {
     pressManager: {
       hireCost: 50,
       salaryPerMin: 0.75,        // Florins per minute
-      poorMultiplier: 0.6,       // Reduces poor outcome weight
-      masterworkBonus: 0.03,     // Adds weight to masterwork outcome
-      excellentBonus: 0.05,      // Increases excellent outcome weight
     },
   },
 
@@ -112,33 +98,6 @@ export const TUNING = {
       pressDurationMs: 3000,
       oilPerPress: 1,
       baseDurationMs: 3000,
-      stochasticRounding: true,
-      // Press outcome probabilities (weights normalized at runtime)
-      // Expected yield progression:
-      //   Base (0 pressers, no manager): ~0.88x multiplier (slight loss, oil not "free")
-      //   With 5 pressers: ~0.94x multiplier (approaching parity)
-      //   With 5 pressers + manager: ~1.08x multiplier (clearly better, masterwork possible)
-      outcomes: [
-        { key: "poor", weight: 0.30, yieldMultiplier: 0.6 },      // Wasteful: lose 40%
-        { key: "normal", weight: 0.50, yieldMultiplier: 0.9 },    // Slight loss: 10% waste
-        { key: "good", weight: 0.15, yieldMultiplier: 1.2 },      // Efficient: +20% bonus
-        { key: "excellent", weight: 0.05, yieldMultiplier: 1.5 }, // Great: +50% bonus
-        { key: "masterwork", weight: 0.00, yieldMultiplier: 2.0 },// Rare jackpot: 2x (manager only)
-      ],
-      // Weight modifiers that shift outcome probabilities
-      weightModifiers: {
-        perPresser: {
-          poorDelta: -0.012,      // Each presser reduces poor weight (fewer bad outcomes)
-          normalDelta: -0.004,    // Each presser reduces normal weight (shift to better)
-          goodDelta: 0.010,       // Each presser increases good weight
-          excellentDelta: 0.006,  // Each presser increases excellent weight
-        },
-        pressManager: {
-          poorMultiplier: 0.4,    // Cuts poor weight significantly when active
-          masterworkBonus: 0.05,  // Adds 5% masterwork chance (2 oil from 3 olives)
-          excellentBonus: 0.08,   // Adds 8% excellent chance
-        },
-      },
     },
   },
 

@@ -211,46 +211,6 @@ let quarryManagerIsActive = false;
 // Active state for Foreman (computed each tick)
 let foremanIsActive = false;
 
-/**
- * Calculate pressing capacity for a given presser count (pure function).
- * Uses logarithmic scaling: capacity = base + (log(1 + count) / logScale) * capacityPerLog
- * Note: Press Manager no longer affects capacity (affects outcome quality instead)
- */
-function getPressingCapacityForCount(count) {
-  const baseCapacity = TUNING.workers.presser.baseCapacity;
-  
-  if (count === 0) return baseCapacity;
-  
-  const logScale = TUNING.workers.presser.logScale;
-  const capacityPerLog = TUNING.workers.presser.capacityPerLog;
-  
-  // Logarithmic scaling: log(1 + count) for smooth diminishing returns
-  const logFactor = Math.log(1 + count) / logScale;
-  const variableCapacity = logFactor * capacityPerLog;
-  
-  return Math.floor(baseCapacity + variableCapacity);
-}
-
-/**
- * Get current pressing capacity based on current state.
- */
-function getPressingCapacity() {
-  return getPressingCapacityForCount(state.presserCount);
-}
-
-function calculatePresserHirePreview() {
-  const currentCount = state.presserCount;
-  const nextCount = currentCount + 1;
-  
-  // Use pure helper to avoid state mutation
-  const currentCapacity = getPressingCapacityForCount(currentCount);
-  const nextCapacity = getPressingCapacityForCount(nextCount);
-  
-  return {
-    capacity: { current: currentCapacity, next: nextCapacity }
-  };
-}
-
 // --- Press Output Helpers ---
 function getBaseOilPerOlive() {
   return TUNING.press.baseOilPerPress / TUNING.press.olivesPerPress;
@@ -1077,10 +1037,6 @@ function getCurrentHarvestOutcomeChances() {
 }
 
 // --- Harvest System ---
-function selectWeightedOutcome() {
-  return rollWeighted(harvestConfig.outcomes);
-}
-
 function getCurrentHarvestBatchSize() {
   // Harvest attempt amount = base batch size (scaled by grove capacity) + harvester bonus
   // Must return a float (harvester bonus can be fractional)
