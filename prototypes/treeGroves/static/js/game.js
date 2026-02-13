@@ -1082,10 +1082,12 @@ function selectWeightedOutcome() {
 }
 
 function getCurrentHarvestBatchSize() {
-  // Harvest attempt amount = base batch size + harvester bonus
+  // Harvest attempt amount = base batch size (scaled by grove capacity) + harvester bonus
   // Must return a float (harvester bonus can be fractional)
   // Must never return less than 0
-  return Math.max(0, harvestConfig.batchSize + getHarvesterOlivesBonus());
+  const currentCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
+  const capacityScale = currentCapacity / TUNING.grove.treeCapacity;
+  return Math.max(0, harvestConfig.batchSize * capacityScale + getHarvesterOlivesBonus());
 }
 
 function startHarvest(opts = {}) {
