@@ -56,7 +56,7 @@ export const TUNING = {
       costScaleLow: 2,           // Cost increase per cultivator (0-30)
       costScaleHigh: 8,          // Cost increase per cultivator (30+)
       costScaleThreshold: 30,    // When cost scaling increases
-      olivesPerSecondPerCultivator: 0.05,
+      olivesPerSecondPerCultivator: 0.10,
     },
     harvester: {
       baseCost: 10,
