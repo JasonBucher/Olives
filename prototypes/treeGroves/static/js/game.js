@@ -41,6 +41,7 @@ const PERSISTED_STATE_KEYS = [
   "quarryPickLevel",
   "quarryCartLevel",
   "autoPressUnlocked",
+  "autoShipOilUnlocked",
   "stone",
   "upgrades",
   "meta",
@@ -78,6 +79,7 @@ function createDefaultState() {
     quarryPickLevel: 0,
     quarryCartLevel: 0,
     autoPressUnlocked: false,
+    autoShipOilUnlocked: false,
 
     // Upgrades
     upgrades: {},
@@ -2049,6 +2051,9 @@ function isInvestmentOwned(investment) {
   if (investment.id === "auto_press") {
     return !!state.autoPressUnlocked;
   }
+  if (investment.id === "auto_ship_oil") {
+    return !!state.autoShipOilUnlocked;
+  }
   return !!state.upgrades[investment.id];
 }
 
@@ -2278,6 +2283,11 @@ function startLoop() {
     // Auto-press if upgrade purchased and Press Manager is active
     if (state.autoPressUnlocked && pressManagerIsActive && !isPressing && getOlivesToPress() >= TUNING.press.olivesPerPress) {
       startPressing();
+    }
+
+    // Auto-ship oil if upgrade purchased and Press Manager is active
+    if (state.autoShipOilUnlocked && pressManagerIsActive && !isShippingOliveOil && getShippableCount(state.oliveOilCount || 0) >= 1) {
+      startShippingOliveOil();
     }
 
     // UI refresh

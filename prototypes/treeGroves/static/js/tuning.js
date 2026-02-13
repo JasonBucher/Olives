@@ -232,6 +232,9 @@ export const TUNING = {
     autoPress: {
       cost: { florins: 100, stone: 20 },
     },
+    autoShipOil: {
+      cost: { florins: 150, stone: 30 },
+    },
     groveExpansion: [
       { idSuffix: 1, florinCost: 45, stoneCost: 5, capacityBonus: 20 },
       { idSuffix: 2, florinCost: 75, stoneCost: 12, capacityBonus: 25 },
