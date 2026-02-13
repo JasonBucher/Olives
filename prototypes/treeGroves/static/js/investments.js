@@ -610,6 +610,53 @@ export const INVESTMENTS = [
     },
   },
 
+  // --- Automate Press ---
+  {
+    id: "auto_press",
+    title: "Automate Press",
+    group: "upgrade",
+
+    cost: (tuning, state) => tuning.investments.autoPress.cost.florins,
+
+    costText: (tuning, state) => {
+      const cost = tuning.investments.autoPress.cost;
+      return `${cost.florins} florins, ${cost.stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => !!state.pressManagerHired,
+
+    prerequisitesMet: (state, tuning) => !!state.pressManagerHired,
+
+    canPurchase: (state, tuning) => {
+      const cost = tuning.investments.autoPress.cost;
+      return !state.autoPressUnlocked &&
+             state.pressManagerHired &&
+             state.florinCount >= cost.florins &&
+             state.stone >= cost.stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "auto_press");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cost = tuning.investments.autoPress.cost;
+      state.florinCount -= cost.florins;
+      state.stone -= cost.stone;
+      if (state.stone < 0) state.stone = 0;
+      state.autoPressUnlocked = true;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const lines = [
+        `Behavior: Auto-press olives when available`,
+      ];
+      if (!state.pressManagerHired) {
+        lines.push(`Requires: Press Manager`);
+      }
+      return lines;
+    },
+  },
+
   // --- Quarry Upgrades ---
   {
     id: "pulley_cart",
