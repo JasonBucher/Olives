@@ -3001,7 +3001,7 @@ function startLoop() {
     }
 
     // Auto-ship oil if upgrade purchased and Press Manager is active
-    if (state.autoShipOilUnlocked && pressManagerIsActive && !isShippingOliveOil && getShippableCount(state.oliveOilCount || 0) >= 1) {
+    if (state.autoShipOilUnlocked && pressManagerIsActive && !isShippingOliveOil && getShippableCount(state.oliveOilCount || 0) >= getOliveOilShippingCapacity()) {
       startShippingOliveOil();
     }
 
