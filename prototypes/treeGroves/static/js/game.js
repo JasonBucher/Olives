@@ -629,6 +629,8 @@ const invitationModal = document.getElementById("invitation-modal");
 const invitationUnderstoodBtn = document.getElementById("invitation-understood-btn");
 const relocationReqLifetimeIcon = document.getElementById("relocation-req-lifetime-icon");
 const relocationReqLifetimeText = document.getElementById("relocation-req-lifetime-text");
+const relocationReqRenownIcon = document.getElementById("relocation-req-renown-icon");
+const relocationReqRenownText = document.getElementById("relocation-req-renown-text");
 const relocationReqCurrentIcon = document.getElementById("relocation-req-current-icon");
 const moveToCityBtn = document.getElementById("move-to-city-btn");
 const era2ResetBtn = document.getElementById("era2-reset-btn");
@@ -1313,10 +1315,17 @@ function updateRelocationUI() {
   const lifetimeMet = hasRelocationLifetimeRequirement();
   const paymentMet = hasRelocationPaymentRequirement();
   const lifetimeEarned = Math.max(0, Math.floor(Number(state.florinsLifetimeEarned) || 0));
+  const renownMet = !!state.renownCapped;
   setRequirementIcon(relocationReqLifetimeIcon, lifetimeMet);
+  setRequirementIcon(relocationReqRenownIcon, renownMet);
   setRequirementIcon(relocationReqCurrentIcon, paymentMet);
   if (relocationReqLifetimeText) {
     relocationReqLifetimeText.textContent = `Earn ${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()} lifetime Florins ${lifetimeEarned.toLocaleString()}/${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()}`;
+  }
+  if (relocationReqRenownText) {
+    const currentRenown = Math.floor(Number(state.renownValue) || 0);
+    const capMax = getRenownCapMax() || 399;
+    relocationReqRenownText.textContent = `Reach Countryside Limit (Renown ${currentRenown}/${capMax})`;
   }
   if (moveToCityBtn) {
     moveToCityBtn.disabled = !(lifetimeMet && paymentMet && state.renownCapped) || Number(state.era) >= 2;
