@@ -18,6 +18,7 @@ let era2LoopInterval = null;
 // Pauses simulation completely when tab loses focus
 let isSimPaused = false;
 let pausedAtMs = 0;
+let allowBackgroundSim = false;
 
 // --- Game State ---
 const PERSISTED_STATE_KEYS = [
@@ -3155,6 +3156,7 @@ debugModal.addEventListener("click", (e) => {
 
 // --- Visibility/Focus Event Listeners ---
 document.addEventListener("visibilitychange", () => {
+  if (allowBackgroundSim) return;
   if (document.hidden) {
     pauseSim();
   } else {
@@ -3163,13 +3165,27 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
+  if (allowBackgroundSim) return;
   pauseSim();
 });
 
 window.addEventListener("focus", () => {
-  if (document.hidden) return; // Let visibilitychange handle it
+  if (allowBackgroundSim) return;
+  if (document.hidden) return;
   resumeSim();
 });
+
+// --- Background Sim Toggle ---
+const bgSimToggleBtn = document.getElementById("bg-sim-toggle");
+if (bgSimToggleBtn) {
+  bgSimToggleBtn.addEventListener("click", () => {
+    allowBackgroundSim = !allowBackgroundSim;
+    bgSimToggleBtn.textContent = allowBackgroundSim ? "BG: On" : "BG: Off";
+    if (allowBackgroundSim && isSimPaused) {
+      resumeSim();
+    }
+  });
+}
 
 // --- Init ---
 // Initialize logger
