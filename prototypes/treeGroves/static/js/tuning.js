@@ -70,7 +70,7 @@ export const TUNING = {
   // Managers: hiring costs, salaries, and supervision effects
   managers: {
     arborist: {
-      hireCost: 50,
+      hireCost: 25,
       salaryPerMin: 0.2,         // Florins per minute
     },
     foreman: {
@@ -222,7 +222,7 @@ export const TUNING = {
 
   // Renown: sale-driven progression
   renown: {
-    perUnitSold: 0.15,
+    perUnitSold: 0.25,
   },
 
   // Renown: city reputation tiers (config-driven)

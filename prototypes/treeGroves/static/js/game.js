@@ -1292,7 +1292,7 @@ function updateRenownUI() {
   renownProgressTextEl.textContent = renownState.progressText;
 }
 
-const RELOCATION_LIFETIME_FLORINS_REQUIRED = 10000;
+const RELOCATION_LIFETIME_FLORINS_REQUIRED = 5000;
 const RELOCATION_FLORIN_COST = 3000;
 
 function hasRelocationLifetimeRequirement() {
@@ -1316,7 +1316,7 @@ function updateRelocationUI() {
   setRequirementIcon(relocationReqLifetimeIcon, lifetimeMet);
   setRequirementIcon(relocationReqCurrentIcon, paymentMet);
   if (relocationReqLifetimeText) {
-    relocationReqLifetimeText.textContent = `Earn 10,000 lifetime Florins ${lifetimeEarned.toLocaleString()}/10,000`;
+    relocationReqLifetimeText.textContent = `Earn ${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()} lifetime Florins ${lifetimeEarned.toLocaleString()}/${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()}`;
   }
   if (moveToCityBtn) {
     moveToCityBtn.disabled = !(lifetimeMet && paymentMet && state.renownCapped) || Number(state.era) >= 2;
