@@ -222,7 +222,7 @@ export const TUNING = {
 
   // Renown: sale-driven progression
   renown: {
-    perUnitSold: 0.1,
+    perUnitSold: 0.15,
   },
 
   // Renown: city reputation tiers (config-driven)

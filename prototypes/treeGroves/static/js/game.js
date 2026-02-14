@@ -1314,7 +1314,7 @@ function updateRelocationUI() {
     relocationReqLifetimeText.textContent = `Earn 10,000 lifetime Florins ${lifetimeEarned.toLocaleString()}/10,000`;
   }
   if (moveToCityBtn) {
-    moveToCityBtn.disabled = !(lifetimeMet && paymentMet) || Number(state.era) >= 2;
+    moveToCityBtn.disabled = !(lifetimeMet && paymentMet && state.renownCapped) || Number(state.era) >= 2;
   }
 }
 
