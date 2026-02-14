@@ -275,8 +275,8 @@ export const TUNING = {
       bonusPerLevel: 1,
     },
     olivePressExpansion: {
-      baseCost: { florins: 120, stone: 40 },
-      costScale: { florins: 90, stone: 30 },
+      baseCost: { florins: 120, stone: 10 },
+      costScale: { florins: 90, stone: 8 },
       maxAdditionalPresses: 5,
     },
     autoShipOil: {
