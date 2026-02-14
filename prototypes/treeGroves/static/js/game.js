@@ -4,7 +4,6 @@ import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
-import { getMarketEvents, MARKET_EVENT_SETTINGS } from './marketEvents.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -13,6 +12,7 @@ const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 // Prevents the "reset doesn't reset" bug where a still-running interval re-saves state.
 let isResetting = false;
 let mainLoopInterval = null;
+let era2LoopInterval = null;
 
 // --- Pause state ---
 // Pauses simulation completely when tab loses focus
@@ -28,6 +28,14 @@ const PERSISTED_STATE_KEYS = [
   "marketAutosellRateUpgrades",
   "marketLanesPurchased",
   "marketPriceUpgrades",
+  "renownValue",
+  "renownLifetime",
+  "renownCapped",
+  "cityInvitationAcknowledged",
+  "florinsLifetimeEarned",
+  "runStats",
+  "era",
+  "estateSnapshot",
   "oliveOilCount",
   "florinCount",
   "cultivatorCount",
@@ -48,7 +56,127 @@ const PERSISTED_STATE_KEYS = [
   "meta",
 ];
 
+function createDefaultRunStats(startTimestamp = Date.now()) {
+  const start = Number.isFinite(Number(startTimestamp)) ? Number(startTimestamp) : Date.now();
+  return {
+    era1: {
+      startTimestamp: start,
+      endTimestamp: null,
+      durationSeconds: 0,
+      florins: {
+        earnedTotal: 0,
+        spentTotal: 0,
+        netTotal: 0,
+      },
+      goods: {
+        olivesSold: 0,
+        oliveOilSold: 0,
+        olivesPressed: 0,
+      },
+      resources: {
+        stoneEarned: 0,
+        stoneSpent: 0,
+      },
+      workers: {
+        harvestersHired: 0,
+        cultivatorsHired: 0,
+        pressersHired: 0,
+      },
+      investments: {
+        purchasedCount: 0,
+        purchasedById: {},
+      },
+    },
+  };
+}
+
+function normalizeRunStats(runStatsCandidate, { startTimestampFallback, legacy } = {}) {
+  const fallbackStart = Number.isFinite(Number(startTimestampFallback))
+    ? Number(startTimestampFallback)
+    : Date.now();
+  const defaults = createDefaultRunStats(fallbackStart);
+  const candidateEra1 = runStatsCandidate?.era1 || {};
+  const legacyStart = Number.isFinite(Number(legacy?.era1StartTimestamp))
+    ? Number(legacy.era1StartTimestamp)
+    : null;
+  const legacyEnd = Number.isFinite(Number(legacy?.era1EndTimestamp))
+    ? Number(legacy.era1EndTimestamp)
+    : null;
+  const startTimestamp = Number.isFinite(Number(candidateEra1.startTimestamp))
+    ? Number(candidateEra1.startTimestamp)
+    : (legacyStart ?? defaults.era1.startTimestamp);
+  const endTimestamp = Number.isFinite(Number(candidateEra1.endTimestamp))
+    ? Number(candidateEra1.endTimestamp)
+    : legacyEnd;
+  const earnedTotal = Number.isFinite(Number(candidateEra1.florins?.earnedTotal))
+    ? Number(candidateEra1.florins.earnedTotal)
+    : (Number.isFinite(Number(legacy?.era1TotalFlorinsEarned)) ? Number(legacy.era1TotalFlorinsEarned) : 0);
+  const spentTotal = Number.isFinite(Number(candidateEra1.florins?.spentTotal))
+    ? Number(candidateEra1.florins.spentTotal)
+    : (Number.isFinite(Number(legacy?.era1TotalFlorinsSpent)) ? Number(legacy.era1TotalFlorinsSpent) : 0);
+  const durationSeconds = Number.isFinite(Number(candidateEra1.durationSeconds))
+    ? Number(candidateEra1.durationSeconds)
+    : (Number.isFinite(Number(legacy?.era1DurationSeconds)) ? Number(legacy.era1DurationSeconds) : 0);
+  const oliveOilSold = Number.isFinite(Number(candidateEra1.goods?.oliveOilSold))
+    ? Number(candidateEra1.goods.oliveOilSold)
+    : (Number.isFinite(Number(legacy?.era1TotalOilSold)) ? Number(legacy.era1TotalOilSold) : 0);
+
+  const normalized = {
+    era1: {
+      startTimestamp: Math.max(0, startTimestamp),
+      endTimestamp: endTimestamp == null ? null : Math.max(Math.max(0, startTimestamp), Number(endTimestamp)),
+      durationSeconds: Math.max(0, durationSeconds),
+      florins: {
+        earnedTotal: Math.max(0, earnedTotal),
+        spentTotal: Math.max(0, spentTotal),
+        netTotal: 0,
+      },
+      goods: {
+        olivesSold: Math.max(0, Number(candidateEra1.goods?.olivesSold) || 0),
+        oliveOilSold: Math.max(0, oliveOilSold),
+        olivesPressed: Math.max(0, Number(candidateEra1.goods?.olivesPressed) || 0),
+      },
+      resources: {
+        stoneEarned: Math.max(0, Number(candidateEra1.resources?.stoneEarned) || 0),
+        stoneSpent: Math.max(0, Number(candidateEra1.resources?.stoneSpent) || 0),
+      },
+      workers: {
+        harvestersHired: Math.max(0, Number(candidateEra1.workers?.harvestersHired) || 0),
+        cultivatorsHired: Math.max(0, Number(candidateEra1.workers?.cultivatorsHired) || 0),
+        pressersHired: Math.max(0, Number(candidateEra1.workers?.pressersHired) || 0),
+      },
+      investments: {
+        purchasedCount: Math.max(0, Number(candidateEra1.investments?.purchasedCount) || 0),
+        purchasedById: {},
+      },
+    },
+  };
+
+  const rawPurchasedById = candidateEra1.investments?.purchasedById;
+  if (rawPurchasedById && typeof rawPurchasedById === "object" && !Array.isArray(rawPurchasedById)) {
+    Object.entries(rawPurchasedById).forEach(([id, value]) => {
+      if (typeof id !== "string" || !id) return;
+      const count = Math.max(0, Math.floor(Number(value) || 0));
+      if (count > 0) {
+        normalized.era1.investments.purchasedById[id] = count;
+      }
+    });
+  }
+  const purchasedByIdTotal = Object.values(normalized.era1.investments.purchasedById)
+    .reduce((acc, value) => acc + (Number(value) || 0), 0);
+  normalized.era1.investments.purchasedCount = Math.max(
+    Number(normalized.era1.investments.purchasedCount) || 0,
+    purchasedByIdTotal
+  );
+
+  normalized.era1.florins.netTotal =
+    normalized.era1.florins.earnedTotal - normalized.era1.florins.spentTotal;
+
+  return normalized;
+}
+
 function createDefaultState() {
+  const nowMs = Date.now();
   return {
     // Grove mechanics
     treeOlives: 15,
@@ -62,6 +190,14 @@ function createDefaultState() {
     marketAutosellRateUpgrades: 0,
     marketLanesPurchased: 0,
     marketPriceUpgrades: 0,
+    renownValue: 0,
+    renownLifetime: 0,
+    renownCapped: false,
+    cityInvitationAcknowledged: false,
+    florinsLifetimeEarned: 0,
+    runStats: createDefaultRunStats(nowMs),
+    era: 1,
+    estateSnapshot: null,
     oliveOilCount: 0,
     florinCount: 0,
 
@@ -111,6 +247,14 @@ function buildPersistedState(currentState) {
 }
 
 let state = createDefaultState();
+const renownTierConfig = (Array.isArray(TUNING.renownTiers) ? [...TUNING.renownTiers] : [])
+  .filter((tier) => tier && typeof tier.id === "string" && typeof tier.name === "string" && Number.isFinite(Number(tier.minRenown)))
+  .map((tier) => ({
+    ...tier,
+    minRenown: Number(tier.minRenown),
+    maxRenown: tier.maxRenown == null ? null : Number(tier.maxRenown),
+  }))
+  .sort((a, b) => a.minRenown - b.minRenown);
 
 // --- Harvest Config (upgrade-tweakable) ---
 const harvestConfig = {
@@ -341,9 +485,7 @@ const MARKET_LOOP_MS = 1000;
 let marketLoopInterval = null;
 let marketLoopLastMs = 0;
 let autosellProgress = 0;
-let marketEventAcc = 0;
-let activeMarketEvent = null;
-const marketEventCooldowns = {};
+let activeCityModifiers = [];
 
 // --- Arborist Active State (computed each tick) ---
 let arboristIsActive = false;
@@ -356,6 +498,11 @@ const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
 const marketAutosellEl = document.getElementById("market-autosell");
+const cityDemandRateEl = document.getElementById("city-demand-rate");
+const renownValueEl = document.getElementById("renown-value");
+const renownTierNameEl = document.getElementById("renown-tier-name");
+const renownProgressFillEl = document.getElementById("renown-progress-fill");
+const renownProgressTextEl = document.getElementById("renown-progress-text");
 
 // Log containers
 const farmLogPlayerEl = document.getElementById("farmLogPlayer");
@@ -462,13 +609,43 @@ const clearMarketLogBtn = document.getElementById("clear-market-log-btn");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
+const debugBtnEra2 = document.getElementById("debug-btn-era2");
 const debugModal = document.getElementById("debug-modal");
 const debugCloseBtn = document.getElementById("debug-close-btn");
 const debugResetBtn = document.getElementById("debug-reset-btn");
+const debugAddFlorins1000Btn = document.getElementById("debug-add-florins-1000-btn");
+const debugEra1Content = document.getElementById("debug-era1-content");
 const debugAddOlivesBtn = document.getElementById("debug-add-olives-btn");
 const debugAddFlorinsBtn = document.getElementById("debug-add-florins-btn");
 const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
+const debugAddRenownBtn = document.getElementById("debug-add-renown-btn");
 const debugHarvestChancesEl = document.getElementById("debug-harvest-chances");
+const invitationModal = document.getElementById("invitation-modal");
+const invitationUnderstoodBtn = document.getElementById("invitation-understood-btn");
+const relocationReqLifetimeIcon = document.getElementById("relocation-req-lifetime-icon");
+const relocationReqLifetimeText = document.getElementById("relocation-req-lifetime-text");
+const relocationReqCurrentIcon = document.getElementById("relocation-req-current-icon");
+const moveToCityBtn = document.getElementById("move-to-city-btn");
+const era2ResetBtn = document.getElementById("era2-reset-btn");
+const eraOneRoot = document.getElementById("era1-root");
+const eraTwoScreen = document.getElementById("era2-screen");
+const era2FlorinCountEl = document.getElementById("era2-florin-count");
+const era2EstateIncomeEl = document.getElementById("era2-estate-income");
+const era2SummaryTimeEl = document.getElementById("era2-summary-time");
+const era2RunOutcomeEstateIncomeEl = document.getElementById("era2-run-outcome-estate-income");
+const era2SummaryFlorinsEarnedEl = document.getElementById("era2-summary-florins-earned");
+const era2SummaryFlorinsSpentEl = document.getElementById("era2-summary-florins-spent");
+const era2SummaryFlorinsNetEl = document.getElementById("era2-summary-florins-net");
+const era2SummaryOlivesSoldEl = document.getElementById("era2-summary-olives-sold");
+const era2SummaryOliveOilSoldEl = document.getElementById("era2-summary-olive-oil-sold");
+const era2SummaryOlivesPressedEl = document.getElementById("era2-summary-olives-pressed");
+const era2SummaryStoneEarnedEl = document.getElementById("era2-summary-stone-earned");
+const era2SummaryStoneSpentEl = document.getElementById("era2-summary-stone-spent");
+const era2SummaryHarvestersHiredEl = document.getElementById("era2-summary-harvesters-hired");
+const era2SummaryCultivatorsHiredEl = document.getElementById("era2-summary-cultivators-hired");
+const era2SummaryPressersHiredEl = document.getElementById("era2-summary-pressers-hired");
+const era2SummaryInvestmentsTotalEl = document.getElementById("era2-summary-investments-total");
+const era2SummaryInvestmentsTopEl = document.getElementById("era2-summary-investments-top");
 
 const harvestActionUI = createInlineActionController({
   pillEl: harvestPill,
@@ -616,6 +793,15 @@ function createInlineActionController({ pillEl, countEl, progressEl, barEl, coun
 }
 
 // --- Storage ---
+function logRenownLoadValues() {
+  const text = `Renown loaded: value=${state.renownValue}, lifetime=${state.renownLifetime}, capped=${state.renownCapped}`;
+  if (farmLogDebugEl || marketLogDebugEl) {
+    logDebug({ channel: farmLogDebugEl ? "farm" : "market", text });
+    return;
+  }
+  console.debug(text);
+}
+
 function loadGame() {
   const raw = localStorage.getItem(STORAGE_KEY);
   const defaults = createDefaultState();
@@ -624,6 +810,7 @@ function loadGame() {
     state = defaults;
     state.meta.createdAt = new Date().toISOString();
     saveGame(); // create key immediately so it's easy to see in DevTools
+    logRenownLoadValues();
     return;
   }
 
@@ -632,6 +819,47 @@ function loadGame() {
     const persisted = pickPersistedState(parsed);
     // Shallow merge so missing fields get defaults
     state = { ...defaults, ...persisted, meta: { ...defaults.meta, ...(persisted.meta || {}) } };
+    state.renownValue = Number.isFinite(Number(state.renownValue)) ? Number(state.renownValue) : defaults.renownValue;
+    state.renownLifetime = Number.isFinite(Number(state.renownLifetime)) ? Number(state.renownLifetime) : defaults.renownLifetime;
+    state.renownCapped = typeof state.renownCapped === "boolean" ? state.renownCapped : defaults.renownCapped;
+    state.cityInvitationAcknowledged = typeof state.cityInvitationAcknowledged === "boolean"
+      ? state.cityInvitationAcknowledged
+      : defaults.cityInvitationAcknowledged;
+    state.florinsLifetimeEarned = Number.isFinite(Number(state.florinsLifetimeEarned))
+      ? Number(state.florinsLifetimeEarned)
+      : Math.max(0, Number(state.florinCount) || 0);
+    const createdAtMs = Number.isFinite(Date.parse(state.meta?.createdAt || ""))
+      ? Date.parse(state.meta.createdAt)
+      : null;
+    state.runStats = normalizeRunStats(state.runStats, {
+      startTimestampFallback: createdAtMs ?? Date.now(),
+      legacy: {
+        era1StartTimestamp: parsed?.era1StartTimestamp,
+        era1EndTimestamp: parsed?.era1EndTimestamp,
+        era1DurationSeconds: parsed?.era1DurationSeconds,
+        era1TotalFlorinsEarned: parsed?.era1TotalFlorinsEarned ?? state.florinsLifetimeEarned,
+        era1TotalFlorinsSpent: parsed?.era1TotalFlorinsSpent,
+        era1TotalOilSold: parsed?.era1TotalOilSold,
+      },
+    });
+    state.era = Number.isFinite(Number(state.era))
+      ? Math.max(1, Math.floor(Number(state.era)))
+      : defaults.era;
+    state.estateSnapshot = (state.estateSnapshot && typeof state.estateSnapshot === "object")
+      ? state.estateSnapshot
+      : defaults.estateSnapshot;
+    if (Number(state.era) >= 2 && state.runStats.era1.endTimestamp == null) {
+      state.runStats.era1.endTimestamp = Date.now();
+    }
+    if (state.runStats.era1.endTimestamp != null && state.runStats.era1.durationSeconds <= 0) {
+      const computedSeconds = Math.max(0, Math.floor((state.runStats.era1.endTimestamp - state.runStats.era1.startTimestamp) / 1000));
+      state.runStats.era1.durationSeconds = computedSeconds;
+    }
+    if (state.runStats.era1.florins) {
+      state.runStats.era1.florins.netTotal =
+        (Number(state.runStats.era1.florins.earnedTotal) || 0) -
+        (Number(state.runStats.era1.florins.spentTotal) || 0);
+    }
 
     if (!state.meta.createdAt) {
       state.meta.createdAt = new Date().toISOString();
@@ -642,6 +870,8 @@ function loadGame() {
     state.meta.createdAt = new Date().toISOString();
     saveGame();
   }
+  logRenownLoadValues();
+  maybeShowInvitationModal();
 }
 
 function saveGame() {
@@ -654,12 +884,190 @@ function resetGame() {
 
   isResetting = true;
   if (mainLoopInterval) clearInterval(mainLoopInterval);
+  if (era2LoopInterval) clearInterval(era2LoopInterval);
   stopMarketLoop();
 
   localStorage.removeItem(STORAGE_KEY);
 
   // Cache-bust reload (useful on GitHub Pages)
   window.location.href = window.location.pathname + "?t=" + Date.now();
+}
+
+function getRunStatsEra1() {
+  if (!state.runStats || typeof state.runStats !== "object") {
+    state.runStats = createDefaultRunStats(Date.now());
+  }
+  if (!state.runStats.era1 || typeof state.runStats.era1 !== "object") {
+    state.runStats = createDefaultRunStats(Date.now());
+  }
+  return state.runStats.era1;
+}
+
+function updateRunStatsFlorinNetTotal() {
+  const era1 = getRunStatsEra1();
+  const earned = Number(era1.florins?.earnedTotal) || 0;
+  const spent = Number(era1.florins?.spentTotal) || 0;
+  era1.florins.netTotal = earned - spent;
+}
+
+function isEra1TrackingActive() {
+  const era1 = getRunStatsEra1();
+  return Number(state.era) === 1 && era1.endTimestamp == null;
+}
+
+function addFlorinsEarned(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.florins.earnedTotal = (Number(era1.florins.earnedTotal) || 0) + amount;
+  updateRunStatsFlorinNetTotal();
+}
+
+function addFlorinsSpent(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.florins.spentTotal = (Number(era1.florins.spentTotal) || 0) + amount;
+  updateRunStatsFlorinNetTotal();
+}
+
+function addOlivesSold(units) {
+  if (!Number.isFinite(units) || units <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.goods.olivesSold = (Number(era1.goods.olivesSold) || 0) + units;
+}
+
+function addOliveOilSold(units) {
+  if (!Number.isFinite(units) || units <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.goods.oliveOilSold = (Number(era1.goods.oliveOilSold) || 0) + units;
+}
+
+function addOlivesPressed(units) {
+  if (!Number.isFinite(units) || units <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.goods.olivesPressed = (Number(era1.goods.olivesPressed) || 0) + units;
+}
+
+function addStoneEarned(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.resources.stoneEarned = (Number(era1.resources.stoneEarned) || 0) + amount;
+}
+
+function addStoneSpent(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  era1.resources.stoneSpent = (Number(era1.resources.stoneSpent) || 0) + amount;
+}
+
+function addWorkerHire(workerType) {
+  if (!isEra1TrackingActive()) return;
+  const era1 = getRunStatsEra1();
+  if (workerType === "harvestersHired") {
+    era1.workers.harvestersHired = (Number(era1.workers.harvestersHired) || 0) + 1;
+    return;
+  }
+  if (workerType === "cultivatorsHired") {
+    era1.workers.cultivatorsHired = (Number(era1.workers.cultivatorsHired) || 0) + 1;
+    return;
+  }
+  if (workerType === "pressersHired") {
+    era1.workers.pressersHired = (Number(era1.workers.pressersHired) || 0) + 1;
+  }
+}
+
+function addInvestmentPurchased(investmentId) {
+  if (!isEra1TrackingActive()) return;
+  if (typeof investmentId !== "string" || !investmentId) return;
+  const era1 = getRunStatsEra1();
+  era1.investments.purchasedCount = (Number(era1.investments.purchasedCount) || 0) + 1;
+  if (!era1.investments.purchasedById || typeof era1.investments.purchasedById !== "object") {
+    era1.investments.purchasedById = {};
+  }
+  era1.investments.purchasedById[investmentId] =
+    (Number(era1.investments.purchasedById[investmentId]) || 0) + 1;
+}
+
+function finalizeEra1RunStats() {
+  const era1 = getRunStatsEra1();
+  if (era1.endTimestamp == null) {
+    era1.endTimestamp = Date.now();
+  }
+  era1.durationSeconds = Math.max(0, Math.floor((era1.endTimestamp - era1.startTimestamp) / 1000));
+  updateRunStatsFlorinNetTotal();
+}
+
+function addFlorins(amount, { trackLifetime = true } = {}) {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  state.florinCount += amount;
+  if (trackLifetime) {
+    state.florinsLifetimeEarned = (Number(state.florinsLifetimeEarned) || 0) + amount;
+  }
+  addFlorinsEarned(amount);
+  return amount;
+}
+
+function spendFlorins(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+  if ((Number(state.florinCount) || 0) < amount) return false;
+  state.florinCount -= amount;
+  addFlorinsSpent(amount);
+  return true;
+}
+
+function formatRunDuration(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatSummaryFlorins(value) {
+  const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return safe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatSummaryCount(value, fractionDigits = 0) {
+  const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return safe.toLocaleString(undefined, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
+}
+
+function getEra1DurationSecondsForSummary() {
+  const era1 = getRunStatsEra1();
+  if (Number(era1.durationSeconds) > 0) return Number(era1.durationSeconds);
+  const start = Number(era1.startTimestamp) || 0;
+  if (start <= 0) return 0;
+  const end = Number.isFinite(Number(era1.endTimestamp))
+    ? Number(era1.endTimestamp)
+    : Date.now();
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+function getInvestmentDisplayName(investmentId) {
+  const found = INVESTMENTS.find((investment) => investment.id === investmentId);
+  return found?.title || investmentId;
+}
+
+function getTopPurchasedInvestments(limit = 3) {
+  const era1 = getRunStatsEra1();
+  const entries = Object.entries(era1.investments?.purchasedById || {})
+    .map(([id, count]) => ({ id, count: Math.max(0, Number(count) || 0) }))
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.id.localeCompare(b.id);
+    });
+  return entries.slice(0, limit);
 }
 
 // --- Tree Growth ---
@@ -713,8 +1121,331 @@ function consumeInventory(actualValue, intAmount) {
   return newValue < EPSILON ? 0 : newValue;
 }
 
+function getRenownTierState() {
+  const renownValue = Number.isFinite(Number(state.renownValue)) ? Number(state.renownValue) : 0;
+  if (!renownTierConfig.length) {
+    return {
+      renownValue,
+      tierId: null,
+      tierName: "Unranked",
+      demandBonus: 0,
+      progressPct: 0,
+      progressText: "0 / 0",
+    };
+  }
+
+  let activeTier = renownTierConfig.find((tier) => {
+    if (renownValue < tier.minRenown) return false;
+    if (tier.maxRenown == null || !Number.isFinite(tier.maxRenown)) return true;
+    return renownValue <= tier.maxRenown;
+  });
+
+  if (!activeTier) {
+    activeTier = renownValue < renownTierConfig[0].minRenown
+      ? renownTierConfig[0]
+      : renownTierConfig[renownTierConfig.length - 1];
+  }
+
+  const lastTier = renownTierConfig[renownTierConfig.length - 1];
+  const atEndOfLastTier = Number.isFinite(lastTier.maxRenown) && renownValue >= lastTier.maxRenown;
+  if (state.renownCapped || atEndOfLastTier) {
+    return {
+      renownValue,
+      tierId: activeTier.id,
+      tierName: "Countryside Limit",
+      demandBonus: Number(activeTier.demandBonus) || 0,
+      progressPct: 100,
+      progressText: "MAX",
+    };
+  }
+
+  const min = activeTier.minRenown;
+  const max = Number.isFinite(activeTier.maxRenown) ? activeTier.maxRenown : null;
+  if (max == null || max <= min) {
+    return {
+      renownValue,
+      tierId: activeTier.id,
+      tierName: activeTier.name,
+      demandBonus: Number(activeTier.demandBonus) || 0,
+      progressPct: 100,
+      progressText: "MAX",
+    };
+  }
+
+  const clamped = Math.min(Math.max(renownValue, min), max);
+  const range = max - min;
+  const inTier = clamped - min;
+  const progressPct = range > 0 ? (inTier / range) * 100 : 0;
+
+  return {
+    renownValue,
+    tierId: activeTier.id,
+    tierName: activeTier.name,
+    demandBonus: Number(activeTier.demandBonus) || 0,
+    progressPct,
+    progressText: `${Math.floor(inTier)} / ${Math.floor(range)}`,
+  };
+}
+
+function getRenownCapMax() {
+  if (!renownTierConfig.length) return null;
+  const lastTier = renownTierConfig[renownTierConfig.length - 1];
+  return Number.isFinite(lastTier.maxRenown) ? Number(lastTier.maxRenown) : null;
+}
+
+function logRenownCapReached(capValue) {
+  const text = `Renown capped at ${capValue} (Countryside Limit).`;
+  if (marketLogDebugEl || farmLogDebugEl) {
+    logDebug({ channel: marketLogDebugEl ? "market" : "farm", text });
+    return;
+  }
+  console.debug(text);
+}
+
+function openInvitationModal() {
+  if (!invitationModal) return;
+  invitationModal.classList.add("active");
+  invitationModal.setAttribute("aria-hidden", "false");
+}
+
+function closeInvitationModal() {
+  if (!invitationModal) return;
+  invitationModal.classList.remove("active");
+  invitationModal.setAttribute("aria-hidden", "true");
+}
+
+function acknowledgeInvitationModal() {
+  if (state.cityInvitationAcknowledged) {
+    closeInvitationModal();
+    return;
+  }
+  state.cityInvitationAcknowledged = true;
+  saveGame();
+  closeInvitationModal();
+}
+
+function maybeShowInvitationModal() {
+  if (!state.renownCapped) return;
+  if (state.cityInvitationAcknowledged) return;
+  openInvitationModal();
+}
+
+function setRenownCapped(capValue) {
+  const wasCapped = !!state.renownCapped;
+  state.renownValue = capValue;
+  state.renownCapped = true;
+  if (!wasCapped) {
+    logRenownCapReached(capValue);
+    maybeShowInvitationModal();
+  }
+}
+
+function applyRenownGainFromSale(unitsSold) {
+  if (unitsSold <= 0) return 0;
+  const renownPerUnitSold = Number(TUNING.renown?.perUnitSold);
+  if (!Number.isFinite(renownPerUnitSold) || renownPerUnitSold <= 0) return 0;
+  return applyRenownGain(unitsSold * renownPerUnitSold);
+}
+
+function applyRenownGain(amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  const capMax = getRenownCapMax();
+  const currentRenown = Number(state.renownValue) || 0;
+  if (state.renownCapped) return 0;
+
+  if (capMax != null && currentRenown >= capMax) {
+    if (!state.renownCapped) {
+      setRenownCapped(capMax);
+    }
+    return 0;
+  }
+
+  const allowed = capMax == null ? amount : Math.min(amount, Math.max(0, capMax - currentRenown));
+  if (allowed <= 0) {
+    if (capMax != null && !state.renownCapped) {
+      setRenownCapped(capMax);
+    }
+    return 0;
+  }
+
+  state.renownLifetime = (Number(state.renownLifetime) || 0) + allowed;
+  state.renownValue = currentRenown + allowed;
+
+  if (capMax != null && state.renownValue >= capMax) {
+    setRenownCapped(capMax);
+  }
+  return allowed;
+}
+
+function updateRenownUI() {
+  if (!renownValueEl || !renownTierNameEl || !renownProgressFillEl || !renownProgressTextEl) return;
+  const renownState = getRenownTierState();
+  renownValueEl.textContent = String(Math.floor(renownState.renownValue));
+  renownTierNameEl.textContent = renownState.tierName;
+  renownProgressFillEl.style.width = `${renownState.progressPct.toFixed(2)}%`;
+  renownProgressTextEl.textContent = renownState.progressText;
+}
+
+const RELOCATION_LIFETIME_FLORINS_REQUIRED = 10000;
+const RELOCATION_FLORIN_COST = 3000;
+
+function hasRelocationLifetimeRequirement() {
+  return (Number(state.florinsLifetimeEarned) || 0) >= RELOCATION_LIFETIME_FLORINS_REQUIRED;
+}
+
+function hasRelocationPaymentRequirement() {
+  return (Number(state.florinCount) || 0) >= RELOCATION_FLORIN_COST;
+}
+
+function setRequirementIcon(el, isMet) {
+  if (!el) return;
+  el.textContent = isMet ? "✓" : "✗";
+  el.classList.toggle("is-met", isMet);
+}
+
+function updateRelocationUI() {
+  const lifetimeMet = hasRelocationLifetimeRequirement();
+  const paymentMet = hasRelocationPaymentRequirement();
+  const lifetimeEarned = Math.max(0, Math.floor(Number(state.florinsLifetimeEarned) || 0));
+  setRequirementIcon(relocationReqLifetimeIcon, lifetimeMet);
+  setRequirementIcon(relocationReqCurrentIcon, paymentMet);
+  if (relocationReqLifetimeText) {
+    relocationReqLifetimeText.textContent = `Earn 10,000 lifetime Florins ${lifetimeEarned.toLocaleString()}/10,000`;
+  }
+  if (moveToCityBtn) {
+    moveToCityBtn.disabled = !(lifetimeMet && paymentMet) || Number(state.era) >= 2;
+  }
+}
+
+function updateEraVisibility() {
+  const inEra2 = Number(state.era) >= 2;
+  if (eraOneRoot) {
+    eraOneRoot.classList.toggle("is-hidden", inEra2);
+  }
+  if (eraTwoScreen) {
+    eraTwoScreen.classList.toggle("is-hidden", !inEra2);
+  }
+}
+
+function computeEstateIncomeRate(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return 0;
+  const treeCapacity = Number(snapshot.treeCapacity) || 0;
+  const olivePressCount = Number(snapshot.olivePressCount) || 0;
+  const harvestBasketLevel = Number(snapshot.harvestBasketLevel) || 0;
+  const harvestUpgradeCount = Array.isArray(snapshot.harvestUpgrades) ? snapshot.harvestUpgrades.length : 0;
+
+  // Placeholder formula (florins/sec), intentionally centralized for easy iteration.
+  const ratePerSecond =
+    (treeCapacity * 0.0025) +
+    (olivePressCount * 0.06) +
+    (harvestBasketLevel * 0.012) +
+    (harvestUpgradeCount * 0.04);
+
+  return Math.max(0, ratePerSecond);
+}
+
+function getEstateIncomeRate() {
+  return computeEstateIncomeRate(state.estateSnapshot);
+}
+
+function updateEra2UI() {
+  if (era2FlorinCountEl) {
+    era2FlorinCountEl.textContent = state.florinCount.toFixed(2);
+  }
+  const ratePerMinute = getEstateIncomeRate() * 60;
+  if (era2EstateIncomeEl) {
+    era2EstateIncomeEl.textContent = `+${ratePerMinute.toFixed(2)} florins/min`;
+  }
+  if (era2RunOutcomeEstateIncomeEl) {
+    era2RunOutcomeEstateIncomeEl.textContent = `+${ratePerMinute.toFixed(2)} florins/min`;
+  }
+
+  const era1 = getRunStatsEra1();
+  const earned = Number(era1.florins.earnedTotal) || 0;
+  const spent = Number(era1.florins.spentTotal) || 0;
+  const net = Number(era1.florins.netTotal) || (earned - spent);
+  const timeSeconds = getEra1DurationSecondsForSummary();
+  const olivesSold = Number(era1.goods.olivesSold) || 0;
+  const oliveOilSold = Number(era1.goods.oliveOilSold) || 0;
+  const olivesPressed = Number(era1.goods.olivesPressed) || 0;
+  const stoneEarned = Number(era1.resources.stoneEarned) || 0;
+  const stoneSpent = Number(era1.resources.stoneSpent) || 0;
+  const harvestersHired = Number(era1.workers.harvestersHired) || 0;
+  const cultivatorsHired = Number(era1.workers.cultivatorsHired) || 0;
+  const pressersHired = Number(era1.workers.pressersHired) || 0;
+  const investmentsTotal = Number(era1.investments.purchasedCount) || 0;
+
+  if (era2SummaryTimeEl) era2SummaryTimeEl.textContent = formatRunDuration(timeSeconds);
+  if (era2SummaryFlorinsEarnedEl) era2SummaryFlorinsEarnedEl.textContent = formatSummaryFlorins(earned);
+  if (era2SummaryFlorinsSpentEl) era2SummaryFlorinsSpentEl.textContent = formatSummaryFlorins(spent);
+  if (era2SummaryFlorinsNetEl) era2SummaryFlorinsNetEl.textContent = formatSummaryFlorins(net);
+  if (era2SummaryOlivesSoldEl) era2SummaryOlivesSoldEl.textContent = formatSummaryCount(olivesSold, 0);
+  if (era2SummaryOliveOilSoldEl) era2SummaryOliveOilSoldEl.textContent = formatSummaryCount(oliveOilSold, 0);
+  if (era2SummaryOlivesPressedEl) era2SummaryOlivesPressedEl.textContent = formatSummaryCount(olivesPressed, 0);
+  if (era2SummaryStoneEarnedEl) era2SummaryStoneEarnedEl.textContent = formatSummaryCount(stoneEarned, 0);
+  if (era2SummaryStoneSpentEl) era2SummaryStoneSpentEl.textContent = formatSummaryCount(stoneSpent, 0);
+  if (era2SummaryHarvestersHiredEl) era2SummaryHarvestersHiredEl.textContent = formatSummaryCount(harvestersHired, 0);
+  if (era2SummaryCultivatorsHiredEl) era2SummaryCultivatorsHiredEl.textContent = formatSummaryCount(cultivatorsHired, 0);
+  if (era2SummaryPressersHiredEl) era2SummaryPressersHiredEl.textContent = formatSummaryCount(pressersHired, 0);
+  if (era2SummaryInvestmentsTotalEl) era2SummaryInvestmentsTotalEl.textContent = formatSummaryCount(investmentsTotal, 0);
+  if (era2SummaryInvestmentsTopEl) {
+    const topEntries = getTopPurchasedInvestments(3);
+    if (!topEntries.length) {
+      era2SummaryInvestmentsTopEl.textContent = "No investments tracked yet.";
+    } else {
+      era2SummaryInvestmentsTopEl.innerHTML = topEntries
+        .map((entry) => `${getInvestmentDisplayName(entry.id)} x${formatSummaryCount(entry.count, 0)}`)
+        .join("<br />");
+    }
+  }
+}
+
+function buildEstateSnapshot() {
+  const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
+  const harvestUpgradeKeys = Object.keys(state.upgrades || {}).filter((key) => (
+    key === "selective_picking" ||
+    key === "ladders_nets" ||
+    key.startsWith("expand_grove_")
+  ));
+
+  return {
+    capturedAt: new Date().toISOString(),
+    treeCapacity: currentTreeCapacity,
+    treeOlives: Number(state.treeOlives) || 0,
+    olivePressCount: Number(state.olivePressCount) || 0,
+    harvestBasketLevel: Number(state.harvestBasketLevel) || 0,
+    harvestUpgrades: harvestUpgradeKeys,
+  };
+}
+
+function moveToCity() {
+  if (Number(state.era) >= 2) return;
+  const lifetimeMet = hasRelocationLifetimeRequirement();
+  const paymentMet = hasRelocationPaymentRequirement();
+  if (!lifetimeMet || !paymentMet) return;
+
+  if (!spendFlorins(RELOCATION_FLORIN_COST)) return;
+  finalizeEra1RunStats();
+  state.estateSnapshot = buildEstateSnapshot();
+  state.era = 2;
+  saveGame();
+
+  if (mainLoopInterval) {
+    clearInterval(mainLoopInterval);
+    mainLoopInterval = null;
+  }
+  stopMarketLoop();
+  startEra2Loop();
+
+  updateEraVisibility();
+  updateUI();
+}
+
 // --- UI ---
 function updateUI() {
+  updateEraVisibility();
+  updateEra2UI();
   florinCountEl.textContent = state.florinCount.toFixed(2);
   treeOlivesEl.textContent = Math.floor(state.treeOlives);
   const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
@@ -730,6 +1461,8 @@ function updateUI() {
   marketOliveCountEl.textContent = getDisplayCount(state.marketOlives);
   marketOilCountEl.textContent = getDisplayCount(state.marketOliveOil || 0);
   updateMarketAutosellUI();
+  updateRenownUI();
+  updateRelocationUI();
   
   // Update ship button state based on inventory (only whole goods can be shipped)
   if (!isShipping) {
@@ -1285,6 +2018,7 @@ function startPressing() {
   
   // Deduct integer amount from float inventory (preserves remainder)
   state.harvestedOlives = consumeInventory(state.harvestedOlives, olivesToPress);
+  addOlivesPressed(olivesToPress);
   
   // Set up press job
   pressJob = {
@@ -1458,6 +2192,7 @@ function startQuarry() {
 function completeQuarry() {
   const output = getQuarryOutput();
   state.stone += output;
+  addStoneEarned(output);
   // Clamp tiny floating negatives
   if (state.stone < 0) state.stone = 0;
 
@@ -1538,14 +2273,14 @@ function getMarketEffectivePriceMultiplier(eventMultiplier = 1) {
   return getMarketPermanentPriceMultiplier() * (eventMultiplier ?? 1);
 }
 
-function getMarketAutosellBaseRate() {
-  const baseRate = TUNING.market.autosell.baseRatePerSecond;
+function getCityDemandRatePerSecond(modifiers = getActiveMarketModifiers()) {
+  const cityBaseRate = Number(TUNING.city?.baseDemandRate) || 0;
+  const renownDemandBonus = Number(getRenownTierState().demandBonus) || 0;
   const upgradeRate = TUNING.market.autosell.rateUpgradeAmount * getMarketAutosellRateUpgrades();
-  return Math.max(0, baseRate + upgradeRate);
-}
-
-function getMarketAutosellRatePerSecond() {
-  return getMarketAutosellBaseRate() * getMarketAutosellLanes();
+  const lanes = getMarketAutosellLanes();
+  const eventMult = modifiers?.autosellRateMultiplier ?? 1;
+  const baseDemandRate = Math.max(0, cityBaseRate + renownDemandBonus + upgradeRate);
+  return Math.max(0, baseDemandRate * lanes * eventMult);
 }
 
 function getMarketInventoryCounts() {
@@ -1577,6 +2312,7 @@ function splitMarketSaleUnits(totalUnits, olivesAvailable, oilAvailable) {
 
 function applyMarketSale({ olives, oil }, priceMultiplier = 1) {
   let earned = 0;
+  const unitsSold = Math.max(0, olives) + Math.max(0, oil);
 
   if (olives > 0) {
     state.marketOlives = consumeInventory(state.marketOlives, olives);
@@ -1590,46 +2326,148 @@ function applyMarketSale({ olives, oil }, priceMultiplier = 1) {
 
   earned *= getMarketEffectivePriceMultiplier(priceMultiplier);
   if (earned > 0) {
-    state.florinCount += earned;
+    addFlorins(earned, { trackLifetime: true });
   }
+  addOlivesSold(Math.max(0, olives));
+  addOliveOilSold(Math.max(0, oil));
+  applyRenownGainFromSale(unitsSold);
 
   return earned;
 }
 
-function resolveMarketEventDurationSeconds(eventDef) {
-  const duration = eventDef.durationSeconds;
-  if (duration === undefined || duration === null) return 0;
-  if (typeof duration === "number") return duration;
-  if (typeof duration === "object") {
-    const min = duration.min ?? 0;
-    const max = duration.max ?? min;
-    if (max <= min) return min;
-    return min + Math.random() * (max - min);
-  }
-  return 0;
+function randomIntInRange(min, max) {
+  const lower = Math.floor(Math.min(min, max));
+  const upper = Math.floor(Math.max(min, max));
+  return lower + Math.floor(Math.random() * (upper - lower + 1));
+}
+
+function getCityEventPoolForCurrentTier() {
+  const tierId = getRenownTierState().tierId;
+  const poolsByTier = TUNING.city?.eventsByTier || {};
+  const pool = poolsByTier[tierId];
+  if (!Array.isArray(pool)) return [];
+  return pool
+    .map((entry) => ({ id: entry?.id, weight: Number(entry?.weight) || 0 }))
+    .filter((entry) => typeof entry.id === "string" && entry.weight > 0);
+}
+
+function getCityEventDefinition(eventId) {
+  return TUNING.city?.events?.[eventId] || null;
 }
 
 function getActiveMarketModifiers() {
-  const defaults = {
+  const demandMultiplier = activeCityModifiers
+    .filter((modifier) => modifier?.type === "demandMultiplier")
+    .reduce((acc, modifier) => acc * (Number(modifier.value) || 1), 1);
+
+  return {
     autosellPaused: false,
-    autosellRateMultiplier: 1,
+    autosellRateMultiplier: demandMultiplier > 0 ? demandMultiplier : 1,
     priceMultiplier: 1,
     uiStatus: null,
     uiSuffix: null,
   };
+}
 
-  if (!activeMarketEvent) return defaults;
+function createCityEventSaleLog(eventName, soldOil, earned, requested) {
+  const playerText = `${eventName}: bought ${soldOil} oil for ${formatFlorins(earned)} florins.`;
+  const debugText = `${eventName}: requested=${requested}, soldOil=${soldOil}, earned=${earned.toFixed(2)} fl`;
+  return { playerText, debugText };
+}
 
-  const modifiers = activeMarketEvent.def.modifiers || {};
-  const ui = activeMarketEvent.def.ui || {};
+function runCityInstantSaleEvent(eventDef) {
+  const minOil = Math.max(0, Number(eventDef.minOil) || 0);
+  const maxOil = Math.max(minOil, Number(eventDef.maxOil) || minOil);
+  const requested = randomIntInRange(minOil, maxOil);
 
-  return {
-    autosellPaused: !!modifiers.autosellPaused,
-    autosellRateMultiplier: modifiers.autosellRateMultiplier ?? 1,
-    priceMultiplier: modifiers.priceMultiplier ?? 1,
-    uiStatus: ui.status || null,
-    uiSuffix: ui.suffix || null,
-  };
+  const availableOil = getShippableCount(state.marketOliveOil || 0);
+  const soldOil = Math.min(availableOil, requested);
+  if (soldOil <= 0) {
+    logEvent({
+      channel: "market",
+      playerText: `${eventDef.name}: no olive oil available to purchase.`,
+      debugText: `${eventDef.name}: requested=${requested}, availableOil=${availableOil}, soldOil=0`,
+    });
+    return;
+  }
+
+  const earned = applyMarketSale({ olives: 0, oil: soldOil }, 1);
+  const renownBonus = Math.max(0, Number(eventDef.renownBonus) || 0);
+  const renownApplied = applyRenownGain(renownBonus);
+  const saleLog = createCityEventSaleLog(eventDef.name, soldOil, earned, requested);
+  logEvent({
+    channel: "market",
+    playerText: saleLog.playerText,
+    debugText: `${saleLog.debugText}, renownBonus=${renownBonus.toFixed(2)}, renownApplied=${renownApplied.toFixed(2)}`,
+  });
+}
+
+function addCityTimedDemandModifier(eventDef) {
+  const demandMultiplier = Number(eventDef.demandMultiplier) || 1;
+  const durationSeconds = Math.max(0, Number(eventDef.durationSeconds) || 0);
+  if (durationSeconds <= 0 || demandMultiplier <= 0 || demandMultiplier === 1) {
+    return;
+  }
+
+  activeCityModifiers.push({
+    eventId: eventDef.id,
+    eventName: eventDef.name,
+    type: "demandMultiplier",
+    value: demandMultiplier,
+    remainingSeconds: durationSeconds,
+    durationSeconds,
+  });
+
+  const pct = ((demandMultiplier - 1) * 100);
+  const sign = pct >= 0 ? "+" : "";
+  logEvent({
+    channel: "market",
+    playerText: `${eventDef.name}: city demand ${pct >= 0 ? "increased" : "decreased"} for ${durationSeconds}s.`,
+    debugText: `${eventDef.name}: demandMultiplier=${demandMultiplier.toFixed(2)} (${sign}${formatPercent(pct)}%), duration=${durationSeconds}s`,
+  });
+}
+
+function tickCityModifiers(dt) {
+  for (let i = activeCityModifiers.length - 1; i >= 0; i -= 1) {
+    const modifier = activeCityModifiers[i];
+    modifier.remainingSeconds -= dt;
+    if (modifier.remainingSeconds > 0) continue;
+
+    activeCityModifiers.splice(i, 1);
+    logEvent({
+      channel: "market",
+      playerText: `${modifier.eventName} ended.`,
+      debugText: `${modifier.eventName} ended: duration=${modifier.durationSeconds}s, type=${modifier.type}, value=${Number(modifier.value).toFixed(2)}`,
+    });
+  }
+}
+
+function runCityEvent(eventDef) {
+  if (!eventDef || typeof eventDef !== "object") return;
+  if (eventDef.type === "instantSale") {
+    runCityInstantSaleEvent(eventDef);
+    return;
+  }
+  if (eventDef.type === "timedDemandModifier") {
+    addCityTimedDemandModifier(eventDef);
+  }
+}
+
+function tryTriggerCityEvent(dt) {
+  const chancePerSecond = Math.max(0, Number(TUNING.city?.eventChancePerSecond) || 0);
+  if (chancePerSecond <= 0) return;
+
+  const triggerChance = 1 - Math.exp(-chancePerSecond * dt);
+  if (Math.random() >= triggerChance) return;
+
+  const pool = getCityEventPoolForCurrentTier();
+  if (!pool.length) return;
+
+  const selected = rollWeighted(pool);
+  const eventDef = getCityEventDefinition(selected.id);
+  if (!eventDef) return;
+
+  runCityEvent(eventDef);
 }
 
 function updateMarketAutosellUI() {
@@ -1642,11 +2480,16 @@ function updateMarketAutosellUI() {
   if (modifiers.autosellPaused) {
     marketAutosellEl.textContent = `Auto-selling: Paused (${lanes} ${laneLabel})`;
     marketAutosellEl.classList.add("is-paused");
+    if (cityDemandRateEl) {
+      cityDemandRateEl.textContent = "Demand: 0.00 oil/sec";
+    }
     return;
   }
 
-  const baseRate = getMarketAutosellRatePerSecond();
-  const effectiveRate = Math.max(0, baseRate * modifiers.autosellRateMultiplier);
+  const effectiveRate = getCityDemandRatePerSecond(modifiers);
+  if (cityDemandRateEl) {
+    cityDemandRateEl.textContent = `Demand: ${formatRatePerSecond(effectiveRate)} oil/sec`;
+  }
 
   const priceBonuses = [];
   const permanentBonusPct = (getMarketPermanentPriceMultiplier() - 1) * 100;
@@ -1674,8 +2517,7 @@ function runAutosellTick(dt) {
   const modifiers = getActiveMarketModifiers();
   if (modifiers.autosellPaused) return;
 
-  const baseRate = getMarketAutosellRatePerSecond();
-  const effectiveRate = Math.max(0, baseRate * modifiers.autosellRateMultiplier);
+  const effectiveRate = getCityDemandRatePerSecond(modifiers);
   if (effectiveRate <= 0) return;
 
   const { olives, oil, total } = getMarketInventoryCounts();
@@ -1723,117 +2565,8 @@ function runAutosellTick(dt) {
   saveGame();
 }
 
-function canTriggerMarketEvent(eventDef, nowMs, totalInventory) {
-  const lastTriggered = marketEventCooldowns[eventDef.id] || 0;
-  const cooldownMs = (eventDef.cooldownSeconds || 0) * 1000;
-  if (cooldownMs > 0 && nowMs - lastTriggered < cooldownMs) return false;
-  if (eventDef.requiresInventory && totalInventory <= 0) return false;
-  return true;
-}
-
-function logMarketEventStart(eventDef) {
-  if (!eventDef.log || !eventDef.log.start) return;
-  logEvent({ channel: "market", playerText: eventDef.log.start, debugText: eventDef.log.start });
-}
-
-function logMarketEventEnd(eventDef) {
-  if (!eventDef.log || !eventDef.log.end) return;
-  logEvent({ channel: "market", playerText: eventDef.log.end, debugText: eventDef.log.end });
-}
-
-function formatMarketPurchaseLine(buyerName, olives, oil, earned, boughtAll = false) {
-  const parts = [];
-  if (olives > 0) parts.push(`${olives} olives`);
-  if (oil > 0) parts.push(`${oil} olive oil`);
-  const goodsText = parts.length ? parts.join(" and ") : "nothing";
-  const prefix = boughtAll ? `${buyerName} purchased all market goods` : `${buyerName} purchased`;
-  return `${prefix}: ${goodsText} (+${formatFlorins(earned)} florins).`;
-}
-
-function executeMarketEventAction(eventDef) {
-  const action = eventDef.action;
-  if (!action) return null;
-
-  const { olives, oil, total } = getMarketInventoryCounts();
-  if (total <= 0) {
-    marketLogLine(`${eventDef.name} found nothing to buy.`);
-    return { olives: 0, oil: 0, earned: 0 };
-  }
-
-  if (action.type === "bulkBuy") {
-    const target = Math.min(action.quantity || 0, total);
-    if (target <= 0) {
-      marketLogLine(`${eventDef.name} found nothing to buy.`);
-      return { olives: 0, oil: 0, earned: 0 };
-    }
-    const allocation = splitMarketSaleUnits(target, olives, oil);
-    const earned = applyMarketSale(allocation, getActiveMarketModifiers().priceMultiplier);
-    marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, false));
-    return { ...allocation, earned };
-  }
-
-  if (action.type === "buyAll") {
-    const allocation = { olives, oil };
-    const earned = applyMarketSale(allocation, getActiveMarketModifiers().priceMultiplier);
-    marketLogLine(formatMarketPurchaseLine(eventDef.name, allocation.olives, allocation.oil, earned, true));
-    return { ...allocation, earned };
-  }
-
-  return null;
-}
-
-function startMarketEvent(eventDef, nowMs) {
-  const durationSeconds = resolveMarketEventDurationSeconds(eventDef);
-  activeMarketEvent = {
-    def: eventDef,
-    startedAtMs: nowMs,
-    endsAtMs: nowMs + (durationSeconds * 1000),
-  };
-
-  marketEventCooldowns[eventDef.id] = nowMs;
-  marketEventAcc = 0;
-
-  logMarketEventStart(eventDef);
-
-  if (eventDef.action) {
-    executeMarketEventAction(eventDef);
-  }
-
-  updateMarketAutosellUI();
-
-  if (durationSeconds <= 0) {
-    endMarketEvent();
-  }
-}
-
-function endMarketEvent() {
-  if (!activeMarketEvent) return;
-  const eventDef = activeMarketEvent.def;
-
-  activeMarketEvent = null;
-  marketEventAcc = 0;
-
-  logMarketEventEnd(eventDef);
-  updateMarketAutosellUI();
-}
-
-function tryStartMarketEvent(nowMs) {
-  if (activeMarketEvent) return;
-
-  const inventory = getMarketInventoryCounts();
-  const events = getMarketEvents(state, TUNING);
-  const eligible = events.filter((eventDef) => (
-    canTriggerMarketEvent(eventDef, nowMs, inventory.total)
-  ));
-  if (eligible.length === 0) return;
-
-  if (Math.random() > MARKET_EVENT_SETTINGS.spawnChance) return;
-
-  const selected = rollWeighted(eligible);
-  startMarketEvent(selected, nowMs);
-}
-
 function startMarketLoop() {
+  if (Number(state.era) >= 2) return;
   if (marketLoopInterval) return;
 
   marketLoopLastMs = Date.now();
@@ -1841,19 +2574,8 @@ function startMarketLoop() {
     const now = Date.now();
     const dt = (now - marketLoopLastMs) / 1000;
     marketLoopLastMs = now;
-
-    if (activeMarketEvent && now >= activeMarketEvent.endsAtMs) {
-      endMarketEvent();
-    }
-
-    if (!activeMarketEvent) {
-      marketEventAcc += dt;
-      if (marketEventAcc >= MARKET_EVENT_SETTINGS.checkEverySeconds) {
-        marketEventAcc -= MARKET_EVENT_SETTINGS.checkEverySeconds;
-        tryStartMarketEvent(now);
-      }
-    }
-
+    tickCityModifiers(dt);
+    tryTriggerCityEvent(dt);
     runAutosellTick(dt);
   }, MARKET_LOOP_MS);
 }
@@ -1868,9 +2590,21 @@ function stopMarketLoop() {
 function buyInvestment(id) {
   const investment = INVESTMENTS.find(i => i.id === id);
   if (!investment) return false;
-  
+  const florinsBefore = Number(state.florinCount) || 0;
+  const stoneBefore = Number(state.stone) || 0;
   const success = investment.purchase(state, TUNING);
   if (success) {
+    const florinsAfter = Number(state.florinCount) || 0;
+    const spent = Math.max(0, florinsBefore - florinsAfter);
+    if (spent > 0) {
+      addFlorinsSpent(spent);
+    }
+    const stoneAfter = Number(state.stone) || 0;
+    const stoneSpent = Math.max(0, stoneBefore - stoneAfter);
+    if (stoneSpent > 0) {
+      addStoneSpent(stoneSpent);
+    }
+    addInvestmentPurchased(investment.id);
     saveGame();
     updateUI();
     logLine(`Purchased: ${investment.title}`);
@@ -2102,6 +2836,10 @@ function pauseSim() {
     clearInterval(mainLoopInterval);
     mainLoopInterval = null;
   }
+  if (era2LoopInterval) {
+    clearInterval(era2LoopInterval);
+    era2LoopInterval = null;
+  }
   stopMarketLoop();
 }
 
@@ -2128,12 +2866,39 @@ function resumeSim() {
   pausedAtMs = 0;
   
   // Restart the loop
-  startLoop();
-  startMarketLoop();
+  if (Number(state.era) >= 2) {
+    startEra2Loop();
+  } else {
+    startLoop();
+    startMarketLoop();
+  }
+}
+
+function startEra2Loop() {
+  if (Number(state.era) < 2) return;
+  if (era2LoopInterval) return;
+
+  const tickMs = 1000;
+  let last = Date.now();
+  era2LoopInterval = setInterval(() => {
+    const now = Date.now();
+    const dt = (now - last) / 1000;
+    last = now;
+
+    const estateIncomeRate = getEstateIncomeRate();
+    if (estateIncomeRate > 0) {
+      const income = estateIncomeRate * dt;
+      addFlorins(income, { trackLifetime: true });
+    }
+
+    updateUI();
+    saveGame();
+  }, tickMs);
 }
 
 // --- Main Loop ---
 function startLoop() {
+  if (Number(state.era) >= 2) return;
   // Prevent multiple intervals
   if (mainLoopInterval) return;
   
@@ -2150,7 +2915,7 @@ function startLoop() {
       const salaryPerSec = TUNING.managers.arborist.salaryPerMin / 60;
       const costThisTick = salaryPerSec * dt;
       if (state.florinCount >= costThisTick) {
-        state.florinCount -= costThisTick;
+        spendFlorins(costThisTick);
         arboristIsActive = true;
       } else {
         arboristIsActive = false;
@@ -2164,7 +2929,7 @@ function startLoop() {
       const salaryPerSec = TUNING.managers.pressManager.salaryPerMin / 60;
       const costThisTick = salaryPerSec * dt;
       if (state.florinCount >= costThisTick) {
-        state.florinCount -= costThisTick;
+        spendFlorins(costThisTick);
         pressManagerIsActive = true;
       } else {
         pressManagerIsActive = false;
@@ -2178,7 +2943,7 @@ function startLoop() {
       const salaryPerSec = TUNING.managers.quarryManager.salaryPerMin / 60;
       const costThisTick = salaryPerSec * dt;
       if (state.florinCount >= costThisTick) {
-        state.florinCount -= costThisTick;
+        spendFlorins(costThisTick);
         quarryManagerIsActive = true;
       } else {
         quarryManagerIsActive = false;
@@ -2192,7 +2957,7 @@ function startLoop() {
       const salaryPerSec = TUNING.managers.foreman.salaryPerMin / 60;
       const costThisTick = salaryPerSec * dt;
       if (state.florinCount >= costThisTick) {
-        state.florinCount -= costThisTick;
+        spendFlorins(costThisTick);
         foremanIsActive = true;
       } else {
         foremanIsActive = false;
@@ -2250,8 +3015,14 @@ function startLoop() {
 
 // --- Debug Modal ---
 function openDebug() {
-  // Capture current harvest chances as snapshot
-  updateDebugHarvestChances();
+  const inEra2 = Number(state.era) >= 2;
+  if (debugEra1Content) {
+    debugEra1Content.classList.toggle("is-hidden", inEra2);
+  }
+  if (!inEra2) {
+    // Capture current harvest chances as snapshot
+    updateDebugHarvestChances();
+  }
   
   debugModal.classList.add("active");
   debugModal.setAttribute("aria-hidden", "false");
@@ -2272,8 +3043,9 @@ quarryBtn.addEventListener("click", startQuarry);
 hireCultivatorBtn.addEventListener("click", () => {
   const cost = getCultivatorHireCost();
   if (state.florinCount < cost) return;
-  state.florinCount -= cost;
+  if (!spendFlorins(cost)) return;
   state.cultivatorCount += 1;
+  addWorkerHire("cultivatorsHired");
   saveGame();
   updateUI();
   logLine(`Hired Cultivator (#${state.cultivatorCount}) for ${cost} florins.`);
@@ -2282,8 +3054,9 @@ hireCultivatorBtn.addEventListener("click", () => {
 hireHarvesterBtn.addEventListener("click", () => {
   const cost = getHarvesterHireCost();
   if (state.florinCount < cost) return;
-  state.florinCount -= cost;
+  if (!spendFlorins(cost)) return;
   state.harvesterCount += 1;
+  addWorkerHire("harvestersHired");
   saveGame();
   updateUI();
   logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
@@ -2292,8 +3065,9 @@ hireHarvesterBtn.addEventListener("click", () => {
 hirePresserBtn.addEventListener("click", () => {
   const cost = getPresserHireCost();
   if (state.florinCount < cost) return;
-  state.florinCount -= cost;
+  if (!spendFlorins(cost)) return;
   state.presserCount += 1;
+  addWorkerHire("pressersHired");
   saveGame();
   updateUI();
   logLine(`Hired Presser (#${state.presserCount}) for ${cost} florins.`);
@@ -2309,9 +3083,19 @@ clearMarketLogBtn.addEventListener("click", () => {
   clearLog('market', 'debug');
 });
 
-debugBtn.addEventListener("click", openDebug);
+if (debugBtn) {
+  debugBtn.addEventListener("click", openDebug);
+}
+if (debugBtnEra2) {
+  debugBtnEra2.addEventListener("click", openDebug);
+}
 debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
+if (era2ResetBtn) {
+  era2ResetBtn.addEventListener("click", resetGame);
+}
+invitationUnderstoodBtn.addEventListener("click", acknowledgeInvitationModal);
+moveToCityBtn.addEventListener("click", moveToCity);
 
 debugAddOlivesBtn.addEventListener("click", () => {
   state.harvestedOlives += 100;
@@ -2321,9 +3105,17 @@ debugAddOlivesBtn.addEventListener("click", () => {
 });
 
 debugAddFlorinsBtn.addEventListener("click", () => {
-  state.florinCount += 100;
+  addFlorins(100, { trackLifetime: true });
   saveGame();
+  updateUI();
   logLine("Debug: +100 florins");
+});
+
+debugAddFlorins1000Btn.addEventListener("click", () => {
+  addFlorins(1000, { trackLifetime: true });
+  saveGame();
+  updateUI();
+  logLine("Debug: +1000 florins");
 });
 
 debugAddOilBtn.addEventListener("click", () => {
@@ -2335,9 +3127,18 @@ debugAddOilBtn.addEventListener("click", () => {
 const debugAddStoneBtn = document.getElementById("debug-add-stone-btn");
 debugAddStoneBtn.addEventListener("click", () => {
   state.stone += 100;
+  addStoneEarned(100);
   saveGame();
   updateUI();
   logLine("Debug: +100 stone");
+});
+
+debugAddRenownBtn.addEventListener("click", () => {
+  const requested = 50;
+  const gained = applyRenownGain(requested);
+  saveGame();
+  updateUI();
+  logLine(`Debug: +${gained.toFixed(2)} renown`);
 });
 
 // Close modal on outside click
@@ -2413,6 +3214,10 @@ quarryManagerSalaryEl.textContent = "-" + quarryManagerSalary.toFixed(2) + " fl/
 const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
 pressManagerSalaryEl.textContent = "-" + pressManagerSalary.toFixed(2) + " fl/min";
 
-startLoop();
-startMarketLoop();
-logLine("Tree Groves prototype loaded. Trees grow olives automatically.");
+if (Number(state.era) < 2) {
+  startLoop();
+  startMarketLoop();
+  logLine("Tree Groves prototype loaded. Trees grow olives automatically.");
+} else {
+  startEra2Loop();
+}

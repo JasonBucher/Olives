@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="static/css/style.css" />
 </head>
 <body>
-  <div class="container">
+  <div id="era1-root" class="container">
     <header class="topbar">
       <div class="title">
         <h1>Olives</h1>
@@ -399,6 +399,44 @@
             </div>
 
             <div id="market-autosell" class="market-autosell">Auto-selling: 0.00 / s (1 lane)</div>
+            <div id="city-demand-rate" class="market-autosell">Demand: 0.00 oil/sec</div>
+          </section>
+
+          <section class="section">
+            <div class="section-title">Renown</div>
+
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Renown</div>
+                <div class="value"><span id="renown-value">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Tier</div>
+                <div class="value"><span id="renown-tier-name">Neighborhood</span></div>
+              </div>
+
+              <div class="renown-progress-wrap">
+                <div class="renown-progress-bar">
+                  <div id="renown-progress-fill" class="renown-progress-fill"></div>
+                </div>
+                <div id="renown-progress-text" class="renown-progress-text">0 / 99</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-title">Relocate to the City</div>
+            <div class="subsection">
+              <div class="relocation-req">
+                <span id="relocation-req-lifetime-icon" class="relocation-check">✗</span>
+                <span id="relocation-req-lifetime-text" class="muted">Earn 10,000 lifetime Florins 0/10,000</span>
+              </div>
+              <div class="relocation-req">
+                <span id="relocation-req-current-icon" class="relocation-check">✗</span>
+                <span class="muted">Pay 3,000 Florins to relocate</span>
+              </div>
+              <button id="move-to-city-btn" class="btn btn-primary" type="button" disabled>Move to the City</button>
+            </div>
           </section>
 
           <section class="section section-locked">
@@ -434,6 +472,155 @@
     </div>
   </div>
 
+  <div id="era2-screen" class="container is-hidden">
+    <header class="topbar">
+      <div class="title">
+        <h1>Olives</h1>
+        <div class="subtitle">Tree Groves (Prototype)</div>
+      </div>
+      <button id="debug-btn-era2" class="btn btn-quiet" type="button">Debug</button>
+    </header>
+    <hr class="divider" />
+    <div class="layout">
+      <div class="col col-left">
+        <div class="col-header">Growth</div>
+        <div class="col-body">
+          <section class="section">
+            <div class="section-title">Income</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Florins (fl)</div>
+                <div class="value"><span id="era2-florin-count">0.00</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Estate</div>
+                <div class="value"><span id="era2-estate-income">+0.00 florins/min</span></div>
+              </div>
+              <div class="muted u-text-12">Passive income generated from your completed Era 1 run.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="col col-mid">
+        <div class="col-header">City</div>
+        <div class="col-body">
+          <section class="section">
+            <div class="section-title">ERA 1 RUN SUMMARY</div>
+            <div class="muted u-pad-y-4">You have reached the current end of implemented content.</div>
+            <div class="u-callout">
+              <div class="u-callout__title">RUN OUTCOME</div>
+              <div class="u-callout__row">
+                <div class="label">Estate Income</div>
+                <div class="u-callout__value"><span id="era2-run-outcome-estate-income">+0.00 florins/min</span></div>
+              </div>
+              <div class="u-callout__subtext">This is the main result to compare between runs.</div>
+            </div>
+            <div class="era2-actions">
+              <button id="era2-reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+            </div>
+            <div class="muted u-text-12 u-pad-top-6">
+              This will reset ALL progress and start Era 1 from zero.
+              <br />
+              No upgrades, florins, renown, estate income, or tracked metrics will carry over.
+            </div>
+            <hr class="divider-light" />
+            <div class="muted u-pad-y-4">This screen marks the end of available gameplay in this prototype build.</div>
+
+            <div class="subhead">Time</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Time in Era 1</div>
+                <div class="value"><span id="era2-summary-time">00:00</span></div>
+              </div>
+            </div>
+
+            <div class="subhead">Economy</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Total Florins Earned</div>
+                <div class="value"><span id="era2-summary-florins-earned">0.00</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Total Florins Spent</div>
+                <div class="value"><span id="era2-summary-florins-spent">0.00</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Net Florins</div>
+                <div class="value"><span id="era2-summary-florins-net">0.00</span></div>
+              </div>
+            </div>
+
+            <div class="subhead">Goods</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Total Olives Sold</div>
+                <div class="value"><span id="era2-summary-olives-sold">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Total Olive Oil Sold</div>
+                <div class="value"><span id="era2-summary-olive-oil-sold">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Total Olives Pressed</div>
+                <div class="value"><span id="era2-summary-olives-pressed">0</span></div>
+              </div>
+            </div>
+
+            <div class="subhead">Resources</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Stone Earned</div>
+                <div class="value"><span id="era2-summary-stone-earned">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Stone Spent</div>
+                <div class="value"><span id="era2-summary-stone-spent">0</span></div>
+              </div>
+            </div>
+
+            <div class="subhead">Workforce</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Harvesters Hired</div>
+                <div class="value"><span id="era2-summary-harvesters-hired">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Cultivators Hired</div>
+                <div class="value"><span id="era2-summary-cultivators-hired">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Pressers Hired</div>
+                <div class="value"><span id="era2-summary-pressers-hired">0</span></div>
+              </div>
+            </div>
+
+            <div class="subhead">Investments</div>
+            <div class="subsection">
+              <div class="row">
+                <div class="label">Investments Purchased</div>
+                <div class="value"><span id="era2-summary-investments-total">0</span></div>
+              </div>
+              <div id="era2-summary-investments-top" class="muted u-text-12 u-pad-top-4">No investments tracked yet.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="col col-right">
+        <div class="col-header">Renown</div>
+        <div class="col-body">
+          <section class="section section-locked">
+            <div class="section-title">Contacts <span class="badge locked-badge">Locked</span></div>
+            <div class="subsection">
+              <div class="muted u-pad-y-4 u-text-12">Coming soon</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Debug Modal -->
   <div id="debug-modal" class="modal-overlay" aria-hidden="true">
     <div class="modal">
@@ -443,34 +630,69 @@
       </div>
 
       <div class="modal-body">
-        <div class="muted">
-          Template includes a safe reset + storage isolation pattern.
-          When you copy this template into a new prototype, rename STORAGE_PREFIX.
-        </div>
-
-        <div class="debug-actions">
-          <button id="debug-add-olives-btn" class="btn" type="button">+100 Olives</button>
-          <button id="debug-add-florins-btn" class="btn" type="button">+100 Florins</button>
-          <button id="debug-add-oil-btn" class="btn" type="button">+100 Oil</button>
-          <button id="debug-add-stone-btn" class="btn" type="button">+100 Stone</button>
-        </div>
-
-        <hr class="divider" />
-
-        <div class="debug-section">
-          <div class="debug-section-title">Current Harvest Outcome Chances</div>
-          <div class="debug-section-hint">Normalized probabilities used by game (single source of truth)</div>
-          <div class="debug-section-hint" style="color: #ff9f43; margin-bottom: 8px;">
-            ⚠️ Values captured when panel opened - will not update live
+        <div id="debug-era1-content">
+          <div class="muted">
+            Template includes a safe reset + storage isolation pattern.
+            When you copy this template into a new prototype, rename STORAGE_PREFIX.
           </div>
-          <div id="debug-harvest-chances" class="debug-harvest-chances">
-            <!-- Populated by JS -->
-          </div>
-        </div>
 
-        <hr class="divider" />
+          <div class="debug-actions">
+            <button id="debug-add-olives-btn" class="btn" type="button">+100 Olives</button>
+            <button id="debug-add-florins-btn" class="btn" type="button">+100 Florins</button>
+            <button id="debug-add-florins-1000-btn" class="btn" type="button">+1000 Florins</button>
+            <button id="debug-add-oil-btn" class="btn" type="button">+100 Oil</button>
+            <button id="debug-add-stone-btn" class="btn" type="button">+100 Stone</button>
+            <button id="debug-add-renown-btn" class="btn" type="button">+50 Renown</button>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="debug-section">
+            <div class="debug-section-title">Current Harvest Outcome Chances</div>
+            <div class="debug-section-hint">Normalized probabilities used by game (single source of truth)</div>
+            <div class="debug-section-hint" style="color: #ff9f43; margin-bottom: 8px;">
+              ⚠️ Values captured when panel opened - will not update live
+            </div>
+            <div id="debug-harvest-chances" class="debug-harvest-chances">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <hr class="divider" />
+        </div>
 
         <button id="debug-reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invitation Modal -->
+  <div id="invitation-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">An Invitation</div>
+      </div>
+
+      <div class="modal-body">
+        <div class="muted invitation-copy">
+          The City has noticed your work.
+        </div>
+        <div class="muted invitation-copy">
+          You will leave the Grove behind.
+        </div>
+        <div class="muted invitation-copy">
+          The Grove will continue generating passive income.
+        </div>
+
+        <hr class="divider" />
+
+        <div class="debug-section-title">Relocation Requirements</div>
+        <ul class="invitation-requirements muted">
+          <li>Earn 10,000 lifetime Florins</li>
+          <li>Pay 3,000 Florins to relocate</li>
+        </ul>
+
+        <button id="invitation-understood-btn" class="btn btn-primary" type="button">Understood</button>
       </div>
     </div>
   </div>

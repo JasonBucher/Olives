@@ -154,6 +154,84 @@ export const TUNING = {
     ],
   },
 
+  // City: demand system (used by autosell pacing)
+  city: {
+    baseDemandRate: 0.35,
+    eventChancePerSecond: 0.05,
+    eventsByTier: {
+      neighborhood: [
+        { id: "localPurchase", weight: 6 },
+        { id: "haggler", weight: 2 },
+        { id: "recommendation", weight: 1 },
+      ],
+      artisans: [
+        { id: "localPurchase", weight: 4 },
+        { id: "haggler", weight: 2 },
+        { id: "chefOrder", weight: 3 },
+        { id: "recommendation", weight: 2 },
+      ],
+      nobles: [
+        { id: "localPurchase", weight: 3 },
+        { id: "haggler", weight: 1 },
+        { id: "chefOrder", weight: 3 },
+        { id: "recommendation", weight: 2 },
+        { id: "noblePatronage", weight: 1 },
+      ],
+    },
+    events: {
+      localPurchase: {
+        id: "localPurchase",
+        name: "Local Purchase",
+        type: "instantSale",
+        minOil: 1,
+        maxOil: 2,
+        renownBonus: 0.2,
+      },
+      haggler: {
+        id: "haggler",
+        name: "Haggler",
+        type: "timedDemandModifier",
+        durationSeconds: 30,
+        demandMultiplier: 0.7,
+      },
+      chefOrder: {
+        id: "chefOrder",
+        name: "Chef Order",
+        type: "instantSale",
+        minOil: 5,
+        maxOil: 10,
+        renownBonus: 0.8,
+      },
+      recommendation: {
+        id: "recommendation",
+        name: "Recommendation",
+        type: "timedDemandModifier",
+        durationSeconds: 60,
+        demandMultiplier: 1.4,
+      },
+      noblePatronage: {
+        id: "noblePatronage",
+        name: "Noble Patronage",
+        type: "instantSale",
+        minOil: 20,
+        maxOil: 30,
+        renownBonus: 2.5,
+      },
+    },
+  },
+
+  // Renown: sale-driven progression
+  renown: {
+    perUnitSold: 0.1,
+  },
+
+  // Renown: city reputation tiers (config-driven)
+  renownTiers: [
+    { id: "neighborhood", name: "Neighborhood", minRenown: 0, maxRenown: 99, demandBonus: 0 },
+    { id: "artisans", name: "Artisans", minRenown: 100, maxRenown: 249, demandBonus: 0 },
+    { id: "nobles", name: "Nobles", minRenown: 250, maxRenown: 399, demandBonus: 0 },
+  ],
+
   // Investments: costs for managers and upgrades
   investments: {
     costs: {
@@ -198,8 +276,8 @@ export const TUNING = {
     harvestBaskets: {
       baseCost: { florins: 20, stone: 3 },
       costScale: { florins: 15, stone: 3 },
-      maxLevel: 8,
-      bonusPerLevel: 5,
+      maxLevel: 5,
+      bonusPerLevel: 2,
     },
     shippingEfficiency: {
       olives: [
