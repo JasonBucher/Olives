@@ -40,6 +40,7 @@ const PERSISTED_STATE_KEYS = [
   "olivePressCount",
   "quarryPickLevel",
   "quarryCartLevel",
+  "harvestBasketLevel",
   "autoPressUnlocked",
   "autoShipOilUnlocked",
   "stone",
@@ -78,6 +79,7 @@ function createDefaultState() {
     olivePressCount: 1,
     quarryPickLevel: 0,
     quarryCartLevel: 0,
+    harvestBasketLevel: 0,
     autoPressUnlocked: false,
     autoShipOilUnlocked: false,
 
@@ -1029,12 +1031,8 @@ function getCurrentHarvestOutcomeChances() {
 
 // --- Harvest System ---
 function getCurrentHarvestBatchSize() {
-  // Harvest attempt amount = base batch size (scaled by grove capacity) + harvester bonus
-  // Must return a float (harvester bonus can be fractional)
-  // Must never return less than 0
-  const currentCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
-  const capacityScale = currentCapacity / TUNING.grove.treeCapacity;
-  return Math.max(0, harvestConfig.batchSize * capacityScale + getHarvesterOlivesBonus());
+  const basketBonus = (state.harvestBasketLevel || 0) * TUNING.investments.harvestBaskets.bonusPerLevel;
+  return Math.max(0, harvestConfig.batchSize + basketBonus + getHarvesterOlivesBonus());
 }
 
 function startHarvest(opts = {}) {
@@ -1993,6 +1991,9 @@ function isInvestmentOwned(investment) {
   }
   if (investment.id === "sharpened_picks") {
     return (state.quarryPickLevel || 0) >= TUNING.investments.sharpenedPicks.maxLevel;
+  }
+  if (investment.id === "harvest_baskets") {
+    return (state.harvestBasketLevel || 0) >= TUNING.investments.harvestBaskets.maxLevel;
   }
   if (investment.id === "build_olive_press") {
     return (state.olivePressCount || 1) - 1 >= TUNING.investments.olivePressExpansion.maxAdditionalPresses;

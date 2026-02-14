@@ -270,18 +270,8 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[0].capacityBonus;
-      const baseCap = tuning.grove.treeCapacity;
-      let groveBonus = 0;
-      for (const exp of tuning.investments.groveExpansion) {
-        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
-      }
-      const currentCap = baseCap + groveBonus;
-      const baseBatch = tuning.harvest.baseBatchSize;
-      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
-      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       return [
         `Grove: Max trees +${bonus}`,
-        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
     },
   },
@@ -323,18 +313,8 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[1].capacityBonus;
-      const baseCap = tuning.grove.treeCapacity;
-      let groveBonus = 0;
-      for (const exp of tuning.investments.groveExpansion) {
-        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
-      }
-      const currentCap = baseCap + groveBonus;
-      const baseBatch = tuning.harvest.baseBatchSize;
-      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
-      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       const lines = [
         `Grove: Max trees +${bonus}`,
-        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
       if (!state.upgrades.expand_grove_1) {
         lines.push(`Requires: Expand Grove I`);
@@ -380,18 +360,8 @@ export const INVESTMENTS = [
 
     effectLines: (state, tuning) => {
       const bonus = tuning.investments.groveExpansion[2].capacityBonus;
-      const baseCap = tuning.grove.treeCapacity;
-      let groveBonus = 0;
-      for (const exp of tuning.investments.groveExpansion) {
-        if (state.upgrades[`expand_grove_${exp.idSuffix}`]) groveBonus += exp.capacityBonus;
-      }
-      const currentCap = baseCap + groveBonus;
-      const baseBatch = tuning.harvest.baseBatchSize;
-      const currentBatch = Math.floor(baseBatch * (currentCap / baseCap));
-      const newBatch = Math.floor(baseBatch * ((currentCap + bonus) / baseCap));
       const lines = [
         `Grove: Max trees +${bonus}`,
-        `Harvest: Base harvest ${currentBatch} → ${newBatch}`,
       ];
       if (!state.upgrades.expand_grove_2) {
         lines.push(`Requires: Expand Grove II`);
@@ -797,6 +767,61 @@ export const INVESTMENTS = [
       const level = state.quarryPickLevel || 0;
       return [
         `Quarry: +${cfg.bonusPerLevel} stone per run`,
+        `Purchased: ${level}/${cfg.maxLevel}`,
+      ];
+    },
+  },
+
+  // --- Harvest Baskets ---
+  {
+    id: "harvest_baskets",
+    title: "Harvest Baskets",
+    group: "upgrade",
+
+    cost: (tuning, state) => {
+      const cfg = tuning.investments.harvestBaskets;
+      const level = state.harvestBasketLevel || 0;
+      return cfg.baseCost.florins + level * cfg.costScale.florins;
+    },
+
+    costText: (tuning, state) => {
+      const cfg = tuning.investments.harvestBaskets;
+      const level = state.harvestBasketLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return `${florins} florins, ${stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cfg = tuning.investments.harvestBaskets;
+      const level = state.harvestBasketLevel || 0;
+      if (level >= cfg.maxLevel) return false;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return state.florinCount >= florins && state.stone >= stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "harvest_baskets");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cfg = tuning.investments.harvestBaskets;
+      const level = state.harvestBasketLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      state.florinCount -= florins;
+      state.stone -= stone;
+      if (state.stone < 0) state.stone = 0;
+      state.harvestBasketLevel = level + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const cfg = tuning.investments.harvestBaskets;
+      const level = state.harvestBasketLevel || 0;
+      return [
+        `Harvest: +${cfg.bonusPerLevel} olives per harvest`,
         `Purchased: ${level}/${cfg.maxLevel}`,
       ];
     },

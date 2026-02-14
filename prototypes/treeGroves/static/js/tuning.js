@@ -195,6 +195,12 @@ export const TUNING = {
       { idSuffix: 2, florinCost: 75, stoneCost: 12, capacityBonus: 25 },
       { idSuffix: 3, florinCost: 200, stoneCost: 25, capacityBonus: 35 },
     ],
+    harvestBaskets: {
+      baseCost: { florins: 20, stone: 3 },
+      costScale: { florins: 15, stone: 3 },
+      maxLevel: 8,
+      bonusPerLevel: 5,
+    },
     shippingEfficiency: {
       olives: [
         { idSuffix: 1, cost: 25, capacityBonus: 10 },
