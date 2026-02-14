@@ -85,6 +85,7 @@ export const TUNING = {
     pressManager: {
       hireCost: 50,
       salaryPerMin: 0.75,        // Florins per minute
+      presserMultiplier: 1.50,   // 50% increase to presser oil bonus
     },
   },
 

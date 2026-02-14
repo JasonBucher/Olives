@@ -351,7 +351,10 @@ function getBaseOilPerOlive() {
 }
 
 function getTotalOilPerOlive() {
-  const bonusPerOlive = state.presserCount * TUNING.workers.presser.oilPerOlivePerPresser;
+  let bonusPerOlive = state.presserCount * TUNING.workers.presser.oilPerOlivePerPresser;
+  if (state.pressManagerHired && pressManagerIsActive) {
+    bonusPerOlive *= TUNING.managers.pressManager.presserMultiplier;
+  }
   return getBaseOilPerOlive() + bonusPerOlive;
 }
 
@@ -1593,9 +1596,12 @@ function updateUI() {
   
   // Update presser stats and preview (conversion bonus)
   const oilBonusPerPresser = TUNING.workers.presser.oilPerOlivePerPresser;
+  const presserMult = (state.pressManagerHired && pressManagerIsActive)
+    ? TUNING.managers.pressManager.presserMultiplier
+    : 1;
   const maxOlivesPerAction = (state.olivePressCount || 1) * TUNING.press.olivesPerPress;
-  const currentOilBonus = maxOlivesPerAction * state.presserCount * oilBonusPerPresser;
-  const nextOilBonus = maxOlivesPerAction * oilBonusPerPresser;
+  const currentOilBonus = maxOlivesPerAction * state.presserCount * oilBonusPerPresser * presserMult;
+  const nextOilBonus = maxOlivesPerAction * oilBonusPerPresser * presserMult;
   
   // Top row: Current bonus per press
   if (state.presserCount > 0) {
