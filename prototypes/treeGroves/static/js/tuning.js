@@ -228,8 +228,8 @@ export const TUNING = {
   // Renown: city reputation tiers (config-driven)
   renownTiers: [
     { id: "neighborhood", name: "Neighborhood", minRenown: 0, maxRenown: 99, demandBonus: 0 },
-    { id: "artisans", name: "Artisans", minRenown: 100, maxRenown: 249, demandBonus: 0 },
-    { id: "nobles", name: "Nobles", minRenown: 250, maxRenown: 399, demandBonus: 0 },
+    { id: "artisans", name: "Artisans", minRenown: 100, maxRenown: 249, demandBonus: 0.10 },
+    { id: "nobles", name: "Nobles", minRenown: 250, maxRenown: 399, demandBonus: 0.25 },
   ],
 
   // Investments: costs for managers and upgrades
