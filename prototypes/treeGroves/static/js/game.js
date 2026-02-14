@@ -49,7 +49,6 @@ const PERSISTED_STATE_KEYS = [
   "quarryPickLevel",
   "quarryCartLevel",
   "harvestBasketLevel",
-  "autoPressUnlocked",
   "autoShipOilUnlocked",
   "simElapsedSeconds",
   "stone",
@@ -215,7 +214,6 @@ function createDefaultState() {
     quarryPickLevel: 0,
     quarryCartLevel: 0,
     harvestBasketLevel: 0,
-    autoPressUnlocked: false,
     autoShipOilUnlocked: false,
     simElapsedSeconds: 0,
 
@@ -2741,9 +2739,6 @@ function isInvestmentOwned(investment) {
   if (investment.id === "build_olive_press") {
     return (state.olivePressCount || 1) - 1 >= TUNING.investments.olivePressExpansion.maxAdditionalPresses;
   }
-  if (investment.id === "auto_press") {
-    return !!state.autoPressUnlocked;
-  }
   if (investment.id === "auto_ship_oil") {
     return !!state.autoShipOilUnlocked;
   }
@@ -3007,8 +3002,8 @@ function startLoop() {
       startQuarry();
     }
 
-    // Auto-press if upgrade purchased and Press Manager is active
-    if (state.autoPressUnlocked && pressManagerIsActive && !isPressing && getOlivesToPress() >= TUNING.press.olivesPerPress) {
+    // Auto-press when Press Manager is active
+    if (pressManagerIsActive && !isPressing && getOlivesToPress() >= TUNING.press.olivesPerPress) {
       startPressing();
     }
 

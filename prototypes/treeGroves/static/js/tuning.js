@@ -279,9 +279,6 @@ export const TUNING = {
       costScale: { florins: 90, stone: 30 },
       maxAdditionalPresses: 5,
     },
-    autoPress: {
-      cost: { florins: 100, stone: 20 },
-    },
     autoShipOil: {
       cost: { florins: 150, stone: 30 },
     },
