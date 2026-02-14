@@ -994,6 +994,11 @@ function finalizeEra1RunStats() {
   }
   era1.durationSeconds = Math.max(0, Math.floor((era1.endTimestamp - era1.startTimestamp) / 1000));
   updateRunStatsFlorinNetTotal();
+  // Stamp actual worker counts from state (incremental tracking may be incomplete
+  // for saves that predate the runStats system)
+  era1.workers.harvestersHired = Math.max(Number(era1.workers.harvestersHired) || 0, Number(state.harvesterCount) || 0);
+  era1.workers.cultivatorsHired = Math.max(Number(era1.workers.cultivatorsHired) || 0, Number(state.cultivatorCount) || 0);
+  era1.workers.pressersHired = Math.max(Number(era1.workers.pressersHired) || 0, Number(state.presserCount) || 0);
 }
 
 function addFlorins(amount, { trackLifetime = true } = {}) {
