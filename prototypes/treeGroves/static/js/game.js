@@ -51,6 +51,7 @@ const PERSISTED_STATE_KEYS = [
   "harvestBasketLevel",
   "autoPressUnlocked",
   "autoShipOilUnlocked",
+  "simElapsedSeconds",
   "stone",
   "upgrades",
   "meta",
@@ -218,6 +219,7 @@ function createDefaultState() {
     harvestBasketLevel: 0,
     autoPressUnlocked: false,
     autoShipOilUnlocked: false,
+    simElapsedSeconds: 0,
 
     // Upgrades
     upgrades: {},
@@ -606,6 +608,9 @@ const managersTotalCostEl = document.getElementById("managers-total-cost");
 // Log UI
 const clearLogBtn = document.getElementById("clear-log-btn");
 const clearMarketLogBtn = document.getElementById("clear-market-log-btn");
+
+// Sim timer
+const simTimerEl = document.getElementById("sim-timer");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -1818,7 +1823,7 @@ function startHarvest(opts = {}) {
   harvestPill.classList.remove("inline-fade-out");
   
   if (opts.source === "auto") {
-    logLine("Arborist ordered harvest (trees at capacity).");
+    logLine("Arborist ordered harvest (batch ready).");
   } else {
     logLine(`Starting harvest (H: ${state.harvesterCount}): attempting ${attemptedInt} olives`);
   }
@@ -2910,6 +2915,10 @@ function startLoop() {
     const dt = (now - last) / 1000;
     last = now;
 
+    // Sim timer
+    state.simElapsedSeconds = (state.simElapsedSeconds || 0) + dt;
+    if (simTimerEl) simTimerEl.textContent = formatRunDuration(state.simElapsedSeconds);
+
     // Arborist salary drain
     if (state.arboristHired) {
       const salaryPerSec = TUNING.managers.arborist.salaryPerMin / 60;
@@ -2969,9 +2978,8 @@ function startLoop() {
     // Trees grow olives automatically
     growTrees(dt);
     
-    // Auto-harvest if Arborist is active and trees are at capacity
-    const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
-    if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= currentTreeCapacity) {
+    // Auto-harvest if Arborist is active and trees have enough for a full batch
+    if (state.arboristHired && arboristIsActive && !isHarvesting && state.treeOlives >= getCurrentHarvestBatchSize()) {
       startHarvest({ source: "auto" });
     }
     

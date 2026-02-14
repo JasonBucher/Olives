@@ -48,7 +48,7 @@ export const INVESTMENTS = [
       const efficientBonus = tuning.harvest.arborist.efficientBonus;
       
       return [
-        `Behavior: Auto-harvest when grove is full`,
+        `Behavior: Auto-harvest when batch is ready`,
         `Harvest (while paid): Poor multiplier ×${poorMult}, Efficient +${efficientBonus.toFixed(2)}`,
         `Ongoing: Salary ${salary} florins/min`,
       ];

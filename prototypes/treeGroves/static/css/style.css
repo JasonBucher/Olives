@@ -81,6 +81,12 @@ html, body {
   gap: 12px;
 }
 
+.sim-timer {
+  font-family: monospace;
+  font-size: 14px;
+  color: #888;
+}
+
 h1 {
   margin: 0;
   font-size: 20px;
