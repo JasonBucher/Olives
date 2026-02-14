@@ -252,8 +252,8 @@ export const TUNING = {
       reductionPerLevel: 0.20,
     },
     sharpenedPicks: {
-      baseCost: { stone: 25, florins: 40 },
-      costScale: { stone: 20, florins: 40 },
+      baseCost: { stone: 5, florins: 40 },
+      costScale: { stone: 3, florins: 40 },
       maxLevel: 6,
       bonusPerLevel: 1,
     },

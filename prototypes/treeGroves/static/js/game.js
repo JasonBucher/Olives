@@ -1325,7 +1325,7 @@ function updateRelocationUI() {
   if (relocationReqRenownText) {
     const currentRenown = Math.floor(Number(state.renownValue) || 0);
     const capMax = getRenownCapMax() || 399;
-    relocationReqRenownText.textContent = `Reach Countryside Limit (Renown ${currentRenown}/${capMax})`;
+    relocationReqRenownText.textContent = `Reach maximum Renown (${currentRenown}/${capMax})`;
   }
   if (moveToCityBtn) {
     moveToCityBtn.disabled = !(lifetimeMet && paymentMet && state.renownCapped) || Number(state.era) >= 2;
