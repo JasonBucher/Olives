@@ -51,7 +51,7 @@ const PERSISTED_STATE_KEYS = [
 function createDefaultState() {
   return {
     // Grove mechanics
-    treeOlives: TUNING.grove.treeCapacity,
+    treeOlives: 15,
     treeCapacity: TUNING.grove.treeCapacity,
     treeGrowthPerSec: TUNING.grove.treeGrowthPerSec,
 
