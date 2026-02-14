@@ -91,7 +91,6 @@ function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActi
   const efficientSelectivePickingBonus = tuning.upgrades?.selective_picking?.efficientBonus ?? 0.06;
   const efficientLaddersNetsPerHarvester = tuning.upgrades?.ladders_nets?.efficientPerHarvester ?? 0.01;
   const efficientLaddersNetsCap = tuning.upgrades?.ladders_nets?.efficientCap ?? 0.08;
-  const efficientQualityInspectorBonus = tuning.upgrades?.quality_inspector?.efficientBonusWithArborist ?? 0.08;
 
   // Calculate deltas for poor weight
   // Base: +per harvester
@@ -116,11 +115,6 @@ function computeHarvestOutcomeWeights({ outcomes, harvesterCount, arboristIsActi
   if (upgrades.ladders_nets) {
     const scaledBonus = Math.min(harvesterCount * efficientLaddersNetsPerHarvester, efficientLaddersNetsCap);
     efficientBonus += scaledBonus;
-  }
-
-  // quality_inspector amplifies arborist benefits
-  if (upgrades.quality_inspector && arboristIsActive) {
-    efficientBonus += efficientQualityInspectorBonus;
   }
 
   const deltaEff = efficientBonus;

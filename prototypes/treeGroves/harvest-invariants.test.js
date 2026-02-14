@@ -140,7 +140,6 @@ describe('Harvest Outcome Invariants', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
         tuning: TUNING.harvest,
       });
@@ -158,7 +157,6 @@ describe('Harvest Outcome Invariants', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
         tuning: TUNING.harvest,
       });
@@ -214,7 +212,6 @@ describe('Harvest Outcome Invariants', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
         tuning: TUNING.harvest,
       });
@@ -244,9 +241,6 @@ describe('Harvest Outcome Invariants', () => {
             efficientPerHarvester: 0.5,
             efficientCap: 50.0,
           },
-          quality_inspector: {
-            efficientBonusWithArborist: 5.0,
-          },
         },
       };
 
@@ -259,7 +253,6 @@ describe('Harvest Outcome Invariants', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
         tuning: extremeTuning,
       });
@@ -280,7 +273,6 @@ describe('Harvest Outcome Invariants', () => {
           training_program: { poorMultiplierReduction: 0 },
           selective_picking: { efficientBonus: 0 },
           ladders_nets: { efficientPerHarvester: 0, efficientCap: 0 },
-          quality_inspector: { efficientBonusWithArborist: 0 },
         },
       };
 
@@ -402,14 +394,12 @@ describe('Harvest Outcome Invariants', () => {
         { training_program: true },
         { selective_picking: true },
         { ladders_nets: true },
-        { quality_inspector: true },
         { standardized_tools: true, training_program: true },
         { 
           standardized_tools: true,
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
       ];
 
@@ -433,7 +423,7 @@ describe('Harvest Outcome Invariants', () => {
       }
 
       // Verify we actually tested a comprehensive set
-      expect(testCount).toBeGreaterThan(90); // 6 * 2 * 8 = 96
+      expect(testCount).toBeGreaterThan(70); // 6 * 2 * 7 = 84
     });
   });
 });

@@ -37,9 +37,6 @@ export const TUNING = {
         efficientPerHarvester: 0.01,  // Scales with harvester count
         efficientCap: 0.08,           // Maximum bonus from scaling
       },
-      quality_inspector: {
-        efficientBonusWithArborist: 0.08,  // Additional bonus when arborist active
-      },
     },
   },
 
@@ -162,7 +159,6 @@ export const TUNING = {
     costs: {
       selective_picking: 5,
       ladders_nets: 10,
-      quality_inspector: 50,
     },
     marketAutosell: {
       rateUpgradeCost: { florins: 60, stone: 6 },
@@ -204,11 +200,6 @@ export const TUNING = {
         { idSuffix: 1, cost: 25, capacityBonus: 10 },
         { idSuffix: 2, cost: 50, capacityBonus: 10 },
         { idSuffix: 3, cost: 100, capacityBonus: 10 },
-      ],
-      oliveOil: [
-        { idSuffix: 1, cost: 100, capacityBonus: 10 },
-        { idSuffix: 2, cost: 200, capacityBonus: 10 },
-        { idSuffix: 3, cost: 500, capacityBonus: 25 },
       ],
     },
   },

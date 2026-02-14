@@ -19,7 +19,7 @@ managerIds.forEach(id => {
 
 // Add group: "upgrade" to all upgrades
 const upgradeIds = [
-  'standardized_tools', 'training_program', 'selective_picking', 'ladders_nets', 'quality_inspector',
+  'standardized_tools', 'training_program', 'selective_picking', 'ladders_nets',
   'olive_ship_efficiency_1', 'olive_ship_efficiency_2', 'olive_ship_efficiency_3',
   'olive_oil_ship_efficiency_1', 'olive_oil_ship_efficiency_2', 'olive_oil_ship_efficiency_3'
 ];

@@ -49,7 +49,6 @@ describe('computeHarvestOutcomeWeights', () => {
             training_program: true,
             selective_picking: true,
             ladders_nets: true,
-            quality_inspector: true,
           },
         },
         {
@@ -60,7 +59,6 @@ describe('computeHarvestOutcomeWeights', () => {
             training_program: true,
             selective_picking: true,
             ladders_nets: true,
-            quality_inspector: true,
           },
         },
       ];
@@ -169,7 +167,7 @@ describe('computeHarvestOutcomeWeights', () => {
       expect(withArboristEfficient).toBeGreaterThan(noArboristEfficient);
     });
 
-    it('should reduce poor weight with standardized_tools upgrade', () => {
+    it('should increase efficient weight with selective_picking upgrade', () => {
       const noUpgrade = computeHarvestOutcomeWeights({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
@@ -182,14 +180,14 @@ describe('computeHarvestOutcomeWeights', () => {
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
-        upgrades: { standardized_tools: true },
+        upgrades: { selective_picking: true },
         tuning: TUNING.harvest,
       });
 
-      const noUpgradePoor = findOutcome(noUpgrade, 'poor').weight;
-      const withUpgradePoor = findOutcome(withUpgrade, 'poor').weight;
+      const noUpgradeEff = findOutcome(noUpgrade, 'efficient').weight;
+      const withUpgradeEff = findOutcome(withUpgrade, 'efficient').weight;
 
-      expect(withUpgradePoor).toBeLessThan(noUpgradePoor);
+      expect(withUpgradeEff).toBeGreaterThan(noUpgradeEff);
     });
   });
 });

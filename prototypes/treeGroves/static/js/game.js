@@ -259,15 +259,6 @@ function getOliveOilShippingCapacity() {
     }
   }
 
-  // Add bonuses from oil-specific upgrades
-  const oilUpgrades = TUNING.investments.shippingEfficiency.oliveOil;
-  for (let i = 0; i < oilUpgrades.length; i++) {
-    const upgradeId = `olive_oil_ship_efficiency_${oilUpgrades[i].idSuffix}`;
-    if (state.upgrades[upgradeId]) {
-      capacity += oilUpgrades[i].capacityBonus;
-    }
-  }
-
   return capacity;
 }
 

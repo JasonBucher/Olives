@@ -77,7 +77,6 @@ describe('Harvester Hire Preview', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         },
         tuning: TUNING.harvest,
       });
@@ -205,7 +204,6 @@ describe('Harvester Hire Preview', () => {
           training_program: true,
           selective_picking: true,
           ladders_nets: true,
-          quality_inspector: true,
         }},
       ];
 
