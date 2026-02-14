@@ -181,8 +181,6 @@ function createDefaultState() {
   return {
     // Grove mechanics
     treeOlives: 15,
-    treeCapacity: TUNING.grove.treeCapacity,
-    treeGrowthPerSec: TUNING.grove.treeGrowthPerSec,
 
     // Player inventory
     harvestedOlives: 0,
@@ -263,18 +261,6 @@ const harvestConfig = {
   batchSize: TUNING.harvest.baseBatchSize,
   outcomes: TUNING.harvest.outcomes,
 };
-
-// --- Baseline Harvest Duration Helper ---
-/**
- * Get baseline harvest duration from "normal" outcome.
- * Used for computing speed reductions in UI displays.
- * @returns {number} Duration in milliseconds
- */
-function getBaselineHarvestDurationMs() {
-  const normalOutcome = harvestConfig.outcomes.find(o => o.key === 'normal');
-  // Fallback to 4500 only if "normal" outcome missing (should not happen in practice)
-  return normalOutcome ? normalOutcome.durationMs : 4500;
-}
 
 // --- Cultivator Hire Cost ---
 function getCultivatorHireCost() {
@@ -1294,15 +1280,12 @@ function updateRenownUI() {
   renownProgressTextEl.textContent = renownState.progressText;
 }
 
-const RELOCATION_LIFETIME_FLORINS_REQUIRED = 5000;
-const RELOCATION_FLORIN_COST = 3000;
-
 function hasRelocationLifetimeRequirement() {
-  return (Number(state.florinsLifetimeEarned) || 0) >= RELOCATION_LIFETIME_FLORINS_REQUIRED;
+  return (Number(state.florinsLifetimeEarned) || 0) >= TUNING.relocation.lifetimeFlorinsRequired;
 }
 
 function hasRelocationPaymentRequirement() {
-  return (Number(state.florinCount) || 0) >= RELOCATION_FLORIN_COST;
+  return (Number(state.florinCount) || 0) >= TUNING.relocation.florinCost;
 }
 
 function setRequirementIcon(el, isMet) {
@@ -1320,7 +1303,8 @@ function updateRelocationUI() {
   setRequirementIcon(relocationReqRenownIcon, renownMet);
   setRequirementIcon(relocationReqCurrentIcon, paymentMet);
   if (relocationReqLifetimeText) {
-    relocationReqLifetimeText.textContent = `Earn ${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()} lifetime Florins ${lifetimeEarned.toLocaleString()}/${RELOCATION_LIFETIME_FLORINS_REQUIRED.toLocaleString()}`;
+    const req = TUNING.relocation.lifetimeFlorinsRequired;
+    relocationReqLifetimeText.textContent = `Earn ${req.toLocaleString()} lifetime Florins ${lifetimeEarned.toLocaleString()}/${req.toLocaleString()}`;
   }
   if (relocationReqRenownText) {
     const currentRenown = Math.floor(Number(state.renownValue) || 0);
@@ -1349,12 +1333,12 @@ function computeEstateIncomeRate(snapshot) {
   const harvestBasketLevel = Number(snapshot.harvestBasketLevel) || 0;
   const harvestUpgradeCount = Array.isArray(snapshot.harvestUpgrades) ? snapshot.harvestUpgrades.length : 0;
 
-  // Placeholder formula (florins/sec), intentionally centralized for easy iteration.
+  const ei = TUNING.era2.estateIncome;
   const ratePerSecond =
-    (treeCapacity * 0.0025) +
-    (olivePressCount * 0.06) +
-    (harvestBasketLevel * 0.012) +
-    (harvestUpgradeCount * 0.04);
+    (treeCapacity * ei.treeCapacityMultiplier) +
+    (olivePressCount * ei.olivePressMultiplier) +
+    (harvestBasketLevel * ei.harvestBasketMultiplier) +
+    (harvestUpgradeCount * ei.harvestUpgradeMultiplier);
 
   return Math.max(0, ratePerSecond);
 }
@@ -1439,7 +1423,7 @@ function moveToCity() {
   const paymentMet = hasRelocationPaymentRequirement();
   if (!lifetimeMet || !paymentMet) return;
 
-  if (!spendFlorins(RELOCATION_FLORIN_COST)) return;
+  if (!spendFlorins(TUNING.relocation.florinCost)) return;
   finalizeEra1RunStats();
   state.estateSnapshot = buildEstateSnapshot();
   state.era = 2;

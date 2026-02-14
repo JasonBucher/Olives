@@ -220,6 +220,22 @@ export const TUNING = {
     },
   },
 
+  // Relocation: Era 2 gating requirements
+  relocation: {
+    lifetimeFlorinsRequired: 5000,
+    florinCost: 3000,
+  },
+
+  // Era 2: estate passive income coefficients (florins/sec)
+  era2: {
+    estateIncome: {
+      treeCapacityMultiplier: 0.0025,
+      olivePressMultiplier: 0.06,
+      harvestBasketMultiplier: 0.012,
+      harvestUpgradeMultiplier: 0.04,
+    },
+  },
+
   // Renown: sale-driven progression
   renown: {
     perUnitSold: 0.25,
