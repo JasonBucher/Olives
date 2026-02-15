@@ -1524,7 +1524,11 @@ function updateUI() {
     harvestBtn.disabled = false;
     harvestActionUI.setIdle({ resetBar: false });
   }
-  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} Olives \u2022 ${TUNING.harvest.durationSeconds}s`;
+  const chances = getCurrentHarvestOutcomeChances();
+  const poorPct = Math.round((chances.find(o => o.key === "poor")?.weight || 0) * 100);
+  const efficientPct = Math.round((chances.find(o => o.key === "efficient")?.weight || 0) * 100);
+  const stabilityLabel = getHarvestStabilityLabel(poorPct);
+  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} olives \u2022 ${TUNING.harvest.durationSeconds}s  |  Stability: ${stabilityLabel} (${poorPct}% \u26A0 / ${efficientPct}% \u2728)`;
 
   // Update cultivator UI
   cultivatorCountEl.textContent = `x${state.cultivatorCount}`;
@@ -1776,6 +1780,13 @@ function getCurrentHarvestOutcomeChances() {
     upgrades: state.upgrades,
     tuning: TUNING.harvest,
   });
+}
+
+function getHarvestStabilityLabel(poorPct) {
+  if (poorPct === 0) return "Certain";
+  if (poorPct <= 5) return "Engineered";
+  if (poorPct < 15) return "Reliable";
+  return "Unstable";
 }
 
 // --- Harvest System ---
