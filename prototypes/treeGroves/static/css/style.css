@@ -813,6 +813,7 @@ h1 {
 }
 
 .inv-middle {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1103,4 +1104,30 @@ h1 {
 /* Ensure empty badges don't reserve space (important now that it's absolute) */
 .worker-actions .worker-badge:empty {
   display: none;
+}
+
+/* ── Floating harvest outcome text ── */
+.harvest-float {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: harvestFloat 4s ease-out forwards;
+}
+
+.harvest-float.efficient {
+  color: #4caf50;
+}
+
+.harvest-float.poor {
+  color: #e57373;
+}
+
+@keyframes harvestFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -24px); }
 }

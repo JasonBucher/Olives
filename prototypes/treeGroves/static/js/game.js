@@ -1885,9 +1885,24 @@ function completeHarvest() {
     logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost}`, logColor);
   }
   
+  // Floating outcome text for notable results
+  if (outcome.key === 'efficient' || outcome.key === 'poor') {
+    const floatEl = document.createElement('span');
+    floatEl.classList.add('harvest-float', outcome.key);
+    if (outcome.key === 'efficient') {
+      const bonusOlives = Math.floor(totalCollected) - Math.floor(attempted * 0.80);
+      floatEl.textContent = `+${Math.floor(totalCollected)} olives ✨ (+${bonusOlives})`;
+    } else {
+      floatEl.textContent = `+${Math.floor(totalCollected)} olives ⚠`;
+    }
+    const middle = harvestBtn.closest('.inventory-row').querySelector('.inv-middle');
+    middle.appendChild(floatEl);
+    setTimeout(() => floatEl.remove(), 4000);
+  }
+
   // Reset state
   isHarvesting = false;
-  
+
   // Use helper to fade out pill and progress without layout shift
   harvestActionUI.end();
   
