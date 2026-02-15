@@ -488,7 +488,6 @@ const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
 const marketAutosellEl = document.getElementById("market-autosell");
-const cityDemandRateEl = document.getElementById("city-demand-rate");
 const renownValueEl = document.getElementById("renown-value");
 const renownTierNameEl = document.getElementById("renown-tier-name");
 const renownProgressFillEl = document.getElementById("renown-progress-fill");
@@ -994,10 +993,19 @@ function finalizeEra1RunStats() {
   if (era1.endTimestamp == null) {
     era1.endTimestamp = Date.now();
   }
-  era1.durationSeconds = Math.max(0, Math.floor((era1.endTimestamp - era1.startTimestamp) / 1000));
+  const wallDuration = Math.max(0, Math.floor((era1.endTimestamp - era1.startTimestamp) / 1000));
+  const simDuration = Math.max(0, Math.floor(Number(state.simElapsedSeconds) || 0));
+  era1.durationSeconds = Math.max(wallDuration, simDuration);
+
+  // Stamp values from state as ground truth — incremental tracking may be
+  // incomplete for saves that predate the runStats system.
+  const lifetimeEarned = Number(state.florinsLifetimeEarned) || 0;
+  era1.florins.earnedTotal = Math.max(Number(era1.florins.earnedTotal) || 0, lifetimeEarned);
+  // Spent = everything earned minus what's left in the bank (relocation cost already deducted)
+  const derivedSpent = Math.max(0, lifetimeEarned - (Number(state.florinCount) || 0));
+  era1.florins.spentTotal = Math.max(Number(era1.florins.spentTotal) || 0, derivedSpent);
   updateRunStatsFlorinNetTotal();
-  // Stamp actual worker counts from state (incremental tracking may be incomplete
-  // for saves that predate the runStats system)
+
   era1.workers.harvestersHired = Math.max(Number(era1.workers.harvestersHired) || 0, Number(state.harvesterCount) || 0);
   era1.workers.cultivatorsHired = Math.max(Number(era1.workers.cultivatorsHired) || 0, Number(state.cultivatorCount) || 0);
   era1.workers.pressersHired = Math.max(Number(era1.workers.pressersHired) || 0, Number(state.presserCount) || 0);
@@ -2488,16 +2496,10 @@ function updateMarketAutosellUI() {
   if (modifiers.autosellPaused) {
     marketAutosellEl.textContent = `Auto-selling: Paused (${lanes} ${laneLabel})`;
     marketAutosellEl.classList.add("is-paused");
-    if (cityDemandRateEl) {
-      cityDemandRateEl.textContent = "Demand: 0.00 oil/sec";
-    }
     return;
   }
 
   const effectiveRate = getCityDemandRatePerSecond(modifiers);
-  if (cityDemandRateEl) {
-    cityDemandRateEl.textContent = `Demand: ${formatRatePerSecond(effectiveRate)} oil/sec`;
-  }
 
   const priceBonuses = [];
   const permanentBonusPct = (getMarketPermanentPriceMultiplier() - 1) * 100;
