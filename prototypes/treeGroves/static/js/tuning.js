@@ -263,8 +263,8 @@ export const TUNING = {
       upgradeCost: { florins: 90, stone: 12 },
     },
     pulleyCart: {
-      baseCost: { florins: 50, stone: 30 },
-      costScale: { florins: 40, stone: 20 },
+      baseCost: { florins: 50, stone: 10 },
+      costScale: { florins: 40, stone: 8 },
       maxLevel: 3,
       reductionPerLevel: 0.20,
     },

@@ -1110,13 +1110,14 @@ h1 {
 .harvest-float {
   position: absolute;
   left: 50%;
-  top: -4px;
+  top: -12px;
   transform: translateX(-50%);
   font-size: 0.85rem;
   font-weight: 600;
   pointer-events: none;
   white-space: nowrap;
-  animation: harvestFloat 4s ease-out forwards;
+  will-change: transform, opacity;
+  animation: harvestFloat 2.5s linear forwards;
 }
 
 .harvest-float.efficient {
@@ -1128,6 +1129,7 @@ h1 {
 }
 
 @keyframes harvestFloat {
-  0%   { opacity: 1; transform: translate(-50%, 0); }
-  100% { opacity: 0; transform: translate(-50%, -24px); }
+  0%   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  25%  { opacity: 1; transform: translate(-50%, -8px) scale(1.06); }
+  100% { opacity: 0; transform: translate(-50%, -30px) scale(1.25); }
 }

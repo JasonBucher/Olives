@@ -1885,19 +1885,20 @@ function completeHarvest() {
     logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost}`, logColor);
   }
   
-  // Floating outcome text for notable results
+  // Floating outcome text for notable results (deferred to next frame to avoid jank)
   if (outcome.key === 'efficient' || outcome.key === 'poor') {
-    const floatEl = document.createElement('span');
-    floatEl.classList.add('harvest-float', outcome.key);
-    if (outcome.key === 'efficient') {
-      const bonusOlives = Math.floor(totalCollected) - Math.floor(attempted * 0.80);
-      floatEl.textContent = `+${Math.floor(totalCollected)} olives ✨ (+${bonusOlives})`;
-    } else {
-      floatEl.textContent = `+${Math.floor(totalCollected)} olives ⚠`;
-    }
-    const middle = harvestBtn.closest('.inventory-row').querySelector('.inv-middle');
-    middle.appendChild(floatEl);
-    setTimeout(() => floatEl.remove(), 4000);
+    const floatKey = outcome.key;
+    const floatText = floatKey === 'efficient'
+      ? `+${Math.floor(totalCollected)} olives ✨ (+${Math.floor(totalCollected) - Math.floor(attempted * 0.80)})`
+      : `+${Math.floor(totalCollected)} olives ⚠`;
+    requestAnimationFrame(() => {
+      const floatEl = document.createElement('span');
+      floatEl.classList.add('harvest-float', floatKey);
+      floatEl.textContent = floatText;
+      const middle = harvestBtn.closest('.inventory-row').querySelector('.inv-middle');
+      middle.appendChild(floatEl);
+      setTimeout(() => floatEl.remove(), 2500);
+    });
   }
 
   // Reset state
