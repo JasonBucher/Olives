@@ -336,7 +336,7 @@ h1 {
   background: var(--btn);
   color: var(--text);
   padding: 6px 12px;
-  border-radius: 10px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
 }
