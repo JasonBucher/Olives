@@ -362,40 +362,12 @@ function formatOilPerPress(value) {
 }
 
 // --- Shipping Capacity Helpers ---
-/**
- * Calculate olive shipping capacity including upgrade bonuses.
- */
 function getOliveShippingCapacity() {
-  let capacity = TUNING.market.shipping.olives.baseBatchSize;
-  
-  // Add bonuses from purchased upgrades
-  const upgrades = TUNING.investments.shippingEfficiency.olives;
-  for (let i = 0; i < upgrades.length; i++) {
-    const upgradeId = `olive_ship_efficiency_${upgrades[i].idSuffix}`;
-    if (state.upgrades[upgradeId]) {
-      capacity += upgrades[i].capacityBonus;
-    }
-  }
-  
-  return capacity;
+  return TUNING.market.shipping.olives.baseBatchSize;
 }
 
-/**
- * Calculate olive oil shipping capacity including upgrade bonuses.
- */
 function getOliveOilShippingCapacity() {
-  let capacity = TUNING.market.shipping.oliveOil.baseBatchSize;
-
-  // Add bonuses from general cart upgrades (shared with olives)
-  const cartUpgrades = TUNING.investments.shippingEfficiency.olives;
-  for (let i = 0; i < cartUpgrades.length; i++) {
-    const upgradeId = `olive_ship_efficiency_${cartUpgrades[i].idSuffix}`;
-    if (state.upgrades[upgradeId]) {
-      capacity += cartUpgrades[i].capacityBonus;
-    }
-  }
-
-  return capacity;
+  return TUNING.market.shipping.oliveOil.baseBatchSize;
 }
 
 // --- Quarry Helpers ---

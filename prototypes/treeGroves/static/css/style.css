@@ -766,6 +766,12 @@ h1 {
   gap: 10px;
 }
 
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .inventory-row {
   position: relative;
   display: grid;
@@ -775,14 +781,19 @@ h1 {
   min-height: 34px;
 }
 
-.press-preview {
-  margin-top: 6px;
-  font-size: 12px;
+/* Shared subtitle style for info lines beneath a row (workers, inventory) */
+.row-subtitle {
+  font-size: 11px;
+  line-height: 1.0;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: -5px;
+}
+
+.press-preview {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  font-variant-numeric: tabular-nums;
 }
 
 .press-preview-sep {
@@ -1030,10 +1041,6 @@ h1 {
 }
 
 .worker-delta {
-  font-size: 11px;
-  color: var(--muted);
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1068,11 +1075,7 @@ h1 {
 /* Tighten Workers “carriage return” spacing */
 .worker-item { gap: 0px; }              /* was probably 2px */
 .worker-left, .worker-middle { line-height: 1.0; }
-.worker-delta { line-height: 1.0; }
-.worker-delta {
-  /* Optical alignment: reduce font-leading gap so this reads as a single carriage return */
-  margin-top: -5px;
-}
+/* worker-delta spacing now handled by shared .row-subtitle */
 
 /* --- Workers: pin MGR to the Hire button without affecting layout --- */
 

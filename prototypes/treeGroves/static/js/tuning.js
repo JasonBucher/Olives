@@ -293,12 +293,5 @@ export const TUNING = {
       maxLevel: 5,
       bonusPerLevel: 2,
     },
-    shippingEfficiency: {
-      olives: [
-        { idSuffix: 1, cost: 25, capacityBonus: 10 },
-        { idSuffix: 2, cost: 50, capacityBonus: 10 },
-        { idSuffix: 3, cost: 100, capacityBonus: 10 },
-      ],
-    },
   },
 };
