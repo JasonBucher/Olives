@@ -267,6 +267,39 @@ h1 {
   flex-wrap: wrap;
 }
 
+.market-modifiers {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.market-modifier-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.market-modifier-pill.demand-up {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.12);
+}
+
+.market-modifier-pill.demand-down {
+  color: #e57373;
+  background: rgba(229, 115, 115, 0.12);
+}
+
+.market-modifier-pill.price-up {
+  color: #ffd700;
+  background: rgba(255, 215, 0, 0.12);
+}
+
 .market-autosell {
   margin-top: 6px;
   font-size: 12px;
@@ -1135,6 +1168,39 @@ h1 {
 }
 
 @keyframes harvestFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  25%  { opacity: 1; transform: translate(-50%, -8px) scale(1.06); }
+  100% { opacity: 0; transform: translate(-50%, -30px) scale(1.25); }
+}
+
+/* ── Floating market event text ── */
+.market-float-anchor {
+  position: relative;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.market-float {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  animation: marketFloat 2.5s linear forwards;
+}
+
+.market-float.arrival  { color: #b89a4a; }
+.market-float.sale     { color: #d4a843; }
+.market-float.premium  { color: #ffd700; }
+.market-float.surge    { color: #4caf50; }
+.market-float.slow     { color: #b07070; }
+
+@keyframes marketFloat {
   0%   { opacity: 1; transform: translate(-50%, 0) scale(1); }
   25%  { opacity: 1; transform: translate(-50%, -8px) scale(1.06); }
   100% { opacity: 0; transform: translate(-50%, -30px) scale(1.25); }

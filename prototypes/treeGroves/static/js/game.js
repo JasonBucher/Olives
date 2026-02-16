@@ -464,6 +464,9 @@ const treeGrowthRateEl = document.getElementById("tree-growth-rate");
 const marketOliveCountEl = document.getElementById("market-olive-count");
 const marketOilCountEl = document.getElementById("market-oil-count");
 const marketAutosellEl = document.getElementById("market-autosell");
+const marketFloatAnchorEl = document.getElementById("market-float-anchor");
+const marketDemandIndicatorEl = document.getElementById("market-demand-indicator");
+const marketPriceIndicatorEl = document.getElementById("market-price-indicator");
 const renownValueEl = document.getElementById("renown-value");
 const renownTierNameEl = document.getElementById("renown-tier-name");
 const renownProgressFillEl = document.getElementById("renown-progress-fill");
@@ -672,11 +675,26 @@ function marketLogLine(message) {
   logPlayer({ channel: 'market', text: message });
 }
 
+function showMarketFloat(text, variant) {
+  if (!marketFloatAnchorEl) return;
+  requestAnimationFrame(() => {
+    const el = document.createElement('span');
+    el.classList.add('market-float', variant);
+    el.textContent = text;
+    const activeFloats = marketFloatAnchorEl.querySelectorAll('.market-float').length;
+    if (activeFloats > 0) {
+      el.style.top = `${-12 - activeFloats * 18}px`;
+    }
+    marketFloatAnchorEl.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  });
+}
 
 // --- Inline Action UI ---
 function createInlineActionController({ pillEl, countEl, progressEl, barEl, countdownEl, keepLayout }) {
   const fadeClass = "inline-fade-out";
   const invisibleClass = "is-invisible";
+  let endTimerId = null;
 
   function setCount(value) {
     if (!countEl || value === undefined || value === null) return;
@@ -721,6 +739,11 @@ function createInlineActionController({ pillEl, countEl, progressEl, barEl, coun
   }
 
   function start({ count, percent = 0 } = {}) {
+    // Cancel any pending end() cleanup so it doesn't hide the pill we're about to show
+    if (endTimerId != null) {
+      clearTimeout(endTimerId);
+      endTimerId = null;
+    }
     setCount(count);
     showPill();
     showProgress();
@@ -750,7 +773,8 @@ function createInlineActionController({ pillEl, countEl, progressEl, barEl, coun
     hideProgress();
     hidePill();
 
-    window.setTimeout(() => {
+    endTimerId = window.setTimeout(() => {
+      endTimerId = null;
       if (!keepLayout) {
         pillEl.hidden = true;
         pillEl.classList.remove(fadeClass);
@@ -1118,10 +1142,13 @@ function getRenownTierState() {
     };
   }
 
+  // Use floored renown for tier matching — tier boundaries are integers (0-99, 100-249, etc.)
+  // but renown accrues fractionally (0.25 per unit sold), so 99.5 must stay in neighborhood
+  const flooredRenown = Math.floor(renownValue);
   let activeTier = renownTierConfig.find((tier) => {
-    if (renownValue < tier.minRenown) return false;
+    if (flooredRenown < tier.minRenown) return false;
     if (tier.maxRenown == null || !Number.isFinite(tier.maxRenown)) return true;
-    return renownValue <= tier.maxRenown;
+    return flooredRenown <= tier.maxRenown;
   });
 
   if (!activeTier) {
@@ -1253,12 +1280,21 @@ function applyRenownGain(amount) {
     return 0;
   }
 
+  const tierBefore = getRenownTierState().tierId;
+
   state.renownLifetime = (Number(state.renownLifetime) || 0) + allowed;
   state.renownValue = currentRenown + allowed;
 
   if (capMax != null && state.renownValue >= capMax) {
     setRenownCapped(capMax);
   }
+
+  const tierAfter = getRenownTierState().tierId;
+  if (tierBefore !== tierAfter && tierAfter) {
+    const tierName = getRenownTierState().tierName;
+    showMarketFloat(`${tierName} Tier reached!`, "surge");
+  }
+
   return allowed;
 }
 
@@ -1999,17 +2035,21 @@ function completeShipping() {
   
   // Add to market inventory
   state.marketOlives += arrived;
-  
+
+  if (arrived > 0) {
+    showMarketFloat(`+${arrived} olives arrived`, "arrival");
+  }
+
   // Log to market log
   const timeKey = shipJob.timeOutcomeKey.toUpperCase();
   const incidentKey = shipJob.incidentKey.toUpperCase();
   marketLogLine(
     `Shipment arrived (${timeKey}, ${incidentKey}): sent ${shipJob.amount}, arrived ${arrived}, lost ${shipJob.lostCount}, stolen ${shipJob.stolenCount}.`
   );
-  
+
   // Reset shipping state
   isShipping = false;
-  
+
   // Update UI based on outcome
   setShipUIComplete();
   
@@ -2160,26 +2200,62 @@ function startShippingOliveOil() {
   updateUI();
 }
 
+function tryPremiumBuyerOnArrival(arrived) {
+  if (arrived <= 0) return { triggered: false };
+  const premiumCfg = TUNING.market?.shipping?.premiumBuyer;
+  if (!premiumCfg) return { triggered: false };
+
+  const tierId = getRenownTierState().tierId;
+  const chance = Number(premiumCfg.chanceByTier?.[tierId]) || 0;
+  if (chance <= 0 || Math.random() >= chance) return { triggered: false };
+
+  const priceMult = Number(premiumCfg.priceMult) || 2;
+  const effectiveMult = getMarketEffectivePriceMultiplier(priceMult);
+  const earned = arrived * TUNING.market.prices.oliveOilFlorins * effectiveMult;
+
+  addFlorins(earned, { trackLifetime: true });
+  addOliveOilSold(arrived);
+  applyRenownGainFromSale(arrived);
+
+  showMarketFloat(`Courier waiting! ${arrived} oil \u2192 ${formatFlorins(earned)} fl`, "premium");
+  logEvent({
+    channel: "market",
+    playerText: `Premium buyer: purchased ${arrived} oil for ${formatFlorins(earned)} florins!`,
+    debugText: `Premium buyer: arrived=${arrived}, priceMult=\u00d7${effectiveMult.toFixed(2)}, earned=${earned.toFixed(2)} fl`,
+  });
+
+  return { triggered: true, earned };
+}
+
 function completeShippingOliveOil() {
   // Calculate how many arrive
   const arrived = oliveOilShipJob.amount - oliveOilShipJob.lostCount - oliveOilShipJob.stolenCount;
-  
-  // Add to market oil inventory
-  state.marketOliveOil = (state.marketOliveOil || 0) + arrived;
-  
+
+  // Try premium buyer before adding to market inventory
+  const premium = tryPremiumBuyerOnArrival(arrived);
+
+  if (!premium.triggered) {
+    // Add to market oil inventory
+    state.marketOliveOil = (state.marketOliveOil || 0) + arrived;
+
+    if (arrived > 0) {
+      showMarketFloat(`+${arrived} oil arrived`, "arrival");
+    }
+  }
+
   // Log to market log
   const timeKey = oliveOilShipJob.timeOutcomeKey.toUpperCase();
   const incidentKey = oliveOilShipJob.incidentKey.toUpperCase();
   marketLogLine(
     `Olive oil shipment arrived (${timeKey}, ${incidentKey}): sent ${oliveOilShipJob.amount}, arrived ${arrived}, lost ${oliveOilShipJob.lostCount}, stolen ${oliveOilShipJob.stolenCount}.`
   );
-  
+
   // Reset shipping state
   isShippingOliveOil = false;
-  
+
   // Update UI
   oliveOilShipActionUI.end();
-  
+
   saveGame();
   updateUI();
 }
@@ -2390,10 +2466,14 @@ function getActiveMarketModifiers() {
     .filter((modifier) => modifier?.type === "demandMultiplier")
     .reduce((acc, modifier) => acc * (Number(modifier.value) || 1), 1);
 
+  const priceMultiplier = activeCityModifiers
+    .filter((modifier) => modifier?.type === "priceMultiplier")
+    .reduce((acc, modifier) => acc * (Number(modifier.value) || 1), 1);
+
   return {
     autosellPaused: false,
     autosellRateMultiplier: demandMultiplier > 0 ? demandMultiplier : 1,
-    priceMultiplier: 1,
+    priceMultiplier: priceMultiplier > 0 ? priceMultiplier : 1,
     uiStatus: null,
     uiSuffix: null,
   };
@@ -2425,6 +2505,9 @@ function runCityInstantSaleEvent(eventDef) {
   const renownBonus = Math.max(0, Number(eventDef.renownBonus) || 0);
   const renownApplied = applyRenownGain(renownBonus);
   const saleLog = createCityEventSaleLog(eventDef.name, soldOil, earned, requested);
+
+  showMarketFloat(`${eventDef.name}: ${soldOil} oil \u2192 ${formatFlorins(earned)} fl`, "sale");
+
   logEvent({
     channel: "market",
     playerText: saleLog.playerText,
@@ -2439,21 +2522,64 @@ function addCityTimedDemandModifier(eventDef) {
     return;
   }
 
-  activeCityModifiers.push({
-    eventId: eventDef.id,
-    eventName: eventDef.name,
-    type: "demandMultiplier",
-    value: demandMultiplier,
-    remainingSeconds: durationSeconds,
-    durationSeconds,
-  });
+  // Refresh timer if same event is already active (don't stack duplicates)
+  const existing = activeCityModifiers.find((m) => m.eventId === eventDef.id);
+  if (existing) {
+    existing.remainingSeconds = durationSeconds;
+  } else {
+    activeCityModifiers.push({
+      eventId: eventDef.id,
+      eventName: eventDef.name,
+      type: "demandMultiplier",
+      value: demandMultiplier,
+      remainingSeconds: durationSeconds,
+      durationSeconds,
+    });
+  }
 
   const pct = ((demandMultiplier - 1) * 100);
   const sign = pct >= 0 ? "+" : "";
+  const demandVariant = demandMultiplier >= 1 ? "surge" : "slow";
+  const demandLabel = demandMultiplier >= 1
+    ? `Demand surging \u00d7${demandMultiplier.toFixed(1)} (${durationSeconds}s)`
+    : `Demand slowed \u00d7${demandMultiplier.toFixed(1)} (${durationSeconds}s)`;
+  showMarketFloat(demandLabel, demandVariant);
+
   logEvent({
     channel: "market",
     playerText: `${eventDef.name}: city demand ${pct >= 0 ? "increased" : "decreased"} for ${durationSeconds}s.`,
     debugText: `${eventDef.name}: demandMultiplier=${demandMultiplier.toFixed(2)} (${sign}${formatPercent(pct)}%), duration=${durationSeconds}s`,
+  });
+}
+
+function addCityTimedPriceModifier(eventDef) {
+  const priceMultiplier = Number(eventDef.priceMultiplier) || 1;
+  const durationSeconds = Math.max(0, Number(eventDef.durationSeconds) || 0);
+  if (durationSeconds <= 0 || priceMultiplier <= 0 || priceMultiplier === 1) {
+    return;
+  }
+
+  // Refresh timer if same event is already active (don't stack duplicates)
+  const existing = activeCityModifiers.find((m) => m.eventId === eventDef.id);
+  if (existing) {
+    existing.remainingSeconds = durationSeconds;
+  } else {
+    activeCityModifiers.push({
+      eventId: eventDef.id,
+      eventName: eventDef.name,
+      type: "priceMultiplier",
+      value: priceMultiplier,
+      remainingSeconds: durationSeconds,
+      durationSeconds,
+    });
+  }
+
+  showMarketFloat(`${eventDef.name}! \u00d7${priceMultiplier.toFixed(1)} prices (${durationSeconds}s)`, "surge");
+
+  logEvent({
+    channel: "market",
+    playerText: `${eventDef.name}: prices increased \u00d7${priceMultiplier.toFixed(1)} for ${durationSeconds}s.`,
+    debugText: `${eventDef.name}: priceMultiplier=${priceMultiplier.toFixed(2)}, duration=${durationSeconds}s`,
   });
 }
 
@@ -2480,6 +2606,11 @@ function runCityEvent(eventDef) {
   }
   if (eventDef.type === "timedDemandModifier") {
     addCityTimedDemandModifier(eventDef);
+    return;
+  }
+  if (eventDef.type === "timedPriceModifier") {
+    addCityTimedPriceModifier(eventDef);
+    return;
   }
 }
 
@@ -2535,6 +2666,30 @@ function updateMarketAutosellUI() {
 
   marketAutosellEl.textContent = text;
   marketAutosellEl.classList.remove("is-paused");
+
+  // Update demand/price modifier indicators
+  const demandMult = modifiers.autosellRateMultiplier ?? 1;
+  if (marketDemandIndicatorEl) {
+    if (Math.abs(demandMult - 1) > 0.01) {
+      const isUp = demandMult > 1;
+      marketDemandIndicatorEl.textContent = `${isUp ? "\u25b2" : "\u25bc"} \u00d7${demandMult.toFixed(1)}`;
+      marketDemandIndicatorEl.className = `market-modifier-pill ${isUp ? "demand-up" : "demand-down"}`;
+      marketDemandIndicatorEl.hidden = false;
+    } else {
+      marketDemandIndicatorEl.hidden = true;
+    }
+  }
+
+  const priceMult = modifiers.priceMultiplier ?? 1;
+  if (marketPriceIndicatorEl) {
+    if (Math.abs(priceMult - 1) > 0.01) {
+      marketPriceIndicatorEl.textContent = `\u25b2 \u00d7${priceMult.toFixed(1)} price`;
+      marketPriceIndicatorEl.className = "market-modifier-pill price-up";
+      marketPriceIndicatorEl.hidden = false;
+    } else {
+      marketPriceIndicatorEl.hidden = true;
+    }
+  }
 }
 
 function runAutosellTick(dt) {

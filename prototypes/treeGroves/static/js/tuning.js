@@ -150,6 +150,10 @@ export const TUNING = {
       oliveOil: {
         baseBatchSize: 5,
       },
+      premiumBuyer: {
+        priceMult: 2.0,
+        chanceByTier: { neighborhood: 0, artisans: 0.10, nobles: 0.25 },
+      },
     },
     buyerOutcomes: [
       { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
@@ -173,6 +177,7 @@ export const TUNING = {
         { id: "haggler", weight: 2 },
         { id: "chefOrder", weight: 3 },
         { id: "recommendation", weight: 2 },
+        { id: "artisanFestival", weight: 2 },
       ],
       nobles: [
         { id: "localPurchase", weight: 3 },
@@ -180,6 +185,7 @@ export const TUNING = {
         { id: "chefOrder", weight: 3 },
         { id: "recommendation", weight: 2 },
         { id: "noblePatronage", weight: 1 },
+        { id: "nobleFeast", weight: 2 },
       ],
     },
     events: {
@@ -221,6 +227,20 @@ export const TUNING = {
         maxOil: 30,
         renownBonus: 2.5,
       },
+      artisanFestival: {
+        id: "artisanFestival",
+        name: "Artisan Festival",
+        type: "timedPriceModifier",
+        priceMultiplier: 1.3,
+        durationSeconds: 25,
+      },
+      nobleFeast: {
+        id: "nobleFeast",
+        name: "Noble Feast",
+        type: "timedPriceModifier",
+        priceMultiplier: 1.5,
+        durationSeconds: 20,
+      },
     },
   },
 
@@ -247,9 +267,9 @@ export const TUNING = {
 
   // Renown: city reputation tiers (config-driven)
   renownTiers: [
-    { id: "neighborhood", name: "Neighborhood", minRenown: 0, maxRenown: 99, demandBonus: 0 },
-    { id: "artisans", name: "Artisans", minRenown: 100, maxRenown: 249, demandBonus: 0.10 },
-    { id: "nobles", name: "Nobles", minRenown: 250, maxRenown: 399, demandBonus: 0.25 },
+    { id: "neighborhood", name: "Neighborhood", minRenown: 0, maxRenown: 49, demandBonus: 0 },
+    { id: "artisans", name: "Artisans", minRenown: 50, maxRenown: 149, demandBonus: 0.10 },
+    { id: "nobles", name: "Nobles", minRenown: 150, maxRenown: 300, demandBonus: 0.25 },
   ],
 
   // Investments: costs for managers and upgrades

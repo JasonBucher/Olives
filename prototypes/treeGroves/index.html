@@ -385,7 +385,12 @@
 
         <div class="col-body">
           <section class="section">
-            <div class="section-title">Market</div>
+            <div class="section-title">Market
+              <span class="market-modifiers">
+                <span id="market-demand-indicator" class="market-modifier-pill" hidden></span>
+                <span id="market-price-indicator" class="market-modifier-pill" hidden></span>
+              </span>
+            </div>
 
             <div class="subhead">Inventory</div>
             
@@ -400,6 +405,7 @@
               </div>
             </div>
 
+            <div id="market-float-anchor" class="market-float-anchor"></div>
             <div id="market-autosell" class="market-autosell">Auto-selling: 0.00 / s (1 lane)</div>
           </section>
 
@@ -434,7 +440,7 @@
               </div>
               <div class="relocation-req">
                 <span id="relocation-req-renown-icon" class="relocation-check">✗</span>
-                <span id="relocation-req-renown-text" class="muted">Reach maximum Renown (0/399)</span>
+                <span id="relocation-req-renown-text" class="muted">Reach maximum Renown (0/300)</span>
               </div>
               <div class="relocation-req">
                 <span id="relocation-req-current-icon" class="relocation-check">✗</span>
