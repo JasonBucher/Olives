@@ -1825,17 +1825,27 @@ function startHarvest(opts = {}) {
 
 function completeHarvest() {
   const { attempted, outcome, durationMs } = harvestJob;
+  const treeOlivesBefore = state.treeOlives;
   
   // Calculate base results from outcome
   const baseCollected = attempted * outcome.collectedPct;
   const lost = Math.floor(attempted * outcome.lostPct);
-  const remaining = attempted - Math.floor(baseCollected) - lost;
-  
-  // No separate harvester bonus: batch size already includes harvester effect
-  const totalCollected = baseCollected;
+  const baseTaken = Math.floor(baseCollected) + lost;
+  const baseRemaining = Math.max(0, treeOlivesBefore - baseTaken);
+
+  // "Efficient" can harvest a little extra, but only from surplus olives already on the trees.
+  // This keeps the UI contract honest: Normal hits the batch size; Efficient can exceed it when surplus exists.
+  let extraCollected = 0;
+  if (outcome.key === "efficient" && outcome.bonusPct) {
+    const desiredExtra = Math.floor(attempted * outcome.bonusPct);
+    extraCollected = Math.min(baseRemaining, desiredExtra);
+  }
+
+  const totalCollected = baseCollected + extraCollected;
+  const remaining = Math.max(0, attempted - Math.floor(baseCollected) - lost); // for logging/debug
   
   // Apply changes
-  state.treeOlives -= (Math.floor(baseCollected) + lost);
+  state.treeOlives -= (Math.floor(baseCollected) + lost + extraCollected);
   state.harvestedOlives += totalCollected;
   
   // Log outcome
@@ -1861,7 +1871,7 @@ function completeHarvest() {
   if (outcome.key === 'efficient' || outcome.key === 'poor' || outcome.key === 'interrupted_short') {
     const floatKey = outcome.key === 'interrupted_short' ? 'interrupted' : outcome.key;
     const floatText = floatKey === 'efficient'
-      ? `+${Math.floor(totalCollected)} olives ✨ (+${Math.floor(totalCollected) - Math.floor(attempted * 0.80)})`
+      ? `+${Math.floor(totalCollected)} olives ✨ (${Math.max(0, Math.floor(totalCollected) - attempted)} bonus)`
       : floatKey === 'interrupted'
       ? `Interrupted ⛔ (+${Math.floor(totalCollected)})`
       : `+${Math.floor(totalCollected)} olives ⚠`;

@@ -253,7 +253,7 @@ describe('Harvester Hire Preview', () => {
     it('should handle missing poor outcome gracefully', () => {
       // Test with outcomes that don't include "poor" key
       const customOutcomes = [
-        { key: "normal", weight: 0.80, durationMs: 4500, collectedPct: 0.80, lostPct: 0.20 },
+        { key: "normal", weight: 0.80, durationMs: 4500, collectedPct: 1.00, lostPct: 0.00 },
         { key: "efficient", weight: 0.20, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
       ];
 
