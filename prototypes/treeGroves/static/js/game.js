@@ -2670,7 +2670,7 @@ function updateMarketAutosellUI() {
   // Update demand/price modifier indicators
   const demandMult = modifiers.autosellRateMultiplier ?? 1;
   if (marketDemandIndicatorEl) {
-    if (Math.abs(demandMult - 1) > 0.01) {
+    if (Math.abs(demandMult - 1) > 0.05) {
       const isUp = demandMult > 1;
       marketDemandIndicatorEl.textContent = `${isUp ? "\u25b2" : "\u25bc"} \u00d7${demandMult.toFixed(1)}`;
       marketDemandIndicatorEl.className = `market-modifier-pill ${isUp ? "demand-up" : "demand-down"}`;

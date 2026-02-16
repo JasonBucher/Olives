@@ -308,8 +308,8 @@ export const TUNING = {
       baseCost: { florins: 60, stone: 8 },
       costScale: { florins: 40, stone: 8 },
       maxLevel: 3,
-      oliveBonusPerLevel: 3,
-      oilBonusPerLevel: 2,
+      oliveBonusPerLevel: 5,
+      oilBonusPerLevel: 4,
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 45, stoneCost: 5, capacityBonus: 20 },
