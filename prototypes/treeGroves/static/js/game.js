@@ -51,6 +51,7 @@ const PERSISTED_STATE_KEYS = [
   "quarryCartLevel",
   "harvestBasketLevel",
   "autoShipOilUnlocked",
+  "shippingCrateLevel",
   "simElapsedSeconds",
   "stone",
   "upgrades",
@@ -216,6 +217,7 @@ function createDefaultState() {
     quarryCartLevel: 0,
     harvestBasketLevel: 0,
     autoShipOilUnlocked: false,
+    shippingCrateLevel: 0,
     simElapsedSeconds: 0,
 
     // Upgrades
@@ -363,11 +365,13 @@ function formatOilPerPress(value) {
 
 // --- Shipping Capacity Helpers ---
 function getOliveShippingCapacity() {
-  return TUNING.market.shipping.olives.baseBatchSize;
+  const bonus = (state.shippingCrateLevel || 0) * TUNING.investments.shippingCrates.oliveBonusPerLevel;
+  return TUNING.market.shipping.olives.baseBatchSize + bonus;
 }
 
 function getOliveOilShippingCapacity() {
-  return TUNING.market.shipping.oliveOil.baseBatchSize;
+  const bonus = (state.shippingCrateLevel || 0) * TUNING.investments.shippingCrates.oilBonusPerLevel;
+  return TUNING.market.shipping.oliveOil.baseBatchSize + bonus;
 }
 
 // --- Quarry Helpers ---
@@ -2754,6 +2758,9 @@ function isInvestmentOwned(investment) {
   }
   if (investment.id === "auto_ship_oil") {
     return !!state.autoShipOilUnlocked;
+  }
+  if (investment.id === "shipping_crates") {
+    return (state.shippingCrateLevel || 0) >= TUNING.investments.shippingCrates.maxLevel;
   }
   return !!state.upgrades[investment.id];
 }

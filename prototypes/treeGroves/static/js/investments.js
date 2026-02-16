@@ -471,6 +471,61 @@ export const INVESTMENTS = [
     },
   },
 
+  // --- Shipping Crates ---
+  {
+    id: "shipping_crates",
+    title: "Shipping Crates",
+    group: "upgrade",
+
+    cost: (tuning, state) => {
+      const cfg = tuning.investments.shippingCrates;
+      const level = state.shippingCrateLevel || 0;
+      return cfg.baseCost.florins + level * cfg.costScale.florins;
+    },
+
+    costText: (tuning, state) => {
+      const cfg = tuning.investments.shippingCrates;
+      const level = state.shippingCrateLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return `${florins} florins, ${stone} stone`;
+    },
+
+    isUnlocked: (state, tuning) => true,
+
+    canPurchase: (state, tuning) => {
+      const cfg = tuning.investments.shippingCrates;
+      const level = state.shippingCrateLevel || 0;
+      if (level >= cfg.maxLevel) return false;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      return state.florinCount >= florins && state.stone >= stone;
+    },
+
+    purchase: (state, tuning) => {
+      const inv = INVESTMENTS.find(i => i.id === "shipping_crates");
+      if (!inv.canPurchase(state, tuning)) return false;
+      const cfg = tuning.investments.shippingCrates;
+      const level = state.shippingCrateLevel || 0;
+      const florins = cfg.baseCost.florins + level * cfg.costScale.florins;
+      const stone = cfg.baseCost.stone + level * cfg.costScale.stone;
+      state.florinCount -= florins;
+      state.stone -= stone;
+      if (state.stone < 0) state.stone = 0;
+      state.shippingCrateLevel = level + 1;
+      return true;
+    },
+
+    effectLines: (state, tuning) => {
+      const cfg = tuning.investments.shippingCrates;
+      const level = state.shippingCrateLevel || 0;
+      return [
+        `Shipping: +${cfg.oliveBonusPerLevel} olives, +${cfg.oilBonusPerLevel} oil per shipment`,
+        `Purchased: ${level}/${cfg.maxLevel}`,
+      ];
+    },
+  },
+
   // --- Olive Press Expansion ---
   {
     id: "build_olive_press",

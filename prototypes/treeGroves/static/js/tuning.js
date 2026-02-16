@@ -114,12 +114,12 @@ export const TUNING = {
     autosell: {
       baseRatePerSecond: 0.35,
       rateUpgradeAmount: 0.15,
-      maxRateUpgrades: 3,
+      maxRateUpgrades: 2,
     },
     lanes: {
       baseLanes: 1,
       laneUpgradeAmount: 1,
-      maxAdditionalLanes: 3,
+      maxAdditionalLanes: 2,
     },
     prices: {
       olivesFlorins: 1,
@@ -283,6 +283,13 @@ export const TUNING = {
     },
     autoShipOil: {
       cost: { florins: 100, stone: 15 },
+    },
+    shippingCrates: {
+      baseCost: { florins: 60, stone: 8 },
+      costScale: { florins: 40, stone: 8 },
+      maxLevel: 3,
+      oliveBonusPerLevel: 3,
+      oilBonusPerLevel: 2,
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 45, stoneCost: 5, capacityBonus: 20 },
