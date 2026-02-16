@@ -6,7 +6,7 @@ export const BASE_HARVEST_OUTCOMES = [
   { key: "interrupted_short", weight: 0.10, durationMs: 2000, collectedPct: 0.30, lostPct: 0.00 },
   { key: "poor", weight: 0.05, durationMs: 5500, collectedPct: 0.50, lostPct: 0.50 },
   { key: "normal", weight: 0.65, durationMs: 4500, collectedPct: 1.00, lostPct: 0.00 },
-  { key: "efficient", weight: 0.20, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 , bonusPct: 0.20 },
+  { key: "efficient", weight: 0.20, durationMs: 3500, collectedPct: 1.00, lostPct: 0.00 },
 ];
 
 export const TUNING = {
@@ -23,6 +23,11 @@ export const TUNING = {
     outcomes: BASE_HARVEST_OUTCOMES,
     // Base harvest modifiers (per harvester)
     poorWeightPerHarvester: 0.005,
+    // Efficient harvest bonus (flat + per-harvester scaling)
+    efficientBonus: {
+      flat: 2,
+      perHarvester: 0.3,
+    },
     // Arborist effects
     arborist: {
       poorReductionMult: 0.5,      // Reduces poor weight accumulation
