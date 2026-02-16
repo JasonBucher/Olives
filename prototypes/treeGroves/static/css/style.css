@@ -778,7 +778,6 @@ h1 {
   grid-template-columns: auto auto 1fr auto;
   gap: 10px;
   align-items: center;
-  min-height: 34px;
 }
 
 /* Shared subtitle style for info lines beneath a row (workers, inventory) */
@@ -924,7 +923,7 @@ h1 {
 .worker-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
 .worker-top {
@@ -1072,10 +1071,8 @@ h1 {
   white-space: nowrap;
 }
 
-/* Tighten Workers “carriage return” spacing */
-.worker-item { gap: 0px; }              /* was probably 2px */
+/* Tighten Workers spacing to match .row-subtitle alignment */
 .worker-left, .worker-middle { line-height: 1.0; }
-/* worker-delta spacing now handled by shared .row-subtitle */
 
 /* --- Workers: pin MGR to the Hire button without affecting layout --- */
 
