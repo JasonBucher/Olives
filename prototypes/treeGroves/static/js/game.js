@@ -1860,14 +1860,11 @@ function completeHarvest() {
   else if (outcome.key === 'efficient') logColor = 'green';
   else if (outcome.key.startsWith('interrupted')) logColor = 'orange';
   
-  // Format collection message (no harvester bonus shown)
-  let collectedMsg = totalCollected.toFixed(1);
-  
-  if (remaining > 0) {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost} (${remaining} left on trees)`, logColor);
-  } else {
-    logLine(`Harvest (${outcomeLabel}, ${durationSec}s): attempted ${attempted}, collected ${collectedMsg}, lost ${lost}`, logColor);
-  }
+  // Format collection message
+  const baseMsg = `Harvest (${outcomeLabel}, ${durationSec}s): collected ${Math.floor(baseCollected)}`;
+  const bonusPart = efficientBonus > 0 ? ` + ${efficientBonus} bonus` : '';
+  const lostPart = lost > 0 ? `, lost ${lost}` : '';
+  logLine(`${baseMsg}${bonusPart}${lostPart}`, logColor);
   
   // Floating outcome text for notable results (deferred to next frame to avoid jank)
   if (outcome.key === 'efficient' || outcome.key === 'poor' || outcome.key === 'interrupted_short') {
