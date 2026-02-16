@@ -778,6 +778,7 @@ h1 {
   grid-template-columns: auto auto 1fr auto;
   gap: 10px;
   align-items: center;
+  min-height: 25px;
 }
 
 /* Shared subtitle style for info lines beneath a row (workers, inventory) */
