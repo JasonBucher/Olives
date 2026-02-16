@@ -138,8 +138,7 @@ describe('Harvest Outcome Invariants', () => {
         upgrades: {
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
         tuning: TUNING.harvest,
       });
@@ -155,8 +154,7 @@ describe('Harvest Outcome Invariants', () => {
         upgrades: {
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
         tuning: TUNING.harvest,
       });
@@ -210,8 +208,7 @@ describe('Harvest Outcome Invariants', () => {
         upgrades: {
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
         tuning: TUNING.harvest,
       });
@@ -234,10 +231,8 @@ describe('Harvest Outcome Invariants', () => {
           training_program: {
             poorMultiplierReduction: 0.01,
           },
-          selective_picking: {
+          improved_harvesting: {
             efficientBonus: 3.0,
-          },
-          ladders_nets: {
             efficientPerHarvester: 0.5,
             efficientCap: 50.0,
           },
@@ -251,8 +246,7 @@ describe('Harvest Outcome Invariants', () => {
         upgrades: {
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
         tuning: extremeTuning,
       });
@@ -271,8 +265,7 @@ describe('Harvest Outcome Invariants', () => {
         upgrades: {
           standardized_tools: { poorFlatReduction: 100 }, // Huge reduction
           training_program: { poorMultiplierReduction: 0 },
-          selective_picking: { efficientBonus: 0 },
-          ladders_nets: { efficientPerHarvester: 0, efficientCap: 0 },
+          improved_harvesting: { efficientBonus: 0, efficientPerHarvester: 0, efficientCap: 0 },
         },
       };
 
@@ -392,14 +385,12 @@ describe('Harvest Outcome Invariants', () => {
         {},
         { standardized_tools: true },
         { training_program: true },
-        { selective_picking: true },
-        { ladders_nets: true },
+        { improved_harvesting: true },
         { standardized_tools: true, training_program: true },
         { 
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
       ];
 

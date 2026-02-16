@@ -75,8 +75,7 @@ describe('Harvester Hire Preview', () => {
         upgrades: {
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         },
         tuning: TUNING.harvest,
       });
@@ -202,8 +201,7 @@ describe('Harvester Hire Preview', () => {
         { count: 20, arborist: true, upgrades: { 
           standardized_tools: true,
           training_program: true,
-          selective_picking: true,
-          ladders_nets: true,
+          improved_harvesting: true,
         }},
       ];
 

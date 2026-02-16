@@ -47,8 +47,7 @@ describe('computeHarvestOutcomeWeights', () => {
           upgrades: {
             standardized_tools: true,
             training_program: true,
-            selective_picking: true,
-            ladders_nets: true,
+            improved_harvesting: true,
           },
         },
         {
@@ -57,8 +56,7 @@ describe('computeHarvestOutcomeWeights', () => {
           upgrades: {
             standardized_tools: true,
             training_program: true,
-            selective_picking: true,
-            ladders_nets: true,
+            improved_harvesting: true,
           },
         },
       ];
@@ -87,7 +85,7 @@ describe('computeHarvestOutcomeWeights', () => {
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 7,
         arboristIsActive: true,
-        upgrades: { standardized_tools: true, selective_picking: true },
+        upgrades: { standardized_tools: true, improved_harvesting: true },
         tuning: TUNING.harvest,
       });
 
@@ -167,7 +165,7 @@ describe('computeHarvestOutcomeWeights', () => {
       expect(withArboristEfficient).toBeGreaterThan(noArboristEfficient);
     });
 
-    it('should increase efficient weight with selective_picking upgrade', () => {
+    it('should increase efficient weight with improved_harvesting upgrade', () => {
       const noUpgrade = computeHarvestOutcomeWeights({
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
@@ -180,7 +178,7 @@ describe('computeHarvestOutcomeWeights', () => {
         outcomes: TUNING.harvest.outcomes,
         harvesterCount: 5,
         arboristIsActive: false,
-        upgrades: { selective_picking: true },
+        upgrades: { improved_harvesting: true },
         tuning: TUNING.harvest,
       });
 

@@ -30,12 +30,10 @@ export const TUNING = {
     },
     // Upgrade effects
     upgrades: {
-      selective_picking: {
-        efficientBonus: 0.06,      // Flat bonus to efficient weight
-      },
-      ladders_nets: {
-        efficientPerHarvester: 0.01,  // Scales with harvester count
-        efficientCap: 0.08,           // Maximum bonus from scaling
+      improved_harvesting: {
+        efficientBonus: 0.06,           // Flat bonus to efficient weight
+        efficientPerHarvester: 0.01,    // Scales with harvester count
+        efficientCap: 0.08,             // Maximum bonus from scaling
       },
     },
   },
@@ -49,8 +47,8 @@ export const TUNING = {
   // Workers: hiring costs and production effects
   workers: {
     cultivator: {
-      baseCost: 5,
-      costScaleLow: 2,           // Cost increase per cultivator (0-30)
+      baseCost: 8,
+      costScaleLow: 3,           // Cost increase per cultivator (0-30)
       costScaleHigh: 8,          // Cost increase per cultivator (30+)
       costScaleThreshold: 30,    // When cost scaling increases
       olivesPerSecondPerCultivator: 0.10,
@@ -252,8 +250,7 @@ export const TUNING = {
   // Investments: costs for managers and upgrades
   investments: {
     costs: {
-      selective_picking: 5,
-      ladders_nets: 10,
+      improved_harvesting: 20,
     },
     marketAutosell: {
       rateUpgradeCost: { florins: 60, stone: 6 },
@@ -271,16 +268,16 @@ export const TUNING = {
     sharpenedPicks: {
       baseCost: { stone: 5, florins: 40 },
       costScale: { stone: 3, florins: 40 },
-      maxLevel: 6,
-      bonusPerLevel: 1,
+      maxLevel: 3,
+      bonusPerLevel: 2,
     },
     olivePressExpansion: {
       baseCost: { florins: 120, stone: 10 },
       costScale: { florins: 90, stone: 8 },
-      maxAdditionalPresses: 5,
+      maxAdditionalPresses: 3,
     },
     autoShipOil: {
-      cost: { florins: 150, stone: 30 },
+      cost: { florins: 100, stone: 15 },
     },
     groveExpansion: [
       { idSuffix: 1, florinCost: 45, stoneCost: 5, capacityBonus: 20 },

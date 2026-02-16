@@ -830,6 +830,7 @@ h1 {
   gap: 8px;
   width: 100%;
   min-width: 0;
+  transform: translateY(-2px);
 }
 
 .inv-transit-pill {
@@ -1127,6 +1128,10 @@ h1 {
 
 .harvest-float.poor {
   color: #e57373;
+}
+
+.harvest-float.interrupted {
+  color: #b0895a;
 }
 
 @keyframes harvestFloat {

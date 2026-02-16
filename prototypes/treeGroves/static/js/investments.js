@@ -159,83 +159,37 @@ export const INVESTMENTS = [
 
   // --- Upgrades ---
   {
-    id: "selective_picking",
-    title: "Selective Picking",
+    id: "improved_harvesting",
+    title: "Improved Harvesting",
     group: "upgrade",
-    
-    cost: (tuning, state) => tuning.investments.costs.selective_picking,
-    
+
+    cost: (tuning, state) => tuning.investments.costs.improved_harvesting,
+
     isUnlocked: (state, tuning) => true,
-    
+
     canPurchase: (state, tuning) => {
-      return !state.upgrades.selective_picking && 
-             state.florinCount >= tuning.investments.costs.selective_picking;
+      return !state.upgrades.improved_harvesting &&
+             state.florinCount >= tuning.investments.costs.improved_harvesting;
     },
-    
+
     purchase: (state, tuning) => {
-      const inv = INVESTMENTS.find(i => i.id === "selective_picking");
+      const inv = INVESTMENTS.find(i => i.id === "improved_harvesting");
       if (!inv.canPurchase(state, tuning)) return false;
-      state.florinCount -= tuning.investments.costs.selective_picking;
-      state.upgrades.selective_picking = true;
+      state.florinCount -= tuning.investments.costs.improved_harvesting;
+      state.upgrades.improved_harvesting = true;
       return true;
     },
-    
+
     effectLines: (state, tuning) => {
-      const bonus = tuning.harvest.upgrades.selective_picking.efficientBonus;
+      const cfg = tuning.harvest.upgrades.improved_harvesting;
+      const bonus = cfg.efficientBonus;
+      const perHarvester = cfg.efficientPerHarvester;
+      const cap = cfg.efficientCap;
+
       return [
         `Harvest: Efficient +${bonus.toFixed(2)}`,
+        `Scales with harvesters: +${perHarvester.toFixed(2)} per harvester (cap +${cap.toFixed(2)})`,
       ];
-    },
-  },
-  
-  {
-    id: "ladders_nets",
-    title: "Ladders & Nets",
-    group: "upgrade",
-    
-    cost: (tuning, state) => tuning.investments.costs.ladders_nets,
-    
-    isUnlocked: (state, tuning) => true,
-    
-    canPurchase: (state, tuning) => {
-      return !state.upgrades.ladders_nets && 
-             state.florinCount >= tuning.investments.costs.ladders_nets;
-    },
-    
-    purchase: (state, tuning) => {
-      const inv = INVESTMENTS.find(i => i.id === "ladders_nets");
-      if (!inv.canPurchase(state, tuning)) return false;
-      state.florinCount -= tuning.investments.costs.ladders_nets;
-      state.upgrades.ladders_nets = true;
-      return true;
-    },
-    
-    effectLines: (state, tuning) => {
-      const perHarvester = tuning.harvest.upgrades.ladders_nets.efficientPerHarvester;
-      const cap = tuning.harvest.upgrades.ladders_nets.efficientCap;
-      
-      // State-aware preview: compute current and after-purchase efficient bonus
-      if (!state.upgrades.ladders_nets) {
-        const currentBonus = 0;
-        const afterBonus = Math.min(state.harvesterCount * perHarvester, cap);
-        
-        if (state.harvesterCount > 0) {
-          return [
-            `Harvest: Efficient +${currentBonus.toFixed(2)} → +${afterBonus.toFixed(2)} (cap +${cap.toFixed(2)})`,
-            `Scales with harvesters: +${perHarvester.toFixed(2)} per harvester`,
-          ];
-        } else {
-          return [
-            `Harvest: Efficient scales with harvesters (+${perHarvester.toFixed(2)} each, cap +${cap.toFixed(2)})`,
-          ];
-        }
-      } else {
-        // Already owned (shouldn't be visible, but for completeness)
-        const currentBonus = Math.min(state.harvesterCount * perHarvester, cap);
-        return [
-          `Harvest: Efficient +${currentBonus.toFixed(2)} (cap +${cap.toFixed(2)})`,
-        ];
-      }
     },
   },
   

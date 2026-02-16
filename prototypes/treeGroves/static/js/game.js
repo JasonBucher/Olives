@@ -1389,8 +1389,7 @@ function updateEra2UI() {
 function buildEstateSnapshot() {
   const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
   const harvestUpgradeKeys = Object.keys(state.upgrades || {}).filter((key) => (
-    key === "selective_picking" ||
-    key === "ladders_nets" ||
+    key === "improved_harvesting" ||
     key.startsWith("expand_grove_")
   ));
 
@@ -1499,8 +1498,9 @@ function updateUI() {
   const chances = getCurrentHarvestOutcomeChances();
   const poorPct = Math.round((chances.find(o => o.key === "poor")?.weight || 0) * 100);
   const efficientPct = Math.round((chances.find(o => o.key === "efficient")?.weight || 0) * 100);
+  const interruptedPct = Math.round((chances.find(o => o.key === "interrupted_short")?.weight || 0) * 100);
   const stabilityLabel = getHarvestStabilityLabel(poorPct);
-  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} olives \u2022 ${TUNING.harvest.durationSeconds}s  |  Stability: ${stabilityLabel} (${poorPct}% \u26A0 / ${efficientPct}% \u2728)`;
+  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} olives \u2022 ${TUNING.harvest.durationSeconds}s  |  Stability: ${stabilityLabel} (${poorPct}% \u26A0 / ${efficientPct}% \u2728 / ${interruptedPct}% \u26D4)`;
 
   // Update cultivator UI
   cultivatorCountEl.textContent = `x${state.cultivatorCount}`;
@@ -1858,10 +1858,12 @@ function completeHarvest() {
   }
   
   // Floating outcome text for notable results (deferred to next frame to avoid jank)
-  if (outcome.key === 'efficient' || outcome.key === 'poor') {
-    const floatKey = outcome.key;
+  if (outcome.key === 'efficient' || outcome.key === 'poor' || outcome.key === 'interrupted_short') {
+    const floatKey = outcome.key === 'interrupted_short' ? 'interrupted' : outcome.key;
     const floatText = floatKey === 'efficient'
       ? `+${Math.floor(totalCollected)} olives ✨ (+${Math.floor(totalCollected) - Math.floor(attempted * 0.80)})`
+      : floatKey === 'interrupted'
+      ? `Interrupted ⛔ (+${Math.floor(totalCollected)})`
       : `+${Math.floor(totalCollected)} olives ⚠`;
     requestAnimationFrame(() => {
       const floatEl = document.createElement('span');
