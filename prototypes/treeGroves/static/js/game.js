@@ -1431,11 +1431,13 @@ function openAnalyzer() {
   activeView = "analyzer";
   updateEraVisibility();
   analyzerView.notifyVisible();
+  syncSimulationPauseState();
 }
 
 function closeAnalyzer() {
   activeView = "game";
   updateUI();
+  syncSimulationPauseState();
 }
 
 function computeEstateIncomeRate(snapshot) {
@@ -3398,6 +3400,24 @@ function resumeSim() {
   }
 }
 
+function shouldPauseSimulation() {
+  if (allowBackgroundSim) return false;
+  const isHidden = typeof document !== "undefined" ? !!document.hidden : false;
+  const hasFocus = typeof document !== "undefined" && typeof document.hasFocus === "function"
+    ? document.hasFocus()
+    : !isHidden;
+  const isAnalyzerOpen = activeView === "analyzer";
+  return isHidden || !hasFocus || isAnalyzerOpen;
+}
+
+function syncSimulationPauseState() {
+  if (shouldPauseSimulation()) {
+    pauseSim();
+  } else {
+    resumeSim();
+  }
+}
+
 function startEra2Loop() {
   if (Number(state.era) < 2) return;
   if (era2LoopInterval) return;
@@ -3720,23 +3740,15 @@ debugModal.addEventListener("click", (e) => {
 
 // --- Visibility/Focus Event Listeners ---
 document.addEventListener("visibilitychange", () => {
-  if (allowBackgroundSim) return;
-  if (document.hidden) {
-    pauseSim();
-  } else {
-    resumeSim();
-  }
+  syncSimulationPauseState();
 });
 
 window.addEventListener("blur", () => {
-  if (allowBackgroundSim) return;
-  pauseSim();
+  syncSimulationPauseState();
 });
 
 window.addEventListener("focus", () => {
-  if (allowBackgroundSim) return;
-  if (document.hidden) return;
-  resumeSim();
+  syncSimulationPauseState();
 });
 
 // --- Background Sim Toggle ---
@@ -3745,9 +3757,7 @@ if (bgSimToggleBtn) {
   bgSimToggleBtn.addEventListener("click", () => {
     allowBackgroundSim = !allowBackgroundSim;
     bgSimToggleBtn.textContent = allowBackgroundSim ? "BG: On" : "BG: Off";
-    if (allowBackgroundSim && isSimPaused) {
-      resumeSim();
-    }
+    syncSimulationPauseState();
   });
 }
 
@@ -3808,3 +3818,4 @@ if (Number(state.era) < 2) {
 } else {
   startEra2Loop();
 }
+syncSimulationPauseState();
