@@ -718,6 +718,12 @@ h1 {
   justify-content: center;
 }
 
+#era2-session-log-session-id {
+  font-family: var(--mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
 .u-callout {
   margin-top: 10px;
   padding: 12px 14px;

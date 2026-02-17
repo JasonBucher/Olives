@@ -4,6 +4,7 @@ import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
+import SessionLog from './sessionLog.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -248,6 +249,11 @@ function buildPersistedState(currentState) {
 }
 
 let state = createDefaultState();
+SessionLog.initSession({
+  version: state.meta?.version || "unknown",
+  build: "unknown",
+  tuning: TUNING,
+});
 const renownTierConfig = (Array.isArray(TUNING.renownTiers) ? [...TUNING.renownTiers] : [])
   .filter((tier) => tier && typeof tier.id === "string" && typeof tier.name === "string" && Number.isFinite(Number(tier.minRenown)))
   .map((tier) => ({
@@ -619,6 +625,10 @@ const era2SummaryCultivatorsHiredEl = document.getElementById("era2-summary-cult
 const era2SummaryPressersHiredEl = document.getElementById("era2-summary-pressers-hired");
 const era2SummaryInvestmentsTotalEl = document.getElementById("era2-summary-investments-total");
 const era2SummaryInvestmentsTopEl = document.getElementById("era2-summary-investments-top");
+const era2SessionLogDownloadBtn = document.getElementById("era2-session-log-download-btn");
+const era2SessionLogLinesEl = document.getElementById("era2-session-log-lines");
+const era2SessionLogSizeEl = document.getElementById("era2-session-log-size");
+const era2SessionLogSessionIdEl = document.getElementById("era2-session-log-session-id");
 
 const harvestActionUI = createInlineActionController({
   pillEl: harvestPill,
@@ -673,6 +683,10 @@ function logLine(message, color = null) {
 
 function marketLogLine(message) {
   logPlayer({ channel: 'market', text: message });
+}
+
+function recordTelemetry(type, payload = {}) {
+  SessionLog.record(type, payload);
 }
 
 function showMarketFloat(text, variant) {
@@ -1050,6 +1064,36 @@ function formatSummaryCount(value, fractionDigits = 0) {
   return safe.toLocaleString(undefined, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
 }
 
+function formatApproxBytes(value) {
+  const bytes = Math.max(0, Math.floor(Number(value) || 0));
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
+function downloadSessionLog() {
+  const text = SessionLog.getText();
+  const stats = SessionLog.getStats();
+  const safeSessionId = String(stats.sessionId || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filename = `treegroves-session-${safeSessionId}-${timestamp}.ndjson`;
+  const blob = new Blob([text], { type: "application/x-ndjson" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  recordTelemetry("action_complete", {
+    action: "download_session_log",
+    lineCount: stats.lineCount || 0,
+    approxBytes: stats.approxBytes || 0,
+  });
+}
+
 function getEra1DurationSecondsForSummary() {
   const era1 = getRunStatsEra1();
   if (Number(era1.durationSeconds) > 0) return Number(era1.durationSeconds);
@@ -1424,6 +1468,17 @@ function updateEra2UI() {
         .join("<br />");
     }
   }
+
+  const sessionLogStats = SessionLog.getStats();
+  if (era2SessionLogLinesEl) {
+    era2SessionLogLinesEl.textContent = formatSummaryCount(sessionLogStats.lineCount || 0, 0);
+  }
+  if (era2SessionLogSizeEl) {
+    era2SessionLogSizeEl.textContent = formatApproxBytes(sessionLogStats.approxBytes || 0);
+  }
+  if (era2SessionLogSessionIdEl) {
+    era2SessionLogSessionIdEl.textContent = sessionLogStats.sessionId || "unknown";
+  }
 }
 
 function buildEstateSnapshot() {
@@ -1450,6 +1505,11 @@ function moveToCity() {
   if (!lifetimeMet || !paymentMet) return;
 
   if (!spendFlorins(TUNING.relocation.florinCost)) return;
+  recordTelemetry("currency_delta", {
+    currency: "florins",
+    delta: Number((-TUNING.relocation.florinCost).toFixed(4)),
+    reason: "move_to_city",
+  });
   finalizeEra1RunStats();
   state.estateSnapshot = buildEstateSnapshot();
   state.era = 2;
@@ -1464,6 +1524,10 @@ function moveToCity() {
 
   updateEraVisibility();
   updateUI();
+  recordTelemetry("action_complete", {
+    action: "move_to_city",
+    estateIncomePerSecond: Number(getEstateIncomeRate().toFixed(6)),
+  });
 }
 
 // --- UI ---
@@ -1771,16 +1835,26 @@ function updateDebugHarvestChances() {
 }
 
 // --- Weighted Random Helper ---
-function rollWeighted(outcomesArray) {
+function rollWeighted(outcomesArray, { detailed = false } = {}) {
   const totalWeight = outcomesArray.reduce((sum, o) => sum + o.weight, 0);
-  let roll = Math.random() * totalWeight;
+  const roll = Math.random() * totalWeight;
+  let remaining = roll;
   
   for (const outcome of outcomesArray) {
-    roll -= outcome.weight;
-    if (roll <= 0) return outcome;
+    remaining -= outcome.weight;
+    if (remaining <= 0) {
+      if (detailed) {
+        return { outcome, roll, totalWeight };
+      }
+      return outcome;
+    }
   }
-  
-  return outcomesArray[outcomesArray.length - 1];
+
+  const fallback = outcomesArray[outcomesArray.length - 1];
+  if (detailed) {
+    return { outcome: fallback, roll, totalWeight };
+  }
+  return fallback;
 }
 
 // --- Debug Helper: Current Harvest Outcome Chances ---
@@ -1840,7 +1914,17 @@ function startHarvest(opts = {}) {
   logDebug({ channel: 'farm', text: `Chances at harvest: ${chancesLog}` });
   
   // Select outcome with normalized chances (weights now represent probabilities 0..1)
-  const outcome = rollWeighted(adjustedOutcomes);
+  const rollResult = rollWeighted(adjustedOutcomes, { detailed: true });
+  const outcome = rollResult.outcome;
+  recordTelemetry("roll_result", {
+    action: "harvest",
+    roll: Number((rollResult.roll || 0).toFixed(6)),
+    totalWeight: Number((rollResult.totalWeight || 0).toFixed(6)),
+    weights: adjustedOutcomes.map((entry) => ({
+      key: entry.key,
+      weight: Number((entry.weight || 0).toFixed(6)),
+    })),
+  });
   
   // Use fixed duration from tuning (outcome duration no longer used)
   const effectiveDurationMs = TUNING.harvest.durationSeconds * 1000;
@@ -1866,6 +1950,14 @@ function startHarvest(opts = {}) {
   } else {
     logLine(`Starting harvest (H: ${state.harvesterCount}): attempting ${attemptedInt} olives`);
   }
+
+  recordTelemetry("action_start", {
+    action: "harvest",
+    source: opts.source === "auto" ? "auto" : "manual",
+    attempted: attemptedInt,
+    durationMs: effectiveDurationMs,
+    harvesterCount: state.harvesterCount,
+  });
 }
 
 function completeHarvest() {
@@ -1905,6 +1997,32 @@ function completeHarvest() {
   const bonusPart = efficientBonus > 0 ? ` + ${efficientBonus} bonus` : '';
   const lostPart = lost > 0 ? `, lost ${lost}` : '';
   logLine(`${baseMsg}${bonusPart}${lostPart}`, logColor);
+
+  const collectedInt = Math.floor(totalCollected);
+  const completionEventType = outcome.key.startsWith("interrupted") ? "action_interrupted" : "action_complete";
+  recordTelemetry(completionEventType, {
+    action: "harvest",
+    attempted,
+    outcome: outcome.key,
+    durationMs,
+    collected: collectedInt,
+    efficientBonus,
+    lost,
+    treeOlivesBefore: Math.floor(treeOlivesBefore),
+    treeOlivesAfter: Math.floor(state.treeOlives),
+  });
+  recordTelemetry("resource_delta", {
+    resource: "tree_olives",
+    delta: -1 * (Math.floor(baseCollected) + lost),
+    reason: "harvest_complete",
+    outcome: outcome.key,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "harvested_olives",
+    delta: Number(totalCollected.toFixed(4)),
+    reason: "harvest_complete",
+    outcome: outcome.key,
+  });
   
   // Floating outcome text for notable results (deferred to next frame to avoid jank)
   if (outcome.key === 'efficient' || outcome.key === 'poor' || outcome.key === 'interrupted_short') {
@@ -1993,8 +2111,32 @@ function startShipping() {
   state.harvestedOlives = consumeInventory(state.harvestedOlives, amount);
   
   // Roll time outcome and incident outcome
-  const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
-  const incidentOutcome = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes);
+  const timeRoll = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes, { detailed: true });
+  const incidentRoll = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes, { detailed: true });
+  const timeOutcome = timeRoll.outcome;
+  const incidentOutcome = incidentRoll.outcome;
+  recordTelemetry("roll_result", {
+    action: "ship_olives",
+    rollKind: "time",
+    roll: Number((timeRoll.roll || 0).toFixed(6)),
+    totalWeight: Number((timeRoll.totalWeight || 0).toFixed(6)),
+    selected: timeOutcome.key,
+    weights: TUNING.market.shipping.sharedTimeOutcomes.map((entry) => ({
+      key: entry.key,
+      weight: Number((entry.weight || 0).toFixed(6)),
+    })),
+  });
+  recordTelemetry("roll_result", {
+    action: "ship_olives",
+    rollKind: "incident",
+    roll: Number((incidentRoll.roll || 0).toFixed(6)),
+    totalWeight: Number((incidentRoll.totalWeight || 0).toFixed(6)),
+    selected: incidentOutcome.key,
+    weights: TUNING.market.shipping.sharedIncidentOutcomes.map((entry) => ({
+      key: entry.key,
+      weight: Number((entry.weight || 0).toFixed(6)),
+    })),
+  });
   
   // Calculate losses
   let lostCount = Math.floor(amount * incidentOutcome.lostPct);
@@ -2025,6 +2167,21 @@ function startShipping() {
   shipOlivesBtn.disabled = true;
   
   logLine(`Loaded ${amount} olives onto cart for market`);
+  recordTelemetry("action_start", {
+    action: "ship_olives",
+    item: "olives",
+    amount,
+    durationMs: timeOutcome.durationMs,
+    timeOutcome: timeOutcome.key,
+    incidentOutcome: incidentOutcome.key,
+    lostCount,
+    stolenCount,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "harvested_olives",
+    delta: -amount,
+    reason: "ship_olives_start",
+  });
   saveGame();
   updateUI();
 }
@@ -2046,6 +2203,21 @@ function completeShipping() {
   marketLogLine(
     `Shipment arrived (${timeKey}, ${incidentKey}): sent ${shipJob.amount}, arrived ${arrived}, lost ${shipJob.lostCount}, stolen ${shipJob.stolenCount}.`
   );
+  recordTelemetry("action_complete", {
+    action: "ship_olives",
+    item: "olives",
+    sent: shipJob.amount,
+    arrived,
+    lostCount: shipJob.lostCount,
+    stolenCount: shipJob.stolenCount,
+    timeOutcome: shipJob.timeOutcomeKey,
+    incidentOutcome: shipJob.incidentKey,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "market_olives",
+    delta: arrived,
+    reason: "ship_olives_complete",
+  });
 
   // Reset shipping state
   isShipping = false;
@@ -2103,6 +2275,17 @@ function startPressing() {
   // Update inline UI
   pressActionUI.start({ count: olivesToPress, percent: 0 });
   pressBtn.disabled = true;
+  recordTelemetry("action_start", {
+    action: "press",
+    olivesConsumed: olivesToPress,
+    oilPerOlive: Number(oilPerOlive.toFixed(6)),
+    durationMs: pressJob.durationMs,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "harvested_olives",
+    delta: -olivesToPress,
+    reason: "press_start",
+  });
   
   saveGame();
   updateUI();
@@ -2123,6 +2306,19 @@ function completePressing() {
     channel: 'farm',
     playerText: playerText,
     debugText: debugText,
+  });
+  recordTelemetry("action_complete", {
+    action: "press",
+    olivesConsumed: pressJob.olivesConsumed,
+    producedOil: Number(producedOil.toFixed(4)),
+    oilPerOlive: Number(pressJob.oilPerOlive.toFixed(6)),
+    durationMs: pressJob.durationMs,
+    outcome: "success",
+  });
+  recordTelemetry("resource_delta", {
+    resource: "olive_oil",
+    delta: Number(producedOil.toFixed(4)),
+    reason: "press_complete",
   });
   
   saveGame();
@@ -2164,8 +2360,32 @@ function startShippingOliveOil() {
   state.oliveOilCount = consumeInventory(state.oliveOilCount || 0, amount);
   
   // Roll time outcome and incident outcome
-  const timeOutcome = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes);
-  const incidentOutcome = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes);
+  const timeRoll = rollWeighted(TUNING.market.shipping.sharedTimeOutcomes, { detailed: true });
+  const incidentRoll = rollWeighted(TUNING.market.shipping.sharedIncidentOutcomes, { detailed: true });
+  const timeOutcome = timeRoll.outcome;
+  const incidentOutcome = incidentRoll.outcome;
+  recordTelemetry("roll_result", {
+    action: "ship_olive_oil",
+    rollKind: "time",
+    roll: Number((timeRoll.roll || 0).toFixed(6)),
+    totalWeight: Number((timeRoll.totalWeight || 0).toFixed(6)),
+    selected: timeOutcome.key,
+    weights: TUNING.market.shipping.sharedTimeOutcomes.map((entry) => ({
+      key: entry.key,
+      weight: Number((entry.weight || 0).toFixed(6)),
+    })),
+  });
+  recordTelemetry("roll_result", {
+    action: "ship_olive_oil",
+    rollKind: "incident",
+    roll: Number((incidentRoll.roll || 0).toFixed(6)),
+    totalWeight: Number((incidentRoll.totalWeight || 0).toFixed(6)),
+    selected: incidentOutcome.key,
+    weights: TUNING.market.shipping.sharedIncidentOutcomes.map((entry) => ({
+      key: entry.key,
+      weight: Number((entry.weight || 0).toFixed(6)),
+    })),
+  });
   
   // Calculate losses
   let lostCount = Math.floor(amount * incidentOutcome.lostPct);
@@ -2196,6 +2416,21 @@ function startShippingOliveOil() {
   shipOliveOilBtn.disabled = true;
   
   logLine(`Loaded ${amount} olive oil onto cart for market`);
+  recordTelemetry("action_start", {
+    action: "ship_olive_oil",
+    item: "olive_oil",
+    amount,
+    durationMs: timeOutcome.durationMs,
+    timeOutcome: timeOutcome.key,
+    incidentOutcome: incidentOutcome.key,
+    lostCount,
+    stolenCount,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "olive_oil",
+    delta: -amount,
+    reason: "ship_olive_oil_start",
+  });
   saveGame();
   updateUI();
 }
@@ -2223,6 +2458,18 @@ function tryPremiumBuyerOnArrival(arrived) {
     playerText: `Premium buyer: purchased ${arrived} oil for ${formatFlorins(earned)} florins!`,
     debugText: `Premium buyer: arrived=${arrived}, priceMult=\u00d7${effectiveMult.toFixed(2)}, earned=${earned.toFixed(2)} fl`,
   });
+  recordTelemetry("action_complete", {
+    action: "premium_buyer",
+    item: "olive_oil",
+    arrived,
+    earned: Number(earned.toFixed(4)),
+    effectivePriceMultiplier: Number(effectiveMult.toFixed(4)),
+  });
+  recordTelemetry("currency_delta", {
+    currency: "florins",
+    delta: Number(earned.toFixed(4)),
+    reason: "premium_buyer",
+  });
 
   return { triggered: true, earned };
 }
@@ -2249,6 +2496,24 @@ function completeShippingOliveOil() {
   marketLogLine(
     `Olive oil shipment arrived (${timeKey}, ${incidentKey}): sent ${oliveOilShipJob.amount}, arrived ${arrived}, lost ${oliveOilShipJob.lostCount}, stolen ${oliveOilShipJob.stolenCount}.`
   );
+  recordTelemetry("action_complete", {
+    action: "ship_olive_oil",
+    item: "olive_oil",
+    sent: oliveOilShipJob.amount,
+    arrived,
+    lostCount: oliveOilShipJob.lostCount,
+    stolenCount: oliveOilShipJob.stolenCount,
+    timeOutcome: oliveOilShipJob.timeOutcomeKey,
+    incidentOutcome: oliveOilShipJob.incidentKey,
+    premiumBuyerTriggered: !!premium.triggered,
+  });
+  if (!premium.triggered) {
+    recordTelemetry("resource_delta", {
+      resource: "market_olive_oil",
+      delta: arrived,
+      reason: "ship_olive_oil_complete",
+    });
+  }
 
   // Reset shipping state
   isShippingOliveOil = false;
@@ -2293,6 +2558,11 @@ function startQuarry() {
   quarryActionUI.start({ count: getQuarryOutput(), percent: 0 });
 
   logLine("Quarrying stone...");
+  recordTelemetry("action_start", {
+    action: "quarry",
+    durationMs,
+    expectedStone: getQuarryOutput(),
+  });
 }
 
 function completeQuarry() {
@@ -2312,6 +2582,17 @@ function completeQuarry() {
     channel: 'farm',
     playerText,
     debugText,
+  });
+  recordTelemetry("action_complete", {
+    action: "quarry",
+    output,
+    totalStone: Number(state.stone.toFixed(4)),
+    durationMs: quarryJob.durationMs,
+  });
+  recordTelemetry("resource_delta", {
+    resource: "stone",
+    delta: output,
+    reason: "quarry_complete",
   });
 
   saveGame();
@@ -2787,6 +3068,29 @@ function buyInvestment(id) {
     saveGame();
     updateUI();
     logLine(`Purchased: ${investment.title}`);
+    recordTelemetry("purchase_investment", {
+      id: investment.id,
+      title: investment.title,
+      group: investment.group || "unknown",
+      florinsSpent: Number(spent.toFixed(4)),
+      stoneSpent: Number(stoneSpent.toFixed(4)),
+    });
+    if (spent > 0) {
+      recordTelemetry("currency_delta", {
+        currency: "florins",
+        delta: Number((-spent).toFixed(4)),
+        reason: "purchase_investment",
+        investmentId: investment.id,
+      });
+    }
+    if (stoneSpent > 0) {
+      recordTelemetry("resource_delta", {
+        resource: "stone",
+        delta: Number((-stoneSpent).toFixed(4)),
+        reason: "purchase_investment",
+        investmentId: investment.id,
+      });
+    }
     if (investment.id === "market_trade_deals") {
       const bonusPct = TUNING.market.price.upgradeMultiplier * 100;
       marketLogLine(`Secured better trade deals \u2192 +${formatPercent(bonusPct)}% prices`);
@@ -3231,6 +3535,17 @@ hireCultivatorBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine(`Hired Cultivator (#${state.cultivatorCount}) for ${cost} florins.`);
+  recordTelemetry("hire_worker", {
+    workerType: "cultivator",
+    count: state.cultivatorCount,
+    cost,
+  });
+  recordTelemetry("currency_delta", {
+    currency: "florins",
+    delta: Number((-cost).toFixed(4)),
+    reason: "hire_worker",
+    workerType: "cultivator",
+  });
 });
 
 hireHarvesterBtn.addEventListener("click", () => {
@@ -3242,6 +3557,17 @@ hireHarvesterBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine(`Hired Harvester (#${state.harvesterCount}) for ${cost} florins.`);
+  recordTelemetry("hire_worker", {
+    workerType: "harvester",
+    count: state.harvesterCount,
+    cost,
+  });
+  recordTelemetry("currency_delta", {
+    currency: "florins",
+    delta: Number((-cost).toFixed(4)),
+    reason: "hire_worker",
+    workerType: "harvester",
+  });
 });
 
 hirePresserBtn.addEventListener("click", () => {
@@ -3253,6 +3579,17 @@ hirePresserBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine(`Hired Presser (#${state.presserCount}) for ${cost} florins.`);
+  recordTelemetry("hire_worker", {
+    workerType: "presser",
+    count: state.presserCount,
+    cost,
+  });
+  recordTelemetry("currency_delta", {
+    currency: "florins",
+    delta: Number((-cost).toFixed(4)),
+    reason: "hire_worker",
+    workerType: "presser",
+  });
 });
 
 clearLogBtn.addEventListener("click", () => {
@@ -3275,6 +3612,9 @@ debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
 if (era2ResetBtn) {
   era2ResetBtn.addEventListener("click", resetGame);
+}
+if (era2SessionLogDownloadBtn) {
+  era2SessionLogDownloadBtn.addEventListener("click", downloadSessionLog);
 }
 invitationUnderstoodBtn.addEventListener("click", acknowledgeInvitationModal);
 moveToCityBtn.addEventListener("click", moveToCity);
