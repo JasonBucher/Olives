@@ -676,6 +676,19 @@
       <section class="section">
         <div class="section-title">Upload</div>
         <div class="subsection">
+          <div class="analyzer-source-row">
+            <div class="muted u-text-12">Data Source</div>
+            <div class="analyzer-source-options">
+              <label class="analyzer-source-option" for="analyzer-source-live">
+                <input id="analyzer-source-live" name="analyzer-source" type="radio" value="live" checked />
+                <span>Current Run</span>
+              </label>
+              <label class="analyzer-source-option" for="analyzer-source-file">
+                <input id="analyzer-source-file" name="analyzer-source" type="radio" value="file" disabled />
+                <span>Loaded File: <span id="analyzer-loaded-filename">none</span></span>
+              </label>
+            </div>
+          </div>
           <input
             id="analyzer-file-input"
             class="analyzer-file-input"
@@ -684,6 +697,7 @@
           />
           <div class="u-pad-top-6 analyzer-actions">
             <button id="analyzer-upload-btn" class="btn btn-primary" type="button">Upload Log</button>
+            <button id="analyzer-snapshot-btn" class="btn" type="button">📌 Snapshot Point</button>
             <button id="analyzer-download-normalized-btn" class="btn" type="button" disabled>Download Normalized Events (JSON)</button>
             <button id="analyzer-download-timeseries-btn" class="btn" type="button" disabled>Download Time Series (CSV)</button>
           </div>

@@ -750,6 +750,33 @@ h1 {
   flex-wrap: wrap;
 }
 
+.analyzer-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.analyzer-source-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.analyzer-source-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.analyzer-source-option input:disabled + span {
+  color: var(--muted);
+}
+
 .analyzer-file-input {
   width: 100%;
   background: rgba(255, 255, 255, 0.05);

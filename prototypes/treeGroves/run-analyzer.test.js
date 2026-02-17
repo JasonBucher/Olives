@@ -52,4 +52,20 @@ describe("Run Analyzer parsing", () => {
     expect(analysis.summary.investmentsPurchasedCount).toBe(1);
     expect(analysis.points.length).toBe(2);
   });
+
+  it("treats analyzer markers as key timeline events", () => {
+    const rawText = JSON.stringify([
+      { ms: 1000, type: "session_start", payload: { version: "treeGroves" } },
+      { ms: 2000, type: "analyzer_marker", payload: { label: "Checkpoint A" } },
+    ]);
+
+    const parsed = parseTelemetryText(rawText);
+    const normalized = normalizeTelemetryEvents(parsed.rawEvents);
+    const analysis = computeRunAnalysis(normalized.events);
+
+    const markerRow = analysis.timelineRows.find((row) => row.type === "analyzer_marker");
+    expect(markerRow).toBeTruthy();
+    expect(markerRow.isKeyEvent).toBe(true);
+    expect(markerRow.details).toContain("Checkpoint A");
+  });
 });

@@ -1,3 +1,5 @@
+import SessionLog from "../sessionLog.js";
+
 const METRIC_DEFS = [
   { key: "florins", label: "Florins", color: "#3b7bff", digits: 2 },
   { key: "stone", label: "Stone", color: "#cbd5e1", digits: 0 },
@@ -216,6 +218,31 @@ export function normalizeTelemetryEvents(rawEvents) {
   return { events: normalized, invalidEvents };
 }
 
+export function buildAnalysisFromText(text) {
+  const rawText = String(text || "");
+  if (!rawText.trim()) {
+    const emptyAnalysis = computeRunAnalysis([]);
+    return {
+      analysis: emptyAnalysis,
+      parsed: { rawEvents: [], invalidLines: 0, format: "empty" },
+      normalized: { events: [], invalidEvents: 0 },
+    };
+  }
+
+  const parsed = parseTelemetryText(rawText);
+  const normalized = normalizeTelemetryEvents(parsed.rawEvents);
+  const analysis = computeRunAnalysis(normalized.events);
+  return { analysis, parsed, normalized };
+}
+
+export function buildLiveAnalysis() {
+  return buildAnalysisFromText(SessionLog.getText());
+}
+
+export function buildFileAnalysis(fileText) {
+  return buildAnalysisFromText(fileText);
+}
+
 function createMetricState() {
   return { value: 0, known: false };
 }
@@ -297,6 +324,10 @@ function compactEventDetails(event) {
   if (event.type === "era_transition") {
     return `era ${payload.fromEra ?? "?"} → ${payload.toEra ?? payload.era ?? "?"}`;
   }
+  if (event.type === "analyzer_marker") {
+    const label = String(payload.label || "Snapshot");
+    return `📌 Snapshot: ${label}`;
+  }
 
   const keys = Object.keys(payload).slice(0, 3);
   if (!keys.length) return "—";
@@ -310,6 +341,7 @@ function isKeyEvent(event) {
     event.type === "hire_manager" ||
     event.type === "action_complete" ||
     event.type === "action_interrupted" ||
+    event.type === "analyzer_marker" ||
     event.type === "era_transition" ||
     (event.type === "action_complete" && event.payload?.action === "move_to_city")
   );
@@ -543,9 +575,13 @@ function createSvgEl(name, attrs = {}) {
   return el;
 }
 
-export function initAnalyzerView() {
+export function initAnalyzerView(options = {}) {
   const fileInput = document.getElementById("analyzer-file-input");
   const uploadBtn = document.getElementById("analyzer-upload-btn");
+  const snapshotBtn = document.getElementById("analyzer-snapshot-btn");
+  const sourceLiveEl = document.getElementById("analyzer-source-live");
+  const sourceFileEl = document.getElementById("analyzer-source-file");
+  const loadedFilenameEl = document.getElementById("analyzer-loaded-filename");
   const statusEl = document.getElementById("analyzer-status");
   const metaSessionIdEl = document.getElementById("analyzer-meta-session-id");
   const metaStartEl = document.getElementById("analyzer-meta-start");
@@ -577,10 +613,30 @@ export function initAnalyzerView() {
 
   let currentAnalysis = null;
   let enabledMetricKeys = new Set();
+  let currentSource = "live";
+  let lastUploadedText = "";
+  let lastUploadedFilename = "";
 
   function setStatus(text, isError = false) {
     statusEl.textContent = text;
     statusEl.style.color = isError ? "#ff9f43" : "";
+  }
+
+  function updateSourceControls() {
+    const hasFile = !!lastUploadedText;
+    if (sourceFileEl) {
+      sourceFileEl.disabled = !hasFile;
+      sourceFileEl.checked = currentSource === "file" && hasFile;
+    }
+    if (sourceLiveEl) {
+      sourceLiveEl.checked = currentSource !== "file";
+    }
+    if (loadedFilenameEl) {
+      loadedFilenameEl.textContent = hasFile ? lastUploadedFilename : "none";
+    }
+    if (snapshotBtn) {
+      snapshotBtn.disabled = currentSource !== "live";
+    }
   }
 
   function updateMetadata(analysis) {
@@ -683,6 +739,13 @@ export function initAnalyzerView() {
   function renderChart() {
     const analysis = currentAnalysis;
     const points = analysis?.points || [];
+    const runStartMs = analysis?.metadata?.runStartMs || points[0]?.ms || 0;
+    const markerEvents = (analysis?.events || [])
+      .filter((event) => event.type === "analyzer_marker")
+      .map((event) => ({
+        tRelSec: Math.max(0, (event.ms - runStartMs) / 1000),
+        label: String(event.payload?.label || "Snapshot"),
+      }));
     chartSvgEl.innerHTML = "";
     chartTooltipEl.classList.add("is-hidden");
 
@@ -793,6 +856,19 @@ export function initAnalyzerView() {
       chartSvgEl.appendChild(label);
     }
 
+    markerEvents.forEach((marker) => {
+      const x = scales.x(Math.min(maxX, Math.max(minX, marker.tRelSec)));
+      chartSvgEl.appendChild(createSvgEl("line", {
+        x1: x,
+        y1: padding.top,
+        x2: x,
+        y2: height - padding.bottom,
+        stroke: "rgba(255, 208, 0, 0.45)",
+        "stroke-width": 1,
+        "stroke-dasharray": "4 4",
+      }));
+    });
+
     activeDefs.forEach((def) => {
       const pointsString = buildPolylinePoints(points, def.key, scales);
       if (!pointsString) return;
@@ -856,6 +932,21 @@ export function initAnalyzerView() {
         if (!Number.isFinite(value)) return;
         lines.push(`<span style="color:${def.color}">${def.label}: ${value.toFixed(def.digits)}</span>`);
       });
+      if (markerEvents.length) {
+        let nearestMarker = markerEvents[0];
+        let markerDistance = Math.abs(nearestMarker.tRelSec - point.tRelSec);
+        for (let i = 1; i < markerEvents.length; i++) {
+          const distance = Math.abs(markerEvents[i].tRelSec - point.tRelSec);
+          if (distance < markerDistance) {
+            nearestMarker = markerEvents[i];
+            markerDistance = distance;
+          }
+        }
+        const markerTolerance = Math.max(0.4, maxX * 0.015);
+        if (markerDistance <= markerTolerance) {
+          lines.push(`<span style="color:#ffd166">📌 ${nearestMarker.label}</span>`);
+        }
+      }
       chartTooltipEl.innerHTML = lines.join("<br />");
       chartTooltipEl.style.left = `${Math.min(width - 170, Math.max(10, x + 10))}px`;
       chartTooltipEl.style.top = `${padding.top + 8}px`;
@@ -877,6 +968,35 @@ export function initAnalyzerView() {
     downloadTimeseriesBtn.disabled = !analysis?.points?.length;
   }
 
+  function buildStatusMessage(prefix, buildResult) {
+    return `${prefix}${buildResult.normalized.events.length} events (${buildResult.parsed.format}).` +
+      (buildResult.parsed.invalidLines ? ` Ignored ${buildResult.parsed.invalidLines} invalid line(s).` : "") +
+      (buildResult.normalized.invalidEvents ? ` Skipped ${buildResult.normalized.invalidEvents} invalid event(s).` : "");
+  }
+
+  function renderFromSource(mode = currentSource) {
+    if (mode === "file" && !lastUploadedText) {
+      currentSource = "live";
+      updateSourceControls();
+      return renderFromSource("live");
+    }
+
+    try {
+      const buildResult = mode === "live"
+        ? buildLiveAnalysis()
+        : buildFileAnalysis(lastUploadedText);
+      currentSource = mode;
+      applyAnalysisResult(buildResult.analysis);
+      updateSourceControls();
+      setStatus(mode === "live"
+        ? buildStatusMessage("Current Run: ", buildResult)
+        : buildStatusMessage(`Loaded File (${lastUploadedFilename}): `, buildResult));
+    } catch (error) {
+      console.error("Analyzer render failed", error);
+      setStatus(`Failed to analyze ${mode === "live" ? "current run" : "loaded file"}: ${error?.message || "unknown error"}`, true);
+    }
+  }
+
   async function handleUpload() {
     const file = fileInput.files?.[0];
     if (!file) {
@@ -886,18 +1006,33 @@ export function initAnalyzerView() {
 
     try {
       const text = await file.text();
-      const parsed = parseTelemetryText(text);
-      const normalized = normalizeTelemetryEvents(parsed.rawEvents);
-      const analysis = computeRunAnalysis(normalized.events);
-      applyAnalysisResult(analysis);
-      const message = `Loaded ${normalized.events.length} events (${parsed.format}).` +
-        (parsed.invalidLines ? ` Ignored ${parsed.invalidLines} invalid line(s).` : "") +
-        (normalized.invalidEvents ? ` Skipped ${normalized.invalidEvents} invalid event(s).` : "");
-      setStatus(message);
+      lastUploadedText = text;
+      lastUploadedFilename = file.name || "uploaded";
+      currentSource = "file";
+      updateSourceControls();
+      renderFromSource("file");
     } catch (error) {
       console.error("Analyzer upload failed", error);
       setStatus(`Failed to parse file: ${error?.message || "unknown error"}`, true);
     }
+  }
+
+  function handleSnapshotPoint() {
+    if (currentSource !== "live") return;
+    const inputLabel = window.prompt("Snapshot label (optional)", "Snapshot");
+    if (inputLabel == null) return;
+    const label = String(inputLabel || "").trim() || "Snapshot";
+    const payload = { label, view: "analyzer" };
+    if (typeof options.getLiveSnapshotPayload === "function") {
+      const extra = options.getLiveSnapshotPayload();
+      if (isPlainObject(extra)) {
+        Object.keys(extra).forEach((key) => {
+          if (extra[key] !== undefined) payload[key] = extra[key];
+        });
+      }
+    }
+    SessionLog.record("analyzer_marker", payload);
+    renderFromSource("live");
   }
 
   uploadBtn.addEventListener("click", handleUpload);
@@ -908,6 +1043,19 @@ export function initAnalyzerView() {
     }
   });
   timelineFilterEl.addEventListener("change", renderTimeline);
+  if (sourceLiveEl) {
+    sourceLiveEl.addEventListener("change", () => {
+      if (sourceLiveEl.checked) renderFromSource("live");
+    });
+  }
+  if (sourceFileEl) {
+    sourceFileEl.addEventListener("change", () => {
+      if (sourceFileEl.checked) renderFromSource("file");
+    });
+  }
+  if (snapshotBtn) {
+    snapshotBtn.addEventListener("click", handleSnapshotPoint);
+  }
 
   downloadNormalizedBtn.addEventListener("click", () => {
     if (!currentAnalysis?.events?.length) return;
@@ -935,11 +1083,13 @@ export function initAnalyzerView() {
     }
   });
 
+  updateSourceControls();
+
   return {
     notifyVisible() {
-      if (currentAnalysis?.points?.length) {
-        renderChart();
-      }
+      currentSource = "live";
+      updateSourceControls();
+      renderFromSource("live");
     },
   };
 }

@@ -635,7 +635,13 @@ const era2SessionLogDownloadBtn = document.getElementById("era2-session-log-down
 const era2SessionLogLinesEl = document.getElementById("era2-session-log-lines");
 const era2SessionLogSizeEl = document.getElementById("era2-session-log-size");
 const era2SessionLogSessionIdEl = document.getElementById("era2-session-log-session-id");
-const analyzerView = initAnalyzerView();
+const analyzerView = initAnalyzerView({
+  getLiveSnapshotPayload: () => ({
+    florins: Number((state.florinCount || 0).toFixed(4)),
+    stone: Number((state.stone || 0).toFixed(4)),
+    era: Number(state.era) || 1,
+  }),
+});
 
 const harvestActionUI = createInlineActionController({
   pillEl: harvestPill,
