@@ -348,7 +348,9 @@ function isKeyEvent(event) {
 }
 
 export function computeRunAnalysis(events) {
-  const orderedEvents = Array.isArray(events) ? events : [];
+  const orderedEvents = (Array.isArray(events) ? events : [])
+    .slice()
+    .sort((a, b) => a.ms - b.ms);
   if (!orderedEvents.length) {
     return {
       events: [],
@@ -360,49 +362,105 @@ export function computeRunAnalysis(events) {
     };
   }
 
-  const metrics = {
-    florins: createMetricState(),
-    stone: createMetricState(),
-    olives: createMetricState(),
-    oliveOil: createMetricState(),
+  const state = {
+    florins: 0,
+    stone: 0,
+    olives: 0,
+    oliveOil: 0,
+    investments: 0,
+    workersByType: {},
+    workersTotal: 0,
   };
-  const workersByType = {};
-  let investmentsPurchasedCount = 0;
+  const known = {
+    florins: false,
+    stone: false,
+    olives: false,
+    oliveOil: false,
+  };
   let actionsCompletedTotal = 0;
   const actionsByType = {};
   let era = null;
   const timelineRows = [];
   const points = [];
 
-  const runStartMs = orderedEvents[0].ms;
+  const runStartMs = orderedEvents.reduce((min, event) => Math.min(min, event.ms), orderedEvents[0].ms);
+  const runEndMs = orderedEvents.reduce((max, event) => Math.max(max, event.ms), orderedEvents[0].ms);
+  const pushPoint = (ms) => {
+    points.push({
+      ms,
+      tRelSec: (ms - runStartMs) / 1000,
+      florins: known.florins ? state.florins : null,
+      stone: known.stone ? state.stone : null,
+      olives: known.olives ? state.olives : null,
+      oliveOil: known.oliveOil ? state.oliveOil : null,
+      investmentsPurchasedCount: state.investments,
+      workersTotal: state.workersTotal,
+      actionsCompletedTotal,
+    });
+  };
+  pushPoint(runStartMs);
 
   orderedEvents.forEach((event) => {
     const payload = isPlainObject(event.payload) ? event.payload : {};
     const type = String(event.type || "unknown");
+    let shouldEmitPoint = false;
 
     if (type === "currency_delta") {
-      const currencyName = normalizeResourceName(payload.currency || payload.resource || "florins");
-      if (currencyName.includes("florin")) {
-        applyAbsoluteOrDelta(metrics.florins, payload);
+      const currencyName = normalizeResourceName(payload.currency || payload.resource);
+      if (currencyName === "florins" || currencyName.includes("florin")) {
+        const before = state.florins;
+        const after = toFiniteNumber(payload.after);
+        if (after != null) {
+          state.florins = after;
+          known.florins = true;
+        } else {
+          const delta = toFiniteNumber(payload.delta);
+          if (delta != null) {
+            state.florins += delta;
+            known.florins = true;
+          }
+        }
+        shouldEmitPoint = shouldEmitPoint || state.florins !== before;
       }
     }
 
     if (type === "resource_delta") {
-      const metricKey = toMetricKeyFromResource(normalizeResourceName(payload.resource || payload.name));
-      if (metricKey && metrics[metricKey]) {
-        applyAbsoluteOrDelta(metrics[metricKey], payload);
+      const resourceName = normalizeResourceName(payload.resource || payload.name);
+      const delta = toFiniteNumber(payload.delta);
+      const after = toFiniteNumber(payload.after);
+      const applyResourceDelta = (metricKey) => {
+        const before = state[metricKey];
+        if (after != null) {
+          state[metricKey] = after;
+        } else if (delta != null) {
+          state[metricKey] += delta;
+        } else {
+          return false;
+        }
+        known[metricKey] = true;
+        return state[metricKey] !== before;
+      };
+      if (resourceName === "stone") {
+        shouldEmitPoint = applyResourceDelta("stone") || shouldEmitPoint;
+      } else if (resourceName === "harvested_olives") {
+        shouldEmitPoint = applyResourceDelta("olives") || shouldEmitPoint;
+      } else if (resourceName === "olive_oil") {
+        shouldEmitPoint = applyResourceDelta("oliveOil") || shouldEmitPoint;
       }
     }
 
-    maybeApplyAbsoluteMetrics(metrics, payload);
-
     if (type === "purchase_investment") {
-      investmentsPurchasedCount += 1;
+      state.investments += 1;
+      shouldEmitPoint = true;
     }
 
     if (type === "hire_worker" || type === "hire_manager") {
       const workerType = String(payload.workerType || payload.managerType || "unknown");
-      workersByType[workerType] = (workersByType[workerType] || 0) + 1;
+      const previousCount = state.workersByType[workerType] || 0;
+      const count = toFiniteNumber(payload.count);
+      state.workersByType[workerType] = count != null ? count : (previousCount + 1);
+      state.workersTotal = Object.values(state.workersByType).reduce((acc, next) => acc + next, 0);
+      shouldEmitPoint = shouldEmitPoint || state.workersByType[workerType] !== previousCount;
     }
 
     if (type === "action_complete") {
@@ -446,25 +504,17 @@ export function computeRunAnalysis(events) {
       });
     }
 
-    const workersTotal = Object.values(workersByType).reduce((acc, count) => acc + count, 0);
-    points.push({
-      ms: event.ms,
-      tRelSec: (event.ms - runStartMs) / 1000,
-      florins: metrics.florins.known ? metrics.florins.value : null,
-      stone: metrics.stone.known ? metrics.stone.value : null,
-      olives: metrics.olives.known ? metrics.olives.value : null,
-      oliveOil: metrics.oliveOil.known ? metrics.oliveOil.value : null,
-      investmentsPurchasedCount,
-      workersTotal,
-      actionsCompletedTotal,
-    });
+    if (shouldEmitPoint || type === "analyzer_marker") {
+      pushPoint(event.ms);
+    }
   });
 
-  const runEndMs = orderedEvents[orderedEvents.length - 1].ms;
   const sessionStart = orderedEvents.find((event) => event.type === "session_start");
   const sessionId = sessionStart?.sessionId || orderedEvents.find((event) => !!event.sessionId)?.sessionId || "unknown";
   const version = sessionStart?.payload?.version || "unknown";
   const build = sessionStart?.payload?.build || "unknown";
+  // Temporary sanity check used during patch verification; keep disabled to avoid console noise.
+  // console.log("[analyzer] series points", points.length, "first", points[0], "last", points[points.length - 1]);
 
   return {
     events: orderedEvents,
@@ -479,24 +529,24 @@ export function computeRunAnalysis(events) {
       build,
     },
     summary: {
-      finalFlorins: metrics.florins.known ? metrics.florins.value : null,
-      finalStone: metrics.stone.known ? metrics.stone.value : null,
-      finalOlives: metrics.olives.known ? metrics.olives.value : null,
-      finalOliveOil: metrics.oliveOil.known ? metrics.oliveOil.value : null,
-      investmentsPurchasedCount,
-      workersByType,
-      workersTotal: Object.values(workersByType).reduce((acc, count) => acc + count, 0),
+      finalFlorins: known.florins ? state.florins : null,
+      finalStone: known.stone ? state.stone : null,
+      finalOlives: known.olives ? state.olives : null,
+      finalOliveOil: known.oliveOil ? state.oliveOil : null,
+      investmentsPurchasedCount: state.investments,
+      workersByType: state.workersByType,
+      workersTotal: state.workersTotal,
       actionsCompletedTotal,
       actionsByType,
       era,
     },
     availableMetrics: {
-      florins: metrics.florins.known,
-      stone: metrics.stone.known,
+      florins: known.florins,
+      stone: known.stone,
       investmentsPurchasedCount: true,
       workersTotal: true,
-      olives: metrics.olives.known,
-      oliveOil: metrics.oliveOil.known,
+      olives: known.olives,
+      oliveOil: known.oliveOil,
     },
   };
 }
