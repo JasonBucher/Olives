@@ -5,6 +5,7 @@ import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
 import SessionLog from './sessionLog.js';
+import { initAnalyzerView } from './views/analyzerView.js';
 
 const STORAGE_PREFIX = "treeGroves_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -249,6 +250,7 @@ function buildPersistedState(currentState) {
 }
 
 let state = createDefaultState();
+let activeView = "game";
 SessionLog.initSession({
   version: state.meta?.version || "unknown",
   build: "unknown",
@@ -587,6 +589,9 @@ const simTimerEl = document.getElementById("sim-timer");
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
 const debugBtnEra2 = document.getElementById("debug-btn-era2");
+const analyzerBtn = document.getElementById("analyzer-btn");
+const analyzerBtnEra2 = document.getElementById("analyzer-btn-era2");
+const analyzerBackBtn = document.getElementById("analyzer-back-btn");
 const debugModal = document.getElementById("debug-modal");
 const debugCloseBtn = document.getElementById("debug-close-btn");
 const debugResetBtn = document.getElementById("debug-reset-btn");
@@ -608,6 +613,7 @@ const moveToCityBtn = document.getElementById("move-to-city-btn");
 const era2ResetBtn = document.getElementById("era2-reset-btn");
 const eraOneRoot = document.getElementById("era1-root");
 const eraTwoScreen = document.getElementById("era2-screen");
+const analyzerScreen = document.getElementById("analyzer-screen");
 const era2FlorinCountEl = document.getElementById("era2-florin-count");
 const era2EstateIncomeEl = document.getElementById("era2-estate-income");
 const era2SummaryTimeEl = document.getElementById("era2-summary-time");
@@ -629,6 +635,7 @@ const era2SessionLogDownloadBtn = document.getElementById("era2-session-log-down
 const era2SessionLogLinesEl = document.getElementById("era2-session-log-lines");
 const era2SessionLogSizeEl = document.getElementById("era2-session-log-size");
 const era2SessionLogSessionIdEl = document.getElementById("era2-session-log-session-id");
+const analyzerView = initAnalyzerView();
 
 const harvestActionUI = createInlineActionController({
   pillEl: harvestPill,
@@ -1388,6 +1395,16 @@ function updateRelocationUI() {
 }
 
 function updateEraVisibility() {
+  const isAnalyzerOpen = activeView === "analyzer";
+  if (analyzerScreen) {
+    analyzerScreen.classList.toggle("is-hidden", !isAnalyzerOpen);
+  }
+  if (isAnalyzerOpen) {
+    if (eraOneRoot) eraOneRoot.classList.add("is-hidden");
+    if (eraTwoScreen) eraTwoScreen.classList.add("is-hidden");
+    return;
+  }
+
   const inEra2 = Number(state.era) >= 2;
   if (eraOneRoot) {
     eraOneRoot.classList.toggle("is-hidden", inEra2);
@@ -1395,6 +1412,17 @@ function updateEraVisibility() {
   if (eraTwoScreen) {
     eraTwoScreen.classList.toggle("is-hidden", !inEra2);
   }
+}
+
+function openAnalyzer() {
+  activeView = "analyzer";
+  updateEraVisibility();
+  analyzerView.notifyVisible();
+}
+
+function closeAnalyzer() {
+  activeView = "game";
+  updateUI();
 }
 
 function computeEstateIncomeRate(snapshot) {
@@ -3607,6 +3635,15 @@ if (debugBtn) {
 }
 if (debugBtnEra2) {
   debugBtnEra2.addEventListener("click", openDebug);
+}
+if (analyzerBtn) {
+  analyzerBtn.addEventListener("click", openAnalyzer);
+}
+if (analyzerBtnEra2) {
+  analyzerBtnEra2.addEventListener("click", openAnalyzer);
+}
+if (analyzerBackBtn) {
+  analyzerBackBtn.addEventListener("click", closeAnalyzer);
 }
 debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
