@@ -101,4 +101,27 @@ describe("Run Analyzer parsing", () => {
     expect(first.olives).not.toBe(last.olives);
     expect(first.oliveOil).not.toBe(last.oliveOil);
   });
+
+  it("tracks market olives and market olive oil balances from resource deltas", () => {
+    const rawText = [
+      '{"ms":1000,"type":"session_start","payload":{"version":"treeGroves"}}',
+      '{"ms":2000,"type":"resource_delta","payload":{"resource":"market_olives","delta":12,"reason":"ship_olives_complete"}}',
+      '{"ms":3000,"type":"resource_delta","payload":{"resource":"market_olive_oil","delta":5,"reason":"ship_olive_oil_complete"}}',
+      '{"ms":4000,"type":"resource_delta","payload":{"resource":"market_olives","delta":-3,"reason":"market_sale"}}',
+      '{"ms":5000,"type":"resource_delta","payload":{"resource":"market_olive_oil","delta":-2,"reason":"market_sale"}}',
+    ].join("\n");
+
+    const parsed = parseTelemetryText(rawText);
+    const normalized = normalizeTelemetryEvents(parsed.rawEvents);
+    const analysis = computeRunAnalysis(normalized.events);
+
+    expect(analysis.summary.finalMarketOlives).toBe(9);
+    expect(analysis.summary.finalMarketOliveOil).toBe(3);
+    expect(analysis.availableMetrics.marketOlives).toBe(true);
+    expect(analysis.availableMetrics.marketOliveOil).toBe(true);
+
+    const last = analysis.points[analysis.points.length - 1];
+    expect(last.marketOlives).toBe(9);
+    expect(last.marketOliveOil).toBe(3);
+  });
 });

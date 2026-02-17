@@ -2747,16 +2747,31 @@ function applyMarketSale({ olives, oil }, priceMultiplier = 1) {
   if (olives > 0) {
     state.marketOlives = consumeInventory(state.marketOlives, olives);
     earned += olives * TUNING.market.prices.olivesFlorins;
+    recordTelemetry("resource_delta", {
+      resource: "market_olives",
+      delta: Number((-olives).toFixed(4)),
+      reason: "market_sale",
+    });
   }
 
   if (oil > 0) {
     state.marketOliveOil = consumeInventory(state.marketOliveOil || 0, oil);
     earned += oil * TUNING.market.prices.oliveOilFlorins;
+    recordTelemetry("resource_delta", {
+      resource: "market_olive_oil",
+      delta: Number((-oil).toFixed(4)),
+      reason: "market_sale",
+    });
   }
 
   earned *= getMarketEffectivePriceMultiplier(priceMultiplier);
   if (earned > 0) {
     addFlorins(earned, { trackLifetime: true });
+    recordTelemetry("currency_delta", {
+      currency: "florins",
+      delta: Number(earned.toFixed(4)),
+      reason: "market_sale",
+    });
   }
   addOlivesSold(Math.max(0, olives));
   addOliveOilSold(Math.max(0, oil));

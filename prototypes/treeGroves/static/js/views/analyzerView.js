@@ -7,6 +7,8 @@ const METRIC_DEFS = [
   { key: "workersTotal", label: "Workers Total", color: "#34d399", digits: 0 },
   { key: "olives", label: "Olives", color: "#84cc16", digits: 0 },
   { key: "oliveOil", label: "Olive Oil", color: "#fb923c", digits: 2 },
+  { key: "marketOlives", label: "Market Olives", color: "#22c55e", digits: 0 },
+  { key: "marketOliveOil", label: "Market Olive Oil", color: "#f97316", digits: 2 },
 ];
 
 const TIMELINE_FILTERS = {
@@ -367,6 +369,8 @@ export function computeRunAnalysis(events) {
     stone: 0,
     olives: 0,
     oliveOil: 0,
+    marketOlives: 0,
+    marketOliveOil: 0,
     investments: 0,
     workersByType: {},
     workersTotal: 0,
@@ -376,6 +380,8 @@ export function computeRunAnalysis(events) {
     stone: false,
     olives: false,
     oliveOil: false,
+    marketOlives: false,
+    marketOliveOil: false,
   };
   let actionsCompletedTotal = 0;
   const actionsByType = {};
@@ -393,6 +399,8 @@ export function computeRunAnalysis(events) {
       stone: known.stone ? state.stone : null,
       olives: known.olives ? state.olives : null,
       oliveOil: known.oliveOil ? state.oliveOil : null,
+      marketOlives: known.marketOlives ? state.marketOlives : null,
+      marketOliveOil: known.marketOliveOil ? state.marketOliveOil : null,
       investmentsPurchasedCount: state.investments,
       workersTotal: state.workersTotal,
       actionsCompletedTotal,
@@ -446,6 +454,10 @@ export function computeRunAnalysis(events) {
         shouldEmitPoint = applyResourceDelta("olives") || shouldEmitPoint;
       } else if (resourceName === "olive_oil") {
         shouldEmitPoint = applyResourceDelta("oliveOil") || shouldEmitPoint;
+      } else if (resourceName === "market_olives") {
+        shouldEmitPoint = applyResourceDelta("marketOlives") || shouldEmitPoint;
+      } else if (resourceName === "market_olive_oil") {
+        shouldEmitPoint = applyResourceDelta("marketOliveOil") || shouldEmitPoint;
       }
     }
 
@@ -533,6 +545,8 @@ export function computeRunAnalysis(events) {
       finalStone: known.stone ? state.stone : null,
       finalOlives: known.olives ? state.olives : null,
       finalOliveOil: known.oliveOil ? state.oliveOil : null,
+      finalMarketOlives: known.marketOlives ? state.marketOlives : null,
+      finalMarketOliveOil: known.marketOliveOil ? state.marketOliveOil : null,
       investmentsPurchasedCount: state.investments,
       workersByType: state.workersByType,
       workersTotal: state.workersTotal,
@@ -547,6 +561,8 @@ export function computeRunAnalysis(events) {
       workersTotal: true,
       olives: known.olives,
       oliveOil: known.oliveOil,
+      marketOlives: known.marketOlives,
+      marketOliveOil: known.marketOliveOil,
     },
   };
 }
@@ -573,6 +589,8 @@ function buildTimeseriesCsv(points) {
     "workersTotal",
     "olives",
     "oliveOil",
+    "marketOlives",
+    "marketOliveOil",
     "actionsCompletedTotal",
   ];
   const rows = [headers.join(",")];
@@ -586,6 +604,8 @@ function buildTimeseriesCsv(points) {
       point.workersTotal ?? "",
       point.olives ?? "",
       point.oliveOil ?? "",
+      point.marketOlives ?? "",
+      point.marketOliveOil ?? "",
       point.actionsCompletedTotal ?? "",
     ].join(","));
   });
@@ -641,6 +661,8 @@ export function initAnalyzerView(options = {}) {
   const metaBuildEl = document.getElementById("analyzer-meta-build");
   const summaryFlorinsEl = document.getElementById("analyzer-summary-florins");
   const summaryStoneEl = document.getElementById("analyzer-summary-stone");
+  const summaryMarketOlivesEl = document.getElementById("analyzer-summary-market-olives");
+  const summaryMarketOliveOilEl = document.getElementById("analyzer-summary-market-olive-oil");
   const summaryInvestmentsEl = document.getElementById("analyzer-summary-investments");
   const summaryWorkersEl = document.getElementById("analyzer-summary-workers");
   const summaryActionsEl = document.getElementById("analyzer-summary-actions");
@@ -703,6 +725,8 @@ export function initAnalyzerView(options = {}) {
     const summary = analysis?.summary;
     summaryFlorinsEl.textContent = summary ? formatValue(summary.finalFlorins, 2) : "—";
     summaryStoneEl.textContent = summary ? formatValue(summary.finalStone, 0) : "—";
+    summaryMarketOlivesEl.textContent = summary ? formatValue(summary.finalMarketOlives, 0) : "—";
+    summaryMarketOliveOilEl.textContent = summary ? formatValue(summary.finalMarketOliveOil, 2) : "—";
     summaryInvestmentsEl.textContent = summary ? String(summary.investmentsPurchasedCount || 0) : "0";
     summaryWorkersEl.textContent = summary ? String(summary.workersTotal || 0) : "0";
     summaryActionsEl.textContent = summary ? String(summary.actionsCompletedTotal || 0) : "0";
