@@ -909,6 +909,13 @@ function resetGame() {
   stopMarketLoop();
 
   localStorage.removeItem(STORAGE_KEY);
+  // Keep analyzer live mode in sync with a full game reset.
+  try {
+    localStorage.removeItem("tg_session_log_v1");
+    sessionStorage.removeItem("tg_session_log_session_id_v1");
+  } catch (error) {
+    console.warn("Failed to clear session telemetry log during reset.", error);
+  }
 
   // Cache-bust reload (useful on GitHub Pages)
   window.location.href = window.location.pathname + "?t=" + Date.now();
