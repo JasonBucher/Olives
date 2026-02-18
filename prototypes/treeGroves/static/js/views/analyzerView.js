@@ -1,4 +1,4 @@
-import SessionLog from "../sessionLog.js";
+import SessionLog, { isPlainObject } from "../sessionLog.js";
 
 const METRIC_DEFS = [
   { key: "florins", label: "Florins", color: "#3b7bff", digits: 2 },
@@ -9,6 +9,7 @@ const METRIC_DEFS = [
   { key: "oliveOil", label: "Olive Oil", color: "#fb923c", digits: 2 },
   { key: "marketOlives", label: "Market Olives", color: "#22c55e", digits: 0 },
   { key: "marketOliveOil", label: "Market Olive Oil", color: "#f97316", digits: 2 },
+  { key: "treeOlives", label: "Tree Olives", color: "#a3e635", digits: 0 },
 ];
 
 const TIMELINE_FILTERS = {
@@ -18,10 +19,6 @@ const TIMELINE_FILTERS = {
   actions: (row) => row.type === "action_complete" || row.type === "action_interrupted" || row.type === "action_start",
   transitions: (row) => row.type === "era_transition" || (row.type === "action_complete" && row.action === "move_to_city"),
 };
-
-function isPlainObject(value) {
-  return value != null && typeof value === "object" && !Array.isArray(value);
-}
 
 function toFiniteNumber(value) {
   const n = Number(value);
@@ -260,58 +257,8 @@ export function buildFileAnalysis(fileText) {
   return buildAnalysisFromText(fileText);
 }
 
-function createMetricState() {
-  return { value: 0, known: false };
-}
-
-function applyMetricAbsolute(metric, nextValue) {
-  const value = toFiniteNumber(nextValue);
-  if (value == null) return;
-  metric.value = value;
-  metric.known = true;
-}
-
-function applyMetricDelta(metric, deltaValue) {
-  const delta = toFiniteNumber(deltaValue);
-  if (delta == null) return;
-  if (!metric.known) {
-    metric.value = 0;
-    metric.known = true;
-  }
-  metric.value += delta;
-}
-
-function applyAbsoluteOrDelta(metric, payload) {
-  applyMetricAbsolute(metric, payload.after);
-  applyMetricAbsolute(metric, payload.value);
-  applyMetricAbsolute(metric, payload.current);
-  applyMetricAbsolute(metric, payload.total);
-  if (!metric.known) {
-    applyMetricDelta(metric, payload.delta);
-  }
-}
-
 function normalizeResourceName(resource) {
   return String(resource || "").toLowerCase().replace(/[\s-]+/g, "_");
-}
-
-function toMetricKeyFromResource(resourceName) {
-  if (!resourceName) return null;
-  if (resourceName.includes("florin")) return "florins";
-  if (resourceName.includes("stone")) return "stone";
-  if (resourceName.includes("oil")) return "oliveOil";
-  if (resourceName.includes("olive")) return "olives";
-  return null;
-}
-
-function maybeApplyAbsoluteMetrics(metrics, payload) {
-  applyMetricAbsolute(metrics.florins, payload.florins);
-  applyMetricAbsolute(metrics.florins, payload.florinCount);
-  applyMetricAbsolute(metrics.stone, payload.stone);
-  applyMetricAbsolute(metrics.olives, payload.olives);
-  applyMetricAbsolute(metrics.olives, payload.harvestedOlives);
-  applyMetricAbsolute(metrics.oliveOil, payload.oliveOil);
-  applyMetricAbsolute(metrics.oliveOil, payload.oliveOilCount);
 }
 
 function extractActionName(event) {
@@ -359,8 +306,7 @@ function isKeyEvent(event) {
     event.type === "action_complete" ||
     event.type === "action_interrupted" ||
     event.type === "analyzer_marker" ||
-    event.type === "era_transition" ||
-    (event.type === "action_complete" && event.payload?.action === "move_to_city")
+    event.type === "era_transition"
   );
 }
 
@@ -386,6 +332,7 @@ export function computeRunAnalysis(events) {
     oliveOil: 0,
     marketOlives: 0,
     marketOliveOil: 0,
+    treeOlives: 0,
     investments: 0,
     workersByType: {},
     workersTotal: 0,
@@ -397,6 +344,7 @@ export function computeRunAnalysis(events) {
     oliveOil: false,
     marketOlives: false,
     marketOliveOil: false,
+    treeOlives: false,
   };
   let actionsCompletedTotal = 0;
   const actionsByType = {};
@@ -431,6 +379,7 @@ export function computeRunAnalysis(events) {
       oliveOil: known.oliveOil ? state.oliveOil : null,
       marketOlives: known.marketOlives ? state.marketOlives : null,
       marketOliveOil: known.marketOliveOil ? state.marketOliveOil : null,
+      treeOlives: known.treeOlives ? state.treeOlives : null,
       investmentsPurchasedCount: state.investments,
       workersTotal: state.workersTotal,
       actionsCompletedTotal,
@@ -488,7 +437,29 @@ export function computeRunAnalysis(events) {
         shouldEmitPoint = applyResourceDelta("marketOlives") || shouldEmitPoint;
       } else if (resourceName === "market_olive_oil") {
         shouldEmitPoint = applyResourceDelta("marketOliveOil") || shouldEmitPoint;
+      } else if (resourceName === "tree_olives") {
+        shouldEmitPoint = applyResourceDelta("treeOlives") || shouldEmitPoint;
       }
+    }
+
+    if (type === "state_snapshot") {
+      const snapshotKeys = {
+        florins: "florins",
+        stone: "stone",
+        harvestedOlives: "olives",
+        oliveOil: "oliveOil",
+        marketOlives: "marketOlives",
+        marketOliveOil: "marketOliveOil",
+        treeOlives: "treeOlives",
+      };
+      Object.entries(snapshotKeys).forEach(([payloadKey, metricKey]) => {
+        const value = toFiniteNumber(payload[payloadKey]);
+        if (value != null) {
+          state[metricKey] = value;
+          known[metricKey] = true;
+        }
+      });
+      shouldEmitPoint = true;
     }
 
     if (type === "purchase_investment") {
@@ -583,6 +554,7 @@ export function computeRunAnalysis(events) {
       finalOliveOil: known.oliveOil ? state.oliveOil : null,
       finalMarketOlives: known.marketOlives ? state.marketOlives : null,
       finalMarketOliveOil: known.marketOliveOil ? state.marketOliveOil : null,
+      finalTreeOlives: known.treeOlives ? state.treeOlives : null,
       investmentsPurchasedCount: state.investments,
       workersByType: state.workersByType,
       workersTotal: state.workersTotal,
@@ -599,6 +571,7 @@ export function computeRunAnalysis(events) {
       oliveOil: known.oliveOil,
       marketOlives: known.marketOlives,
       marketOliveOil: known.marketOliveOil,
+      treeOlives: known.treeOlives,
     },
   };
 }
@@ -628,6 +601,7 @@ function buildTimeseriesCsv(points) {
     "oliveOil",
     "marketOlives",
     "marketOliveOil",
+    "treeOlives",
     "actionsCompletedTotal",
   ];
   const rows = [headers.join(",")];
@@ -644,6 +618,7 @@ function buildTimeseriesCsv(points) {
       point.oliveOil ?? "",
       point.marketOlives ?? "",
       point.marketOliveOil ?? "",
+      point.treeOlives ?? "",
       point.actionsCompletedTotal ?? "",
     ].join(","));
   });
@@ -779,7 +754,11 @@ export function initAnalyzerView(options = {}) {
 
     if (!rows.length) {
       const row = document.createElement("tr");
-      row.innerHTML = `<td colspan="4" class="muted">No events match this filter.</td>`;
+      const td = document.createElement("td");
+      td.colSpan = 4;
+      td.className = "muted";
+      td.textContent = "No events match this filter.";
+      row.appendChild(td);
       timelineBodyEl.appendChild(row);
       return;
     }
@@ -787,12 +766,12 @@ export function initAnalyzerView(options = {}) {
     rows.forEach((rowData) => {
       const row = document.createElement("tr");
       const elapsed = formatDurationMs(Math.max(0, Number(rowData.tRelSec || 0) * 1000));
-      row.innerHTML = `
-        <td>${elapsed}</td>
-        <td>${formatDateTime(rowData.ms)}</td>
-        <td>${rowData.type}</td>
-        <td>${rowData.details}</td>
-      `;
+      const cells = [elapsed, formatDateTime(rowData.ms), rowData.type, rowData.details];
+      cells.forEach((text) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        row.appendChild(td);
+      });
       timelineBodyEl.appendChild(row);
     });
   }
@@ -1040,11 +1019,18 @@ export function initAnalyzerView(options = {}) {
       hoverLine.setAttribute("x2", x);
       hoverLine.setAttribute("visibility", "visible");
 
-      const lines = [`<strong>${formatChartTime(point.tRelSec)}</strong>`];
+      chartTooltipEl.textContent = "";
+      const timeEl = document.createElement("strong");
+      timeEl.textContent = formatChartTime(point.tRelSec);
+      chartTooltipEl.appendChild(timeEl);
       activeDefs.forEach((def) => {
         const value = point[def.key];
         if (!Number.isFinite(value)) return;
-        lines.push(`<span style="color:${def.color}">${def.label}: ${value.toFixed(def.digits)}</span>`);
+        chartTooltipEl.appendChild(document.createElement("br"));
+        const span = document.createElement("span");
+        span.style.color = def.color;
+        span.textContent = `${def.label}: ${value.toFixed(def.digits)}`;
+        chartTooltipEl.appendChild(span);
       });
       if (markerEvents.length) {
         let nearestMarker = markerEvents[0];
@@ -1058,10 +1044,13 @@ export function initAnalyzerView(options = {}) {
         }
         const markerTolerance = Math.max(0.4, maxX * 0.015);
         if (markerDistance <= markerTolerance) {
-          lines.push(`<span style="color:#ffd166">📌 ${nearestMarker.label}</span>`);
+          chartTooltipEl.appendChild(document.createElement("br"));
+          const markerSpan = document.createElement("span");
+          markerSpan.style.color = "#ffd166";
+          markerSpan.textContent = `\u{1F4CC} ${nearestMarker.label}`;
+          chartTooltipEl.appendChild(markerSpan);
         }
       }
-      chartTooltipEl.innerHTML = lines.join("<br />");
       chartTooltipEl.style.left = `${Math.min(width - 170, Math.max(10, x + 10))}px`;
       chartTooltipEl.style.top = `${padding.top + 8}px`;
       chartTooltipEl.classList.remove("is-hidden");
@@ -1202,9 +1191,11 @@ export function initAnalyzerView(options = {}) {
 
   return {
     notifyVisible() {
-      currentSource = "live";
+      if (currentSource !== "file" || !lastUploadedText) {
+        currentSource = "live";
+      }
       updateSourceControls();
-      renderFromSource("live");
+      renderFromSource(currentSource);
     },
   };
 }

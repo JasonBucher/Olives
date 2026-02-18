@@ -722,6 +722,21 @@ function recordTelemetry(type, payload = {}) {
   SessionLog.record(type, payload);
 }
 
+let lastSnapshotSimMs = 0;
+const SNAPSHOT_INTERVAL_MS = 30000;
+
+function recordStateSnapshot() {
+  recordTelemetry("state_snapshot", {
+    florins: Number(state.florinCount) || 0,
+    stone: Number(state.stone) || 0,
+    harvestedOlives: Number(state.harvestedOlives) || 0,
+    oliveOil: Number(state.oliveOilCount) || 0,
+    marketOlives: Number(state.marketOlives) || 0,
+    marketOliveOil: Number(state.marketOliveOil) || 0,
+    treeOlives: Number(state.treeOlives) || 0,
+  });
+}
+
 function showMarketFloat(text, variant) {
   if (!marketFloatAnchorEl) return;
   requestAnimationFrame(() => {
@@ -3469,6 +3484,12 @@ function startEra2Loop() {
     state.simElapsedSeconds = (state.simElapsedSeconds || 0) + dt;
     advanceSimMs(dt * 1000);
 
+    // Periodic state snapshot for analyzer drift correction
+    if (simMs - lastSnapshotSimMs >= SNAPSHOT_INTERVAL_MS) {
+      lastSnapshotSimMs = simMs;
+      recordStateSnapshot();
+    }
+
     const estateIncomeRate = getEstateIncomeRate();
     if (estateIncomeRate > 0) {
       const income = estateIncomeRate * dt;
@@ -3498,6 +3519,12 @@ function startLoop() {
     state.simElapsedSeconds = (state.simElapsedSeconds || 0) + dt;
     advanceSimMs(dt * 1000);
     if (simTimerEl) simTimerEl.textContent = formatRunDuration(state.simElapsedSeconds);
+
+    // Periodic state snapshot for analyzer drift correction
+    if (simMs - lastSnapshotSimMs >= SNAPSHOT_INTERVAL_MS) {
+      lastSnapshotSimMs = simMs;
+      recordStateSnapshot();
+    }
 
     // Arborist salary drain
     if (state.arboristHired) {
@@ -3832,6 +3859,8 @@ setupLogTabs(farmLogTabPlayer, farmLogTabDebug, farmLogPlayerEl, farmLogDebugEl)
 setupLogTabs(marketLogTabPlayer, marketLogTabDebug, marketLogPlayerEl, marketLogDebugEl);
 
 loadGame();
+lastSnapshotSimMs = simMs;
+recordStateSnapshot();
 initInvestments();
 updateUI();
 setShipUIIdle();

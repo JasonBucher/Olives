@@ -19,7 +19,7 @@ function generateSessionId(cryptoImpl = globalThis?.crypto) {
   return `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function isPlainObject(value) {
+export function isPlainObject(value) {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
