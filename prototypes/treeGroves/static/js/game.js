@@ -326,13 +326,9 @@ function getPresserHireCost() {
 }
 
 // --- Presser Effects ---
-// Active state for Press Manager (computed each tick)
+// Active state for managers (computed each tick)
 let pressManagerIsActive = false;
-
-// Active state for Quarry Manager (computed each tick)
 let quarryManagerIsActive = false;
-
-// Active state for Foreman (computed each tick)
 let foremanIsActive = false;
 
 // --- Press Output Helpers ---
@@ -426,6 +422,31 @@ let activeCityModifiers = [];
 
 // --- Arborist Active State (computed each tick) ---
 let arboristIsActive = false;
+
+// Manager registry: maps tuning key to state hired key and active flag setter
+const MANAGER_REGISTRY = [
+  { tuningKey: "arborist", hiredKey: "arboristHired", setActive(v) { arboristIsActive = v; } },
+  { tuningKey: "pressManager", hiredKey: "pressManagerHired", setActive(v) { pressManagerIsActive = v; } },
+  { tuningKey: "quarryManager", hiredKey: "quarryManagerHired", setActive(v) { quarryManagerIsActive = v; } },
+  { tuningKey: "foreman", hiredKey: "foremanHired", setActive(v) { foremanIsActive = v; } },
+];
+
+function tickManagers(dt) {
+  for (const mgr of MANAGER_REGISTRY) {
+    if (state[mgr.hiredKey]) {
+      const salaryPerSec = TUNING.managers[mgr.tuningKey].salaryPerMin / 60;
+      const costThisTick = salaryPerSec * dt;
+      if (state.florinCount >= costThisTick) {
+        spendFlorins(costThisTick);
+        mgr.setActive(true);
+      } else {
+        mgr.setActive(false);
+      }
+    } else {
+      mgr.setActive(false);
+    }
+  }
+}
 
 // --- DOM ---
 const florinCountEl = document.getElementById("florin-count");
@@ -3337,61 +3358,8 @@ function startLoop() {
       recordStateSnapshot();
     }
 
-    // Arborist salary drain
-    if (state.arboristHired) {
-      const salaryPerSec = TUNING.managers.arborist.salaryPerMin / 60;
-      const costThisTick = salaryPerSec * dt;
-      if (state.florinCount >= costThisTick) {
-        spendFlorins(costThisTick);
-        arboristIsActive = true;
-      } else {
-        arboristIsActive = false;
-      }
-    } else {
-      arboristIsActive = false;
-    }
-
-    // Press Manager salary drain
-    if (state.pressManagerHired) {
-      const salaryPerSec = TUNING.managers.pressManager.salaryPerMin / 60;
-      const costThisTick = salaryPerSec * dt;
-      if (state.florinCount >= costThisTick) {
-        spendFlorins(costThisTick);
-        pressManagerIsActive = true;
-      } else {
-        pressManagerIsActive = false;
-      }
-    } else {
-      pressManagerIsActive = false;
-    }
-
-    // Quarry Manager salary drain
-    if (state.quarryManagerHired) {
-      const salaryPerSec = TUNING.managers.quarryManager.salaryPerMin / 60;
-      const costThisTick = salaryPerSec * dt;
-      if (state.florinCount >= costThisTick) {
-        spendFlorins(costThisTick);
-        quarryManagerIsActive = true;
-      } else {
-        quarryManagerIsActive = false;
-      }
-    } else {
-      quarryManagerIsActive = false;
-    }
-
-    // Foreman salary drain
-    if (state.foremanHired) {
-      const salaryPerSec = TUNING.managers.foreman.salaryPerMin / 60;
-      const costThisTick = salaryPerSec * dt;
-      if (state.florinCount >= costThisTick) {
-        spendFlorins(costThisTick);
-        foremanIsActive = true;
-      } else {
-        foremanIsActive = false;
-      }
-    } else {
-      foremanIsActive = false;
-    }
+    // Manager salary drain (registry-driven)
+    tickManagers(dt);
 
     // Trees grow olives automatically
     growTrees(dt);
