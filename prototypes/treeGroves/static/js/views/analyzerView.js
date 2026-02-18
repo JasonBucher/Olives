@@ -185,6 +185,20 @@ function extractPayload(rawEvent) {
   return payload;
 }
 
+function extractEventSimMs(rawEvent, payload) {
+  const candidates = [
+    rawEvent.simMs,
+    rawEvent.sim_ms,
+    payload.simMs,
+    payload.sim_ms,
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    const value = toFiniteNumber(candidates[i]);
+    if (value != null) return value;
+  }
+  return null;
+}
+
 export function normalizeTelemetryEvents(rawEvents) {
   const normalized = [];
   let invalidEvents = 0;
@@ -209,6 +223,7 @@ export function normalizeTelemetryEvents(rawEvents) {
     normalized.push({
       tIso,
       ms: Number(ms),
+      simMs: extractEventSimMs(rawEvent, payload),
       type: extractEventType(rawEvent),
       payload,
       sessionId: rawEvent.sessionId ?? payload.sessionId ?? null,
@@ -391,10 +406,25 @@ export function computeRunAnalysis(events) {
 
   const runStartMs = orderedEvents.reduce((min, event) => Math.min(min, event.ms), orderedEvents[0].ms);
   const runEndMs = orderedEvents.reduce((max, event) => Math.max(max, event.ms), orderedEvents[0].ms);
-  const pushPoint = (ms) => {
+  const simMsValues = orderedEvents
+    .map((event) => toFiniteNumber(event.simMs))
+    .filter((value) => value != null);
+  const runStartSimMs = simMsValues.length ? Math.min(...simMsValues) : null;
+  const runEndSimMs = simMsValues.length ? Math.max(...simMsValues) : null;
+
+  const toRelativeSeconds = (eventLike) => {
+    const eventSimMs = toFiniteNumber(eventLike?.simMs);
+    if (runStartSimMs != null && eventSimMs != null) {
+      return Math.max(0, (eventSimMs - runStartSimMs) / 1000);
+    }
+    return Math.max(0, ((Number(eventLike?.ms) || runStartMs) - runStartMs) / 1000);
+  };
+
+  const pushPoint = (eventLike) => {
     points.push({
-      ms,
-      tRelSec: (ms - runStartMs) / 1000,
+      ms: Number(eventLike?.ms) || runStartMs,
+      simMs: toFiniteNumber(eventLike?.simMs),
+      tRelSec: toRelativeSeconds(eventLike),
       florins: known.florins ? state.florins : null,
       stone: known.stone ? state.stone : null,
       olives: known.olives ? state.olives : null,
@@ -406,7 +436,7 @@ export function computeRunAnalysis(events) {
       actionsCompletedTotal,
     });
   };
-  pushPoint(runStartMs);
+  pushPoint({ ms: runStartMs, simMs: runStartSimMs });
 
   orderedEvents.forEach((event) => {
     const payload = isPlainObject(event.payload) ? event.payload : {};
@@ -495,8 +525,9 @@ export function computeRunAnalysis(events) {
     if (isKeyEvent(event)) {
       timelineRows.push({
         ms: event.ms,
+        simMs: toFiniteNumber(event.simMs),
         tIso: event.tIso,
-        tRelSec: (event.ms - runStartMs) / 1000,
+        tRelSec: toRelativeSeconds(event),
         type: event.type,
         action: extractActionName(event),
         details: compactEventDetails(event),
@@ -506,8 +537,9 @@ export function computeRunAnalysis(events) {
     } else {
       timelineRows.push({
         ms: event.ms,
+        simMs: toFiniteNumber(event.simMs),
         tIso: event.tIso,
-        tRelSec: (event.ms - runStartMs) / 1000,
+        tRelSec: toRelativeSeconds(event),
         type: event.type,
         action: extractActionName(event),
         details: compactEventDetails(event),
@@ -517,7 +549,7 @@ export function computeRunAnalysis(events) {
     }
 
     if (shouldEmitPoint || type === "analyzer_marker") {
-      pushPoint(event.ms);
+      pushPoint(event);
     }
   });
 
@@ -536,7 +568,11 @@ export function computeRunAnalysis(events) {
       sessionId,
       runStartMs,
       runEndMs,
-      durationMs: Math.max(0, runEndMs - runStartMs),
+      runStartSimMs,
+      runEndSimMs,
+      durationMs: runStartSimMs != null && runEndSimMs != null
+        ? Math.max(0, runEndSimMs - runStartSimMs)
+        : Math.max(0, runEndMs - runStartMs),
       version,
       build,
     },
@@ -583,6 +619,7 @@ function buildTimeseriesCsv(points) {
   const headers = [
     "tRelSec",
     "ms",
+    "simMs",
     "florins",
     "stone",
     "investmentsPurchasedCount",
@@ -598,6 +635,7 @@ function buildTimeseriesCsv(points) {
     rows.push([
       Number(point.tRelSec || 0).toFixed(3),
       point.ms ?? "",
+      point.simMs ?? "",
       point.florins ?? "",
       point.stone ?? "",
       point.investmentsPurchasedCount ?? "",
@@ -746,10 +784,9 @@ export function initAnalyzerView(options = {}) {
       return;
     }
 
-    const runStartMs = currentAnalysis?.metadata?.runStartMs || rows[0].ms;
     rows.forEach((rowData) => {
       const row = document.createElement("tr");
-      const elapsed = formatDurationMs(Math.max(0, rowData.ms - runStartMs));
+      const elapsed = formatDurationMs(Math.max(0, Number(rowData.tRelSec || 0) * 1000));
       row.innerHTML = `
         <td>${elapsed}</td>
         <td>${formatDateTime(rowData.ms)}</td>
@@ -814,10 +851,13 @@ export function initAnalyzerView(options = {}) {
     const analysis = currentAnalysis;
     const points = analysis?.points || [];
     const runStartMs = analysis?.metadata?.runStartMs || points[0]?.ms || 0;
+    const runStartSimMs = toFiniteNumber(analysis?.metadata?.runStartSimMs);
     const markerEvents = (analysis?.events || [])
       .filter((event) => event.type === "analyzer_marker")
       .map((event) => ({
-        tRelSec: Math.max(0, (event.ms - runStartMs) / 1000),
+        tRelSec: runStartSimMs != null && toFiniteNumber(event.simMs) != null
+          ? Math.max(0, (Number(event.simMs) - runStartSimMs) / 1000)
+          : Math.max(0, (event.ms - runStartMs) / 1000),
         label: String(event.payload?.label || "Snapshot"),
       }));
     chartSvgEl.innerHTML = "";
@@ -1138,6 +1178,7 @@ export function initAnalyzerView(options = {}) {
       JSON.stringify(currentAnalysis.events.map((event) => ({
         tIso: event.tIso,
         ms: event.ms,
+        simMs: event.simMs,
         type: event.type,
         payload: event.payload,
         sessionId: event.sessionId,

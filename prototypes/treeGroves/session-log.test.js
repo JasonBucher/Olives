@@ -72,4 +72,17 @@ describe("SessionLog", () => {
     expect(lines.length).toBeLessThanOrEqual(3);
     expect(lines.some((entry) => entry.type === "log_trimmed")).toBe(true);
   });
+
+  it("includes simMs when available", () => {
+    const originalSimMs = globalThis.__tgSimMs;
+    globalThis.__tgSimMs = 1234;
+    try {
+      const log = createTestSessionLog();
+      log.record("action_start", { action: "harvest" });
+      const lines = getParsedLines(log.getText());
+      expect(lines[0].simMs).toBe(1234);
+    } finally {
+      globalThis.__tgSimMs = originalSimMs;
+    }
+  });
 });

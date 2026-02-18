@@ -21,6 +21,26 @@ let era2LoopInterval = null;
 let isSimPaused = false;
 let pausedAtMs = 0;
 let allowBackgroundSim = false;
+let simMs = 0;
+
+function publishSimMs() {
+  globalThis.__tgSimMs = simMs;
+}
+
+function setSimMs(nextValue) {
+  const nextMs = Number(nextValue);
+  simMs = Number.isFinite(nextMs) && nextMs >= 0 ? nextMs : 0;
+  publishSimMs();
+}
+
+function advanceSimMs(dtMs) {
+  const delta = Number(dtMs);
+  if (!Number.isFinite(delta) || delta <= 0) return;
+  simMs += delta;
+  publishSimMs();
+}
+
+setSimMs(0);
 
 // --- Game State ---
 const PERSISTED_STATE_KEYS = [
@@ -831,6 +851,7 @@ function loadGame() {
     state = defaults;
     state.meta.createdAt = new Date().toISOString();
     saveGame(); // create key immediately so it's easy to see in DevTools
+    setSimMs((Number(state.simElapsedSeconds) || 0) * 1000);
     logRenownLoadValues();
     return;
   }
@@ -885,10 +906,12 @@ function loadGame() {
     if (!state.meta.createdAt) {
       state.meta.createdAt = new Date().toISOString();
     }
+    setSimMs((Number(state.simElapsedSeconds) || 0) * 1000);
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state = defaults;
     state.meta.createdAt = new Date().toISOString();
+    setSimMs((Number(state.simElapsedSeconds) || 0) * 1000);
     saveGame();
   }
   logRenownLoadValues();
@@ -3443,6 +3466,8 @@ function startEra2Loop() {
     const now = Date.now();
     const dt = (now - last) / 1000;
     last = now;
+    state.simElapsedSeconds = (state.simElapsedSeconds || 0) + dt;
+    advanceSimMs(dt * 1000);
 
     const estateIncomeRate = getEstateIncomeRate();
     if (estateIncomeRate > 0) {
@@ -3471,6 +3496,7 @@ function startLoop() {
 
     // Sim timer
     state.simElapsedSeconds = (state.simElapsedSeconds || 0) + dt;
+    advanceSimMs(dt * 1000);
     if (simTimerEl) simTimerEl.textContent = formatRunDuration(state.simElapsedSeconds);
 
     // Arborist salary drain

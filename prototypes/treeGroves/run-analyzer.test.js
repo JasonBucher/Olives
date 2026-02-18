@@ -124,4 +124,20 @@ describe("Run Analyzer parsing", () => {
     expect(last.marketOlives).toBe(9);
     expect(last.marketOliveOil).toBe(3);
   });
+
+  it("uses simMs for relative chart timing when available", () => {
+    const rawText = [
+      '{"ms":1000,"simMs":0,"type":"session_start","payload":{"version":"treeGroves"}}',
+      '{"ms":2000,"simMs":1000,"type":"currency_delta","payload":{"currency":"florins","delta":5}}',
+      '{"ms":28802000,"simMs":2000,"type":"currency_delta","payload":{"currency":"florins","delta":5}}',
+    ].join("\n");
+
+    const parsed = parseTelemetryText(rawText);
+    const normalized = normalizeTelemetryEvents(parsed.rawEvents);
+    const analysis = computeRunAnalysis(normalized.events);
+
+    const last = analysis.points[analysis.points.length - 1];
+    expect(last.tRelSec).toBe(2);
+    expect(analysis.metadata.durationMs).toBe(2000);
+  });
 });

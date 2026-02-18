@@ -102,14 +102,29 @@ function getUserAgent() {
   }
 }
 
+function getSimMs() {
+  try {
+    const raw = globalThis?.__tgSimMs ?? globalThis?.window?.__tgSimMs;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function createBaseEntry(type, payload, sessionId) {
-  return {
+  const entry = {
     t: new Date().toISOString(),
     ms: Date.now(),
     sessionId,
     type,
     payload: isPlainObject(payload) ? payload : {},
   };
+  const simMs = getSimMs();
+  if (simMs != null) {
+    entry.simMs = simMs;
+  }
+  return entry;
 }
 
 export function createSessionLog(options = {}) {
