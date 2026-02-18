@@ -14,8 +14,11 @@
         <div class="subtitle">Tree Groves (Prototype)</div>
       </div>
       <span id="sim-timer" class="sim-timer">00:00</span>
-      <button id="bg-sim-toggle" class="btn btn-quiet" type="button">BG: Off</button>
-      <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+      <div class="topbar-actions">
+        <button id="bg-sim-toggle" class="btn btn-quiet" type="button">BG: Off</button>
+        <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+        <button id="analyzer-btn" class="btn btn-quiet" type="button">Analyzer</button>
+      </div>
     </header>
 
     <hr class="divider" />
@@ -489,7 +492,10 @@
         <h1>Olives</h1>
         <div class="subtitle">Tree Groves (Prototype)</div>
       </div>
-      <button id="debug-btn-era2" class="btn btn-quiet" type="button">Debug</button>
+      <div class="topbar-actions">
+        <button id="debug-btn-era2" class="btn btn-quiet" type="button">Debug</button>
+        <button id="analyzer-btn-era2" class="btn btn-quiet" type="button">Analyzer</button>
+      </div>
     </header>
     <hr class="divider" />
     <div class="layout">
@@ -614,6 +620,30 @@
               </div>
               <div id="era2-summary-investments-top" class="muted u-text-12 u-pad-top-4">No investments tracked yet.</div>
             </div>
+
+            <div class="subhead">Session Log</div>
+            <div class="subsection">
+              <div class="muted u-text-12">
+                Download this file and email it to the developer so we can analyze your run.
+              </div>
+              <div class="u-pad-top-6">
+                <button id="era2-session-log-download-btn" class="btn" type="button">
+                  Download Session Log (.ndjson)
+                </button>
+              </div>
+              <div class="row u-pad-top-6">
+                <div class="label">Lines</div>
+                <div class="value"><span id="era2-session-log-lines">0</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Approx Size</div>
+                <div class="value"><span id="era2-session-log-size">0 B</span></div>
+              </div>
+              <div class="row">
+                <div class="label">Session ID</div>
+                <div class="value"><span id="era2-session-log-session-id">-</span></div>
+              </div>
+            </div>
           </section>
         </div>
       </div>
@@ -629,6 +659,167 @@
           </section>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="analyzer-screen" class="container is-hidden">
+    <header class="topbar">
+      <div class="title">
+        <h1>Run Analyzer</h1>
+        <div class="subtitle">Upload a telemetry log to inspect run progression and balance.</div>
+      </div>
+      <button id="analyzer-back-btn" class="btn btn-quiet" type="button">Back to Game</button>
+    </header>
+    <hr class="divider" />
+
+    <div class="analyzer-layout">
+      <section class="section">
+        <div class="section-title">Upload</div>
+        <div class="subsection">
+          <div class="analyzer-source-row">
+            <div class="muted u-text-12">Data Source</div>
+            <div class="analyzer-source-options">
+              <label class="analyzer-source-option" for="analyzer-source-live">
+                <input id="analyzer-source-live" name="analyzer-source" type="radio" value="live" checked />
+                <span>Current Run</span>
+              </label>
+              <label class="analyzer-source-option" for="analyzer-source-file">
+                <input id="analyzer-source-file" name="analyzer-source" type="radio" value="file" disabled />
+                <span>Loaded File: <span id="analyzer-loaded-filename">none</span></span>
+              </label>
+            </div>
+          </div>
+          <input
+            id="analyzer-file-input"
+            class="analyzer-file-input"
+            type="file"
+            accept=".json,.ndjson,.txt,application/json"
+          />
+          <div class="u-pad-top-6 analyzer-actions">
+            <button id="analyzer-upload-btn" class="btn btn-primary" type="button">Upload Log</button>
+            <button id="analyzer-snapshot-btn" class="btn" type="button">📌 Snapshot Point</button>
+            <button id="analyzer-download-normalized-btn" class="btn" type="button" disabled>Download Normalized Events (JSON)</button>
+            <button id="analyzer-download-timeseries-btn" class="btn" type="button" disabled>Download Time Series (CSV)</button>
+          </div>
+          <div class="muted u-text-12 u-pad-top-6">
+            Accepted formats: NDJSON, JSON array, or object with <code>events: []</code>. No data is uploaded; processing is local in your browser.
+          </div>
+          <div id="analyzer-status" class="muted u-text-12 u-pad-top-6">Choose a telemetry file to begin.</div>
+        </div>
+      </section>
+
+      <div class="analyzer-overview">
+        <section class="section">
+          <div class="section-title">Run Metadata</div>
+          <div class="subsection">
+            <div class="row">
+              <div class="label">Session ID</div>
+              <div class="value"><span id="analyzer-meta-session-id">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Start</div>
+              <div class="value"><span id="analyzer-meta-start">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">End</div>
+              <div class="value"><span id="analyzer-meta-end">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Duration</div>
+              <div class="value"><span id="analyzer-meta-duration">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Version</div>
+              <div class="value"><span id="analyzer-meta-version">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Build</div>
+              <div class="value"><span id="analyzer-meta-build">—</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Summary</div>
+          <div class="subsection">
+            <div class="row">
+              <div class="label">Final Florins</div>
+              <div class="value"><span id="analyzer-summary-florins">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Final Stone</div>
+              <div class="value"><span id="analyzer-summary-stone">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Market Olives</div>
+              <div class="value"><span id="analyzer-summary-market-olives">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Market Olive Oil</div>
+              <div class="value"><span id="analyzer-summary-market-olive-oil">—</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Investments Purchased</div>
+              <div class="value"><span id="analyzer-summary-investments">0</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Workers Hired</div>
+              <div class="value"><span id="analyzer-summary-workers">0</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Actions Completed</div>
+              <div class="value"><span id="analyzer-summary-actions">0</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Era</div>
+              <div class="value"><span id="analyzer-summary-era">—</span></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="section">
+        <div class="section-title">Time Series</div>
+        <div class="subsection">
+          <div id="analyzer-series-controls" class="analyzer-series-controls"></div>
+          <div id="analyzer-chart-wrap" class="analyzer-chart-wrap">
+            <svg id="analyzer-chart-svg" class="analyzer-chart-svg" aria-label="Run metrics chart"></svg>
+            <div id="analyzer-chart-empty" class="muted u-text-12">Upload a log to render chart data.</div>
+            <div id="analyzer-chart-tooltip" class="analyzer-chart-tooltip is-hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Event Timeline</div>
+        <div class="subsection">
+          <div class="analyzer-timeline-controls">
+            <label for="analyzer-timeline-filter" class="muted u-text-12">Filter</label>
+            <select id="analyzer-timeline-filter" class="analyzer-select">
+              <option value="key">Key Events</option>
+              <option value="all">All Events</option>
+              <option value="purchases">Purchases</option>
+              <option value="actions">Actions</option>
+              <option value="transitions">Transitions</option>
+            </select>
+          </div>
+          <div class="analyzer-table-wrap">
+            <table class="analyzer-table">
+              <thead>
+                <tr>
+                  <th>Elapsed</th>
+                  <th>Timestamp</th>
+                  <th>Type</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="analyzer-timeline-body">
+                <tr><td colspan="4" class="muted">Upload a file to view timeline events.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
