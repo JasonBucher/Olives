@@ -3,6 +3,7 @@
 import { computeHarvestOutcomeChances } from './harvestWeights.js';
 import { TUNING } from './tuning.js';
 import { INVESTMENTS } from './investments.js';
+import * as Calc from './gameCalc.js';
 import { initLogger, logPlayer, logDebug, logEvent, clearLog } from './logger.js';
 import SessionLog from './sessionLog.js';
 import { initAnalyzerView } from './views/analyzerView.js';
@@ -293,75 +294,35 @@ const harvestConfig = {
 
 // --- Cultivator Hire Cost ---
 function getCultivatorHireCost() {
-  const count = state.cultivatorCount;
-  const baseCost = TUNING.workers.cultivator.baseCost;
-  const threshold = TUNING.workers.cultivator.costScaleThreshold;
-  
-  if (count < threshold) {
-    return baseCost + (count * TUNING.workers.cultivator.costScaleLow);
-  } else {
-    // Cost at threshold + additional cost for workers beyond threshold
-    const costAtThreshold = baseCost + (threshold * TUNING.workers.cultivator.costScaleLow);
-    const beyondThreshold = count - threshold;
-    return costAtThreshold + (beyondThreshold * TUNING.workers.cultivator.costScaleHigh);
-  }
+  return Calc.getCultivatorHireCost(state.cultivatorCount, TUNING);
 }
 
 // --- Cultivator Effects ---
 function getCultivatorBonusPerSecond() {
-  let bonus = state.cultivatorCount * TUNING.workers.cultivator.olivesPerSecondPerCultivator;
-  
-  if (state.foremanHired && foremanIsActive) {
-    bonus *= TUNING.managers.foreman.growthMultiplier;
-  }
-  
-  return bonus;
+  return Calc.getCultivatorBonusPerSecond(state.cultivatorCount, TUNING, state.foremanHired && foremanIsActive);
 }
 
 function getGroveExpansionBonus() {
-  let bonus = 0;
-  const expansions = TUNING.investments.groveExpansion;
-  for (let i = 0; i < expansions.length; i++) {
-    const upgradeId = `expand_grove_${expansions[i].idSuffix}`;
-    if (state.upgrades[upgradeId]) {
-      bonus += expansions[i].capacityBonus;
-    }
-  }
-  return bonus;
-}
-
-function formatOlivesPerSecond(value) {
-  const rounded = value < 1 ? value.toFixed(3) : value.toFixed(2);
-  return rounded.replace(/\.?0+$/, "");
+  return Calc.getGroveExpansionBonus(state.upgrades, TUNING);
 }
 
 // --- Harvester Hire Cost ---
 function getHarvesterHireCost() {
-  return TUNING.workers.harvester.baseCost + (state.harvesterCount * TUNING.workers.harvester.costScale);
+  return Calc.getHarvesterHireCost(state.harvesterCount, TUNING);
 }
 
 // --- Harvester Effects ---
 function getHarvesterOlivesBonus() {
-  // Simple linear bonus: each harvester provides +0.6 olives per harvest
-  return state.harvesterCount * TUNING.workers.harvester.olivesPerHarvest;
+  return Calc.getHarvesterOlivesBonus(state.harvesterCount, TUNING);
 }
 
 function calculateHarvesterHirePreview() {
-  const currentCount = state.harvesterCount;
-  const nextCount = currentCount + 1;
-  
-  // Calculate olives bonus (simple linear scaling)
-  const currentOlives = currentCount * TUNING.workers.harvester.olivesPerHarvest;
-  const nextOlives = nextCount * TUNING.workers.harvester.olivesPerHarvest;
-  
-  return {
-    olives: { current: currentOlives, next: nextOlives }
-  };
+  return Calc.calculateHarvesterHirePreview(state.harvesterCount, TUNING);
 }
 
 // --- Presser Hire Cost ---
 function getPresserHireCost() {
-  return TUNING.workers.presser.baseCost + (state.presserCount * TUNING.workers.presser.costScale);
+  return Calc.getPresserHireCost(state.presserCount, TUNING);
 }
 
 // --- Presser Effects ---
@@ -376,53 +337,35 @@ let foremanIsActive = false;
 
 // --- Press Output Helpers ---
 function getBaseOilPerOlive() {
-  return TUNING.press.baseOilPerPress / TUNING.press.olivesPerPress;
+  return Calc.getBaseOilPerOlive(TUNING);
 }
 
 function getTotalOilPerOlive() {
-  let bonusPerOlive = state.presserCount * TUNING.workers.presser.oilPerOlivePerPresser;
-  if (state.pressManagerHired && pressManagerIsActive) {
-    bonusPerOlive *= TUNING.managers.pressManager.presserMultiplier;
-  }
-  return getBaseOilPerOlive() + bonusPerOlive;
-}
-
-function formatOilPerPress(value) {
-  return value < 1 ? value.toFixed(3) : value.toFixed(2);
+  return Calc.getTotalOilPerOlive(state.presserCount, TUNING, state.pressManagerHired && pressManagerIsActive);
 }
 
 // --- Shipping Capacity Helpers ---
 function getOliveShippingCapacity() {
-  const bonus = (state.shippingCrateLevel || 0) * TUNING.investments.shippingCrates.oliveBonusPerLevel;
-  return TUNING.market.shipping.olives.baseBatchSize + bonus;
+  return Calc.getOliveShippingCapacity(state.shippingCrateLevel, TUNING);
 }
 
 function getOliveOilShippingCapacity() {
-  const bonus = (state.shippingCrateLevel || 0) * TUNING.investments.shippingCrates.oilBonusPerLevel;
-  return TUNING.market.shipping.oliveOil.baseBatchSize + bonus;
+  return Calc.getOliveOilShippingCapacity(state.shippingCrateLevel, TUNING);
 }
 
 // --- Quarry Helpers ---
 function getQuarryDurationSeconds() {
-  const level = state.quarryCartLevel || 0;
-  const reduction = level * TUNING.investments.pulleyCart.reductionPerLevel;
-  return TUNING.quarry.durationSeconds * (1 - reduction);
+  return Calc.getQuarryDurationSeconds(state.quarryCartLevel, TUNING);
 }
 
 // --- Quarry Output Helper ---
 function getQuarryOutput() {
-  const bonus = (state.quarryPickLevel || 0) * TUNING.investments.sharpenedPicks.bonusPerLevel;
-  return TUNING.quarry.outputPerRun + bonus;
+  return Calc.getQuarryOutput(state.quarryPickLevel, TUNING);
 }
 
 // --- Olive Press Scaling Helper ---
 function getOlivesToPress() {
-  const olivesPerPress = TUNING.press.olivesPerPress;
-  const pressCount = state.olivePressCount || 1;
-  const pressableOlives = getShippableCount(state.harvestedOlives);
-  const availableMultiples = Math.floor(pressableOlives / olivesPerPress);
-  const multiplesToRun = Math.min(availableMultiples, pressCount);
-  return multiplesToRun * olivesPerPress;
+  return Calc.getOlivesToPress(state.harvestedOlives, state.olivePressCount, TUNING);
 }
 
 // --- Harvest Job State (not persisted) ---
@@ -1189,22 +1132,12 @@ function growTrees(dt) {
 }
 
 // --- Inventory Helpers (Fractional Internal, Integer Display/Shipping) ---
-/**
- * Get display count for inventory (always integer).
- * @param {number} actualValue - The actual float inventory value
- * @returns {number} Integer count for display
- */
 function getDisplayCount(actualValue) {
-  return Math.floor(actualValue);
+  return Calc.getDisplayCount(actualValue);
 }
 
-/**
- * Get maximum shippable/consumable count (always integer).
- * @param {number} actualValue - The actual float inventory value
- * @returns {number} Integer count available for shipping/consumption
- */
 function getShippableCount(actualValue) {
-  return Math.floor(actualValue);
+  return Calc.getShippableCount(actualValue);
 }
 
 /**
@@ -1615,282 +1548,164 @@ function moveToCity() {
 function updateUI() {
   updateEraVisibility();
   updateEra2UI();
+
+  const activeFlags = {
+    arborist: arboristIsActive,
+    foreman: state.foremanHired && foremanIsActive,
+    quarryManager: quarryManagerIsActive,
+    pressManager: state.pressManagerHired && pressManagerIsActive,
+  };
+
+  // --- Grove & inventory ---
+  const grove = Calc.calcGroveStats(state, TUNING, activeFlags.foreman);
   florinCountEl.textContent = state.florinCount.toFixed(2);
-  treeOlivesEl.textContent = Math.floor(state.treeOlives);
-  const currentTreeCapacity = TUNING.grove.treeCapacity + getGroveExpansionBonus();
-  treeCapacityEl.textContent = currentTreeCapacity;
-  
-  // Display growth rate (olives/sec)
-  const growthRate = TUNING.grove.treeGrowthPerSec + getCultivatorBonusPerSecond();
-  treeGrowthRateEl.textContent = `(${growthRate.toFixed(2)}/s)`;
-  
-  // Inventory displays always show integers (floor of actual float values)
-  invOlivesQty.textContent = getDisplayCount(state.harvestedOlives);
-  invOliveOilQty.textContent = getDisplayCount(state.oliveOilCount || 0);
-  marketOliveCountEl.textContent = getDisplayCount(state.marketOlives);
-  marketOilCountEl.textContent = getDisplayCount(state.marketOliveOil || 0);
+  treeOlivesEl.textContent = grove.treeOlives;
+  treeCapacityEl.textContent = grove.treeCapacity;
+  treeGrowthRateEl.textContent = `(${grove.growthRate.toFixed(2)}/s)`;
+
+  invOlivesQty.textContent = Calc.getDisplayCount(state.harvestedOlives);
+  invOliveOilQty.textContent = Calc.getDisplayCount(state.oliveOilCount || 0);
+  marketOliveCountEl.textContent = Calc.getDisplayCount(state.marketOlives);
+  marketOilCountEl.textContent = Calc.getDisplayCount(state.marketOliveOil || 0);
   updateMarketAutosellUI();
   updateRenownUI();
   updateRelocationUI();
-  
-  // Update ship button state based on inventory (only whole goods can be shipped)
+
+  // --- Shipping buttons ---
+  const ship = Calc.calcShippingStats(state, TUNING);
   if (!isShipping) {
-    const shippableOlives = getShippableCount(state.harvestedOlives);
-    shipOlivesBtn.disabled = shippableOlives === 0;
-    const maxShip = Math.min(shippableOlives, getOliveShippingCapacity());
-    shipOlivesBtn.textContent = `Ship (up to ${maxShip})`;
+    shipOlivesBtn.disabled = ship.olives.shippable === 0;
+    shipOlivesBtn.textContent = `Ship (up to ${ship.olives.maxShip})`;
   }
-
-  // Update oil ship button state based on inventory (only whole goods can be shipped)
   if (!isShippingOliveOil) {
-    const shippableOil = getShippableCount(state.oliveOilCount || 0);
-    shipOliveOilBtn.disabled = shippableOil === 0;
-    const maxShipOil = Math.min(shippableOil, getOliveOilShippingCapacity());
-    shipOliveOilBtn.textContent = `Ship (up to ${maxShipOil})`;
+    shipOliveOilBtn.disabled = ship.oil.shippable === 0;
+    shipOliveOilBtn.textContent = `Ship (up to ${ship.oil.maxShip})`;
   }
 
-  // Update olive press count display
+  // --- Press ---
   olivePressCountEl.textContent = "x" + (state.olivePressCount || 1);
-
-  // Update press button state based on inventory (only whole goods can be pressed)
-  const olivesToPress = getOlivesToPress();
+  const press = Calc.calcPressAction(state, TUNING, activeFlags.pressManager);
   if (!isPressing) {
-    pressBtn.disabled = olivesToPress < TUNING.press.olivesPerPress;
-    pressBtn.textContent = `Press (${olivesToPress})`;
+    pressBtn.disabled = press.olivesToPress < TUNING.press.olivesPerPress;
+    pressBtn.textContent = `Press (${press.olivesToPress})`;
   }
-
-  // Update press preview (deterministic output per press)
-  const oilPerOlive = getTotalOilPerOlive();
   if (pressConsumesEl) {
-    pressConsumesEl.textContent = `Consumes: ${olivesToPress} Olives`;
+    pressConsumesEl.textContent = `Consumes: ${press.olivesToPress} Olives`;
   }
   if (pressProducesEl) {
-    pressProducesEl.textContent = `Produces: ${(olivesToPress * oilPerOlive).toFixed(2)} Olive Oil`;
+    pressProducesEl.textContent = `Produces: ${press.oilOutput.toFixed(2)} Olive Oil`;
   }
 
-  // Update stone inventory display and quarry button state
-  invStoneQty.textContent = getDisplayCount(state.stone);
+  // --- Stone & quarry ---
+  invStoneQty.textContent = Calc.getDisplayCount(state.stone);
   if (!isQuarrying) {
     quarryBtn.disabled = false;
   }
-  quarryNextEl.textContent = `Next: +${getQuarryOutput()} Stone \u2022 ${parseFloat(getQuarryDurationSeconds().toFixed(2))}s`;
+  const quarry = Calc.calcQuarryStats(state, TUNING);
+  quarryNextEl.textContent = `Next: +${quarry.output} Stone \u2022 ${parseFloat(quarry.durationSeconds.toFixed(2))}s`;
 
-  // Update harvest button state and pill visibility
+  // --- Harvest ---
   if (!isHarvesting) {
     harvestBtn.disabled = false;
     harvestActionUI.setIdle({ resetBar: false });
   }
   const chances = getCurrentHarvestOutcomeChances();
-  const poorPct = Math.round((chances.find(o => o.key === "poor")?.weight || 0) * 100);
-  const efficientPct = Math.round((chances.find(o => o.key === "efficient")?.weight || 0) * 100);
-  const interruptedPct = Math.round((chances.find(o => o.key === "interrupted_short")?.weight || 0) * 100);
-  const stabilityLabel = getHarvestStabilityLabel(poorPct);
-  harvestNextEl.textContent = `Next: +${Math.floor(getCurrentHarvestBatchSize())} olives \u2022 ${TUNING.harvest.durationSeconds}s  |  Stability: ${stabilityLabel} (${poorPct}% \u26A0 / ${efficientPct}% \u2728 / ${interruptedPct}% \u26D4)`;
+  const hStats = Calc.calcHarvesterStats(state, TUNING, arboristIsActive, chances, harvestConfig.batchSize);
+  harvestNextEl.textContent = `Next: +${Math.floor(hStats.batchSize)} olives \u2022 ${TUNING.harvest.durationSeconds}s  |  Stability: ${hStats.harvest.stabilityLabel} (${hStats.harvest.poorPct}% \u26A0 / ${hStats.harvest.efficientPct}% \u2728 / ${hStats.harvest.interruptedPct}% \u26D4)`;
 
-  // Update cultivator UI
-  cultivatorCountEl.textContent = `x${state.cultivatorCount}`;
-  const cultivatorCost = getCultivatorHireCost();
-  hireCultivatorCostEl.textContent = cultivatorCost;
-  hireCultivatorBtn.disabled = state.florinCount < cultivatorCost;
-  
-  const perCultivator = TUNING.workers.cultivator.olivesPerSecondPerCultivator;
-  const cultivatorMultiplier = (state.foremanHired && foremanIsActive)
-    ? TUNING.managers.foreman.growthMultiplier
-    : 1;
-  const currentBonus = state.cultivatorCount * perCultivator * cultivatorMultiplier;
-  const nextBonus = perCultivator * cultivatorMultiplier;
-  
-  cultivatorImpactEl.textContent = `+${formatOlivesPerSecond(currentBonus)} olives / s`;
-  cultivatorDelta.textContent = `Next: +${formatOlivesPerSecond(nextBonus)} olives / s`;
-  
-  // Update cultivator badges
-  if (foremanIsActive) {
-    cultivatorBadgeManager.textContent = "Mgr";
-    cultivatorBadgeManager.style.visibility = "visible";
-  } else {
-    cultivatorBadgeManager.textContent = "";
-    cultivatorBadgeManager.style.visibility = "hidden";
-  }
+  // --- Cultivator UI ---
+  const cult = Calc.calcCultivatorStats(state, TUNING, activeFlags.foreman);
+  cultivatorCountEl.textContent = `x${cult.count}`;
+  hireCultivatorCostEl.textContent = cult.hireCost;
+  hireCultivatorBtn.disabled = state.florinCount < cult.hireCost;
+  cultivatorImpactEl.textContent = `+${Calc.formatOlivesPerSecond(cult.currentBonus)} olives / s`;
+  cultivatorDelta.textContent = `Next: +${Calc.formatOlivesPerSecond(cult.nextBonus)} olives / s`;
+  renderBadge(cultivatorBadgeManager, cult.managerActive);
   cultivatorBadgeStatus.textContent = "";
   cultivatorBadgeStatus.style.visibility = "hidden";
   cultivatorBadgeExtra.textContent = "";
   cultivatorBadgeExtra.style.visibility = "hidden";
 
-  // Update harvester UI
-  harvesterCountEl.textContent = `x${state.harvesterCount}`;
-  const harvesterCost = getHarvesterHireCost();
-  hireHarvesterCostEl.textContent = harvesterCost;
-  hireHarvesterBtn.disabled = state.florinCount < harvesterCost;
-  
-  // Update harvester stats and preview
-  const preview = calculateHarvesterHirePreview();
-  
-  // Top row: Current stats
-  const effCfg = TUNING.harvest.efficientBonus;
-  const currentEffBonus = Math.floor(effCfg.flat + state.harvesterCount * effCfg.perHarvester);
-  if (state.harvesterCount > 0) {
-    const currentBonus = preview.olives.current;
-    harvesterImpactEl.textContent = `Harvest +${currentBonus.toFixed(1)} olives, ✨ +${currentEffBonus} bonus`;
+  // --- Harvester UI ---
+  harvesterCountEl.textContent = `x${hStats.count}`;
+  hireHarvesterCostEl.textContent = hStats.hireCost;
+  hireHarvesterBtn.disabled = state.florinCount < hStats.hireCost;
+  if (hStats.count > 0) {
+    harvesterImpactEl.textContent = `Harvest +${hStats.olives.current.toFixed(1)} olives, \u2728 +${hStats.eff.current} bonus`;
   } else {
-    harvesterImpactEl.textContent = "—";
+    harvesterImpactEl.textContent = "\u2014";
   }
-
-  // Bottom row: Next hire delta (olives bonus increase)
-  const olivesDelta = preview.olives.next - preview.olives.current;
-  const nextEffBonus = Math.floor(effCfg.flat + (state.harvesterCount + 1) * effCfg.perHarvester);
-  const effDelta = nextEffBonus - currentEffBonus;
-  const effPart = effDelta > 0 ? `, ✨ +${effDelta} bonus` : '';
-  harvesterDelta.textContent = `Next: +${olivesDelta.toFixed(1)} olives per harvest${effPart}`;
-
-  
-  // Update badges
-  // Badge slot 1: Manager coverage
-  if (arboristIsActive) {
-    harvesterBadgeManager.textContent = "Mgr";
-    harvesterBadgeManager.style.visibility = "visible";
-  } else {
-    harvesterBadgeManager.textContent = "";
-    harvesterBadgeManager.style.visibility = "hidden";
-  }
-  
-  // Badge slot 2: Status modifier (for future use - Auto/Idle/etc)
+  const effPart = hStats.eff.delta > 0 ? `, \u2728 +${hStats.eff.delta} bonus` : '';
+  harvesterDelta.textContent = `Next: +${hStats.olives.delta.toFixed(1)} olives per harvest${effPart}`;
+  renderBadge(harvesterBadgeManager, hStats.managerActive);
   harvesterBadgeStatus.textContent = "";
   harvesterBadgeStatus.style.visibility = "hidden";
-  
-  // Badge slot 3: Extra modifier (for future use)
   harvesterBadgeExtra.textContent = "";
   harvesterBadgeExtra.style.visibility = "hidden";
 
-  // Update presser UI
-  presserCountEl.textContent = `x${state.presserCount}`;
-  const presserCost = getPresserHireCost();
-  hirePresserCostEl.textContent = presserCost;
-  hirePresserBtn.disabled = state.florinCount < presserCost;
-  
-  // Update presser stats and preview (conversion bonus)
-  const oilBonusPerPresser = TUNING.workers.presser.oilPerOlivePerPresser;
-  const presserMult = (state.pressManagerHired && pressManagerIsActive)
-    ? TUNING.managers.pressManager.presserMultiplier
-    : 1;
-  const maxOlivesPerAction = (state.olivePressCount || 1) * TUNING.press.olivesPerPress;
-  const currentOilBonus = maxOlivesPerAction * state.presserCount * oilBonusPerPresser * presserMult;
-  const nextOilBonus = maxOlivesPerAction * oilBonusPerPresser * presserMult;
-  
-  // Top row: Current bonus per press
-  if (state.presserCount > 0) {
-    presserImpactEl.textContent = `+${formatOilPerPress(currentOilBonus)} oil / press`;
+  // --- Presser UI ---
+  const pStats = Calc.calcPresserStats(state, TUNING, activeFlags.pressManager);
+  presserCountEl.textContent = `x${pStats.count}`;
+  hirePresserCostEl.textContent = pStats.hireCost;
+  hirePresserBtn.disabled = state.florinCount < pStats.hireCost;
+  if (pStats.count > 0) {
+    presserImpactEl.textContent = `+${Calc.formatOilPerPress(pStats.currentOilBonus)} oil / press`;
   } else {
-    presserImpactEl.textContent = "—";
+    presserImpactEl.textContent = "\u2014";
   }
-  
-  // Bottom row: Next hire delta
-  presserDelta.textContent = `Next: +${formatOilPerPress(nextOilBonus)} oil / press`;
-  
-  // Update presser badges
-  // Badge slot 1: Press Manager coverage
-  if (pressManagerIsActive) {
-    presserBadgeManager.textContent = "Mgr";
-    presserBadgeManager.style.visibility = "visible";
-  } else {
-    presserBadgeManager.textContent = "";
-    presserBadgeManager.style.visibility = "hidden";
-  }
-  
-  // Badge slot 2: Status modifier (for future use)
+  presserDelta.textContent = `Next: +${Calc.formatOilPerPress(pStats.nextOilBonus)} oil / press`;
+  renderBadge(presserBadgeManager, pStats.managerActive);
   presserBadgeStatus.textContent = "";
   presserBadgeStatus.style.visibility = "hidden";
-  
-  // Badge slot 3: Extra modifier (for future use)
   presserBadgeExtra.textContent = "";
   presserBadgeExtra.style.visibility = "hidden";
 
-  // Toggle Managers section
-  const anyManagerHired = state.arboristHired || state.foremanHired || state.quarryManagerHired || state.pressManagerHired;
-  managersEmptyEl.hidden = anyManagerHired;
-  
-  if (state.arboristHired) {
-    managersArboristWrap.hidden = false;
-    // Toggle active/inactive styling on manager name
-    if (arboristIsActive) {
-      arboristNameEl.classList.add("mgr-name--active");
-      arboristNameEl.classList.remove("mgr-name--inactive");
+  // --- Managers section ---
+  const mgrSummary = Calc.calcManagersSummary(state, TUNING, {
+    arborist: arboristIsActive,
+    foreman: foremanIsActive,
+    quarryManager: quarryManagerIsActive,
+    pressManager: pressManagerIsActive,
+  });
+  managersEmptyEl.hidden = mgrSummary.anyHired;
+
+  const mgrUI = {
+    arborist: { wrap: managersArboristWrap, nameEl: arboristNameEl },
+    foreman: { wrap: managersForemanWrap, nameEl: foremanNameEl },
+    quarryManager: { wrap: managersQuarryMgrWrap, nameEl: quarryManagerNameEl },
+    pressManager: { wrap: managersPressMgrWrap, nameEl: pressManagerNameEl },
+  };
+  for (const mgr of mgrSummary.managers) {
+    const ui = mgrUI[mgr.id];
+    if (mgr.hired) {
+      ui.wrap.hidden = false;
+      ui.nameEl.classList.toggle("mgr-name--active", mgr.active);
+      ui.nameEl.classList.toggle("mgr-name--inactive", !mgr.active);
     } else {
-      arboristNameEl.classList.add("mgr-name--inactive");
-      arboristNameEl.classList.remove("mgr-name--active");
+      ui.wrap.hidden = true;
     }
-  } else {
-    managersArboristWrap.hidden = true;
-  }
-  
-  if (state.foremanHired) {
-    managersForemanWrap.hidden = false;
-    // Toggle active/inactive styling on manager name
-    if (foremanIsActive) {
-      foremanNameEl.classList.add("mgr-name--active");
-      foremanNameEl.classList.remove("mgr-name--inactive");
-    } else {
-      foremanNameEl.classList.add("mgr-name--inactive");
-      foremanNameEl.classList.remove("mgr-name--active");
-    }
-  } else {
-    managersForemanWrap.hidden = true;
-  }
-  
-  if (state.quarryManagerHired) {
-    managersQuarryMgrWrap.hidden = false;
-    if (quarryManagerIsActive) {
-      quarryManagerNameEl.classList.add("mgr-name--active");
-      quarryManagerNameEl.classList.remove("mgr-name--inactive");
-    } else {
-      quarryManagerNameEl.classList.add("mgr-name--inactive");
-      quarryManagerNameEl.classList.remove("mgr-name--active");
-    }
-  } else {
-    managersQuarryMgrWrap.hidden = true;
   }
 
-  if (state.pressManagerHired) {
-    managersPressMgrWrap.hidden = false;
-    // Toggle active/inactive styling on manager name
-    if (pressManagerIsActive) {
-      pressManagerNameEl.classList.add("mgr-name--active");
-      pressManagerNameEl.classList.remove("mgr-name--inactive");
-    } else {
-      pressManagerNameEl.classList.add("mgr-name--inactive");
-      pressManagerNameEl.classList.remove("mgr-name--active");
-    }
-  } else {
-    managersPressMgrWrap.hidden = true;
-  }
-  
-  // Update total active manager cost
-  if (anyManagerHired) {
-    let totalCost = 0;
-    if (arboristIsActive) {
-      totalCost += TUNING.managers.arborist.salaryPerMin;
-    }
-    if (foremanIsActive) {
-      totalCost += TUNING.managers.foreman.salaryPerMin;
-    }
-    if (quarryManagerIsActive) {
-      totalCost += TUNING.managers.quarryManager.salaryPerMin;
-    }
-    if (pressManagerIsActive) {
-      totalCost += TUNING.managers.pressManager.salaryPerMin;
-    }
-    
-    if (totalCost > 0) {
-      managersTotalWrap.hidden = false;
-      managersTotalCostEl.textContent = "-" + totalCost.toFixed(2) + " fl/min";
-    } else {
-      managersTotalWrap.hidden = true;
-    }
+  if (mgrSummary.anyHired && mgrSummary.totalActiveCost > 0) {
+    managersTotalWrap.hidden = false;
+    managersTotalCostEl.textContent = "-" + mgrSummary.totalActiveCost.toFixed(2) + " fl/min";
   } else {
     managersTotalWrap.hidden = true;
   }
-  
+
   // Update investment button states (state-aware previews)
   updateInvestmentButtons();
+}
+
+// --- Badge rendering helper ---
+function renderBadge(badgeEl, isActive) {
+  if (isActive) {
+    badgeEl.textContent = "Mgr";
+    badgeEl.style.visibility = "visible";
+  } else {
+    badgeEl.textContent = "";
+    badgeEl.style.visibility = "hidden";
+  }
 }
 
 // --- Debug: Render Current Harvest Outcome Chances ---
@@ -1955,16 +1770,12 @@ function getCurrentHarvestOutcomeChances() {
 }
 
 function getHarvestStabilityLabel(poorPct) {
-  if (poorPct === 0) return "Certain";
-  if (poorPct <= 5) return "Engineered";
-  if (poorPct < 15) return "Reliable";
-  return "Unstable";
+  return Calc.getHarvestStabilityLabel(poorPct);
 }
 
 // --- Harvest System ---
 function getCurrentHarvestBatchSize() {
-  const basketBonus = (state.harvestBasketLevel || 0) * TUNING.investments.harvestBaskets.bonusPerLevel;
-  return Math.max(0, harvestConfig.batchSize + basketBonus + getHarvesterOlivesBonus());
+  return Calc.getCurrentHarvestBatchSize(state.harvesterCount, state.harvestBasketLevel, harvestConfig.batchSize, TUNING);
 }
 
 function startHarvest(opts = {}) {
