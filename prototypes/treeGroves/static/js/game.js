@@ -429,18 +429,16 @@ const MANAGER_REGISTRY = [
 
 function tickManagers(dt) {
   for (const mgr of MANAGER_REGISTRY) {
-    if (state[mgr.hiredKey]) {
-      const salaryPerSec = TUNING.managers[mgr.tuningKey].salaryPerMin / 60;
-      const costThisTick = salaryPerSec * dt;
-      if (state.florinCount >= costThisTick) {
-        spendFlorins(costThisTick);
-        mgr.setActive(true);
-      } else {
-        mgr.setActive(false);
-      }
-    } else {
-      mgr.setActive(false);
+    const decision = Calc.computeManagerTickDecision(
+      !!state[mgr.hiredKey],
+      TUNING.managers[mgr.tuningKey].salaryPerMin,
+      state.florinCount,
+      dt
+    );
+    if (decision.active) {
+      spendFlorins(decision.cost);
     }
+    mgr.setActive(decision.active);
   }
 }
 
@@ -1153,93 +1151,12 @@ function getShippableCount(actualValue) {
   return Calc.getShippableCount(actualValue);
 }
 
-/**
- * Check if we can consume a given integer amount.
- * @param {number} actualValue - The actual float inventory value
- * @param {number} intAmount - Integer amount to consume
- * @returns {boolean} True if floor(actualValue) >= intAmount
- */
-/**
- * Consume an integer amount from float inventory.
- * Subtracts exactly intAmount from actualValue and guards against float precision issues.
- * @param {number} actualValue - The actual float inventory value
- * @param {number} intAmount - Integer amount to consume
- * @returns {number} New inventory value (clamped to 0 if within epsilon)
- */
 function consumeInventory(actualValue, intAmount) {
-  const newValue = actualValue - intAmount;
-  // Guard against float precision creating tiny negatives
-  const EPSILON = 1e-9;
-  return newValue < EPSILON ? 0 : newValue;
+  return Calc.consumeInventory(actualValue, intAmount);
 }
 
 function getRenownTierState() {
-  const renownValue = Number.isFinite(Number(state.renownValue)) ? Number(state.renownValue) : 0;
-  if (!renownTierConfig.length) {
-    return {
-      renownValue,
-      tierId: null,
-      tierName: "Unranked",
-      demandBonus: 0,
-      progressPct: 0,
-      progressText: "0 / 0",
-    };
-  }
-
-  // Use floored renown for tier matching — tier boundaries are integers (0-99, 100-249, etc.)
-  // but renown accrues fractionally (0.25 per unit sold), so 99.5 must stay in neighborhood
-  const flooredRenown = Math.floor(renownValue);
-  let activeTier = renownTierConfig.find((tier) => {
-    if (flooredRenown < tier.minRenown) return false;
-    if (tier.maxRenown == null || !Number.isFinite(tier.maxRenown)) return true;
-    return flooredRenown <= tier.maxRenown;
-  });
-
-  if (!activeTier) {
-    activeTier = renownValue < renownTierConfig[0].minRenown
-      ? renownTierConfig[0]
-      : renownTierConfig[renownTierConfig.length - 1];
-  }
-
-  const lastTier = renownTierConfig[renownTierConfig.length - 1];
-  const atEndOfLastTier = Number.isFinite(lastTier.maxRenown) && renownValue >= lastTier.maxRenown;
-  if (state.renownCapped || atEndOfLastTier) {
-    return {
-      renownValue,
-      tierId: activeTier.id,
-      tierName: "Countryside Limit",
-      demandBonus: Number(activeTier.demandBonus) || 0,
-      progressPct: 100,
-      progressText: "MAX",
-    };
-  }
-
-  const min = activeTier.minRenown;
-  const max = Number.isFinite(activeTier.maxRenown) ? activeTier.maxRenown : null;
-  if (max == null || max <= min) {
-    return {
-      renownValue,
-      tierId: activeTier.id,
-      tierName: activeTier.name,
-      demandBonus: Number(activeTier.demandBonus) || 0,
-      progressPct: 100,
-      progressText: "MAX",
-    };
-  }
-
-  const clamped = Math.min(Math.max(renownValue, min), max);
-  const range = max - min;
-  const inTier = clamped - min;
-  const progressPct = range > 0 ? (inTier / range) * 100 : 0;
-
-  return {
-    renownValue,
-    tierId: activeTier.id,
-    tierName: activeTier.name,
-    demandBonus: Number(activeTier.demandBonus) || 0,
-    progressPct,
-    progressText: `${Math.floor(inTier)} / ${Math.floor(range)}`,
-  };
+  return Calc.getRenownTierState(state.renownValue, state.renownCapped, renownTierConfig);
 }
 
 function getRenownCapMax() {
@@ -1421,20 +1338,7 @@ function closeAnalyzer() {
 }
 
 function computeEstateIncomeRate(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") return 0;
-  const treeCapacity = Number(snapshot.treeCapacity) || 0;
-  const olivePressCount = Number(snapshot.olivePressCount) || 0;
-  const harvestBasketLevel = Number(snapshot.harvestBasketLevel) || 0;
-  const harvestUpgradeCount = Array.isArray(snapshot.harvestUpgrades) ? snapshot.harvestUpgrades.length : 0;
-
-  const ei = TUNING.era2.estateIncome;
-  const ratePerSecond =
-    (treeCapacity * ei.treeCapacityMultiplier) +
-    (olivePressCount * ei.olivePressMultiplier) +
-    (harvestBasketLevel * ei.harvestBasketMultiplier) +
-    (harvestUpgradeCount * ei.harvestUpgradeMultiplier);
-
-  return Math.max(0, ratePerSecond);
+  return Calc.computeEstateIncomeRate(snapshot, TUNING);
 }
 
 function getEstateIncomeRate() {
@@ -2552,13 +2456,11 @@ function getMarketPriceUpgrades() {
 }
 
 function getMarketPermanentPriceMultiplier() {
-  const base = TUNING.market.price.baseMultiplier;
-  const upgrade = TUNING.market.price.upgradeMultiplier;
-  return base + (getMarketPriceUpgrades() * upgrade);
+  return Calc.getMarketPermanentPriceMultiplier(getMarketPriceUpgrades(), TUNING);
 }
 
 function getMarketEffectivePriceMultiplier(eventMultiplier = 1) {
-  return getMarketPermanentPriceMultiplier() * (eventMultiplier ?? 1);
+  return Calc.getMarketEffectivePriceMultiplier(getMarketPriceUpgrades(), TUNING, eventMultiplier);
 }
 
 function getCityDemandRatePerSecond(modifiers = getActiveMarketModifiers()) {
@@ -2578,24 +2480,7 @@ function getMarketInventoryCounts() {
 }
 
 function splitMarketSaleUnits(totalUnits, olivesAvailable, oilAvailable) {
-  if (totalUnits <= 0) return { olives: 0, oil: 0 };
-  if (olivesAvailable <= 0) return { olives: 0, oil: Math.min(oilAvailable, totalUnits) };
-  if (oilAvailable <= 0) return { olives: Math.min(olivesAvailable, totalUnits), oil: 0 };
-
-  const totalAvailable = olivesAvailable + oilAvailable;
-  let oilUnits = Math.floor((totalUnits * oilAvailable) / totalAvailable);
-  let oliveUnits = totalUnits - oilUnits;
-
-  if (oliveUnits > olivesAvailable) {
-    oliveUnits = olivesAvailable;
-    oilUnits = Math.min(oilAvailable, totalUnits - oliveUnits);
-  }
-  if (oilUnits > oilAvailable) {
-    oilUnits = oilAvailable;
-    oliveUnits = Math.min(olivesAvailable, totalUnits - oilUnits);
-  }
-
-  return { olives: oliveUnits, oil: oilUnits };
+  return Calc.splitMarketSaleUnits(totalUnits, olivesAvailable, oilAvailable);
 }
 
 function applyMarketSale({ olives, oil }, priceMultiplier = 1) {

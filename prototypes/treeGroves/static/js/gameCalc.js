@@ -146,6 +146,149 @@ export function getHarvestStabilityLabel(poorPct) {
   return "Unstable";
 }
 
+// --- Inventory consumption ---
+
+export function consumeInventory(actualValue, intAmount) {
+  const newValue = actualValue - intAmount;
+  const EPSILON = 1e-9;
+  return newValue < EPSILON ? 0 : newValue;
+}
+
+// --- Market sale allocation ---
+
+export function splitMarketSaleUnits(totalUnits, olivesAvailable, oilAvailable) {
+  if (totalUnits <= 0) return { olives: 0, oil: 0 };
+  if (olivesAvailable <= 0) return { olives: 0, oil: Math.min(oilAvailable, totalUnits) };
+  if (oilAvailable <= 0) return { olives: Math.min(olivesAvailable, totalUnits), oil: 0 };
+
+  const totalAvailable = olivesAvailable + oilAvailable;
+  let oilUnits = Math.floor((totalUnits * oilAvailable) / totalAvailable);
+  let oliveUnits = totalUnits - oilUnits;
+
+  if (oliveUnits > olivesAvailable) {
+    oliveUnits = olivesAvailable;
+    oilUnits = Math.min(oilAvailable, totalUnits - oliveUnits);
+  }
+  if (oilUnits > oilAvailable) {
+    oilUnits = oilAvailable;
+    oliveUnits = Math.min(olivesAvailable, totalUnits - oilUnits);
+  }
+
+  return { olives: oliveUnits, oil: oilUnits };
+}
+
+// --- Estate income ---
+
+export function computeEstateIncomeRate(snapshot, tuning) {
+  if (!snapshot || typeof snapshot !== "object") return 0;
+  const treeCapacity = Number(snapshot.treeCapacity) || 0;
+  const olivePressCount = Number(snapshot.olivePressCount) || 0;
+  const harvestBasketLevel = Number(snapshot.harvestBasketLevel) || 0;
+  const harvestUpgradeCount = Array.isArray(snapshot.harvestUpgrades) ? snapshot.harvestUpgrades.length : 0;
+
+  const ei = tuning.era2.estateIncome;
+  const ratePerSecond =
+    (treeCapacity * ei.treeCapacityMultiplier) +
+    (olivePressCount * ei.olivePressMultiplier) +
+    (harvestBasketLevel * ei.harvestBasketMultiplier) +
+    (harvestUpgradeCount * ei.harvestUpgradeMultiplier);
+
+  return Math.max(0, ratePerSecond);
+}
+
+// --- Renown tier ---
+
+export function getRenownTierState(renownValue, renownCapped, tierConfig) {
+  const safeRenown = Number.isFinite(Number(renownValue)) ? Number(renownValue) : 0;
+  if (!tierConfig || !tierConfig.length) {
+    return {
+      renownValue: safeRenown,
+      tierId: null,
+      tierName: "Unranked",
+      demandBonus: 0,
+      progressPct: 0,
+      progressText: "0 / 0",
+    };
+  }
+
+  const flooredRenown = Math.floor(safeRenown);
+  let activeTier = tierConfig.find((tier) => {
+    if (flooredRenown < tier.minRenown) return false;
+    if (tier.maxRenown == null || !Number.isFinite(tier.maxRenown)) return true;
+    return flooredRenown <= tier.maxRenown;
+  });
+
+  if (!activeTier) {
+    activeTier = safeRenown < tierConfig[0].minRenown
+      ? tierConfig[0]
+      : tierConfig[tierConfig.length - 1];
+  }
+
+  const lastTier = tierConfig[tierConfig.length - 1];
+  const atEndOfLastTier = Number.isFinite(lastTier.maxRenown) && safeRenown >= lastTier.maxRenown;
+  if (renownCapped || atEndOfLastTier) {
+    return {
+      renownValue: safeRenown,
+      tierId: activeTier.id,
+      tierName: "Countryside Limit",
+      demandBonus: Number(activeTier.demandBonus) || 0,
+      progressPct: 100,
+      progressText: "MAX",
+    };
+  }
+
+  const min = activeTier.minRenown;
+  const max = Number.isFinite(activeTier.maxRenown) ? activeTier.maxRenown : null;
+  if (max == null || max <= min) {
+    return {
+      renownValue: safeRenown,
+      tierId: activeTier.id,
+      tierName: activeTier.name,
+      demandBonus: Number(activeTier.demandBonus) || 0,
+      progressPct: 100,
+      progressText: "MAX",
+    };
+  }
+
+  const clamped = Math.min(Math.max(safeRenown, min), max);
+  const range = max - min;
+  const inTier = clamped - min;
+  const progressPct = range > 0 ? (inTier / range) * 100 : 0;
+
+  return {
+    renownValue: safeRenown,
+    tierId: activeTier.id,
+    tierName: activeTier.name,
+    demandBonus: Number(activeTier.demandBonus) || 0,
+    progressPct,
+    progressText: `${Math.floor(inTier)} / ${Math.floor(range)}`,
+  };
+}
+
+// --- Market price multipliers ---
+
+export function getMarketPermanentPriceMultiplier(priceUpgradeCount, tuning) {
+  const base = tuning.market.price.baseMultiplier;
+  const upgrade = tuning.market.price.upgradeMultiplier;
+  return base + (priceUpgradeCount * upgrade);
+}
+
+export function getMarketEffectivePriceMultiplier(priceUpgradeCount, tuning, eventMultiplier = 1) {
+  return getMarketPermanentPriceMultiplier(priceUpgradeCount, tuning) * (eventMultiplier ?? 1);
+}
+
+// --- Manager tick decision ---
+
+export function computeManagerTickDecision(isHired, salaryPerMin, florinCount, dt) {
+  if (!isHired) return { active: false, cost: 0 };
+  const salaryPerSec = salaryPerMin / 60;
+  const costThisTick = salaryPerSec * dt;
+  if (florinCount >= costThisTick) {
+    return { active: true, cost: costThisTick };
+  }
+  return { active: false, cost: 0 };
+}
+
 // --- Compound calc functions ---
 
 export function calcGroveStats(state, tuning, foremanIsActive) {
