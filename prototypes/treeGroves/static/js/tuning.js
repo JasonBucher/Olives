@@ -47,6 +47,7 @@ export const TUNING = {
   press: {
     olivesPerPress: 3,
     baseOilPerPress: 1,
+    baseDurationMs: 3000,
   },
 
   // Workers: hiring costs and production effects
@@ -89,16 +90,6 @@ export const TUNING = {
       hireCost: 50,
       salaryPerMin: 0.75,        // Florins per minute
       presserMultiplier: 1.50,   // 50% increase to presser oil bonus
-    },
-  },
-
-  // Production: processor batch sizes, durations, and conversions
-  production: {
-    olivePress: {
-      olivesPerPress: 3,
-      pressDurationMs: 3000,
-      oilPerPress: 1,
-      baseDurationMs: 3000,
     },
   },
 
@@ -155,11 +146,6 @@ export const TUNING = {
         chanceByTier: { neighborhood: 0, artisans: 0.10, nobles: 0.25 },
       },
     },
-    buyerOutcomes: [
-      { key: "nonna", weight: 0.45, buyMin: 1, buyMax: 4 },
-      { key: "regular", weight: 0.40, buyMin: 2, buyMax: 8 },
-      { key: "giuseppe", weight: 0.15, buyAll: true },
-    ],
   },
 
   // City: demand system (used by autosell pacing)

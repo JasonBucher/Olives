@@ -257,10 +257,6 @@ function createDefaultState() {
 function pickPersistedState(parsed) {
   if (!parsed || typeof parsed !== "object") return {};
   return PERSISTED_STATE_KEYS.reduce((acc, key) => {
-    if (key === "cultivatorCount" && !(key in parsed) && "farmHandCount" in parsed) {
-      acc[key] = parsed.farmHandCount;
-      return acc;
-    }
     if (key in parsed) acc[key] = parsed[key];
     return acc;
   }, {});
@@ -425,10 +421,10 @@ let arboristIsActive = false;
 
 // Manager registry: maps tuning key to state hired key and active flag setter
 const MANAGER_REGISTRY = [
-  { tuningKey: "arborist", hiredKey: "arboristHired", setActive(v) { arboristIsActive = v; } },
-  { tuningKey: "pressManager", hiredKey: "pressManagerHired", setActive(v) { pressManagerIsActive = v; } },
-  { tuningKey: "quarryManager", hiredKey: "quarryManagerHired", setActive(v) { quarryManagerIsActive = v; } },
-  { tuningKey: "foreman", hiredKey: "foremanHired", setActive(v) { foremanIsActive = v; } },
+  { tuningKey: "arborist", hiredKey: "arboristHired", salaryElId: "arborist-salary", setActive(v) { arboristIsActive = v; } },
+  { tuningKey: "pressManager", hiredKey: "pressManagerHired", salaryElId: "press-manager-salary", setActive(v) { pressManagerIsActive = v; } },
+  { tuningKey: "quarryManager", hiredKey: "quarryManagerHired", salaryElId: "quarry-manager-salary", setActive(v) { quarryManagerIsActive = v; } },
+  { tuningKey: "foreman", hiredKey: "foremanHired", salaryElId: "foreman-salary", setActive(v) { foremanIsActive = v; } },
 ];
 
 function tickManagers(dt) {
@@ -548,18 +544,14 @@ const presserBadgeExtra = document.getElementById("presser-badge-extra");
 const presserDelta = document.getElementById("presser-delta");
 
 const arboristNameEl = document.getElementById("arborist-name");
-const arboristSalaryEl = document.getElementById("arborist-salary");
 const managersEmptyEl = document.getElementById("managers-empty");
 const managersArboristWrap = document.getElementById("managers-arborist");
 const managersPressMgrWrap = document.getElementById("managers-press-manager");
 const pressManagerNameEl = document.getElementById("press-manager-name");
-const pressManagerSalaryEl = document.getElementById("press-manager-salary");
 const managersQuarryMgrWrap = document.getElementById("managers-quarry-manager");
 const quarryManagerNameEl = document.getElementById("quarry-manager-name");
-const quarryManagerSalaryEl = document.getElementById("quarry-manager-salary");
 const managersForemanWrap = document.getElementById("managers-foreman");
 const foremanNameEl = document.getElementById("foreman-name");
-const foremanSalaryEl = document.getElementById("foreman-salary");
 const managersTotalWrap = document.getElementById("managers-total");
 const managersTotalCostEl = document.getElementById("managers-total-cost");
 
@@ -1167,10 +1159,6 @@ function getShippableCount(actualValue) {
  * @param {number} intAmount - Integer amount to consume
  * @returns {boolean} True if floor(actualValue) >= intAmount
  */
-function canConsume(actualValue, intAmount) {
-  return getShippableCount(actualValue) >= intAmount;
-}
-
 /**
  * Consume an integer amount from float inventory.
  * Subtracts exactly intAmount from actualValue and guards against float precision issues.
@@ -2178,7 +2166,7 @@ function startPressing() {
   // Set up press job
   pressJob = {
     startTimeMs: Date.now(),
-    durationMs: TUNING.production.olivePress.baseDurationMs,
+    durationMs: TUNING.press.baseDurationMs,
     olivesConsumed: olivesToPress,
     oilPerOlive: oilPerOlive,
   };
@@ -3118,45 +3106,13 @@ function initInvestments() {
 }
 
 function isInvestmentOwned(investment) {
-  if (investment.id === "arborist") return state.arboristHired;
-  if (investment.id === "foreman") return state.foremanHired;
-  if (investment.id === "pressManager") return state.pressManagerHired;
-  if (investment.id === "quarryManager") return state.quarryManagerHired;
-  if (investment.id === "market_autosell_rate") {
-    return getMarketAutosellRateUpgrades() >= TUNING.market.autosell.maxRateUpgrades;
-  }
-  if (investment.id === "market_autosell_lane") {
-    return getMarketLanesPurchased() >= TUNING.market.lanes.maxAdditionalLanes;
-  }
-  if (investment.id === "market_trade_deals") {
-    return getMarketPriceUpgrades() >= TUNING.market.price.maxUpgrades;
-  }
-  if (investment.id === "pulley_cart") {
-    return (state.quarryCartLevel || 0) >= TUNING.investments.pulleyCart.maxLevel;
-  }
-  if (investment.id === "sharpened_picks") {
-    return (state.quarryPickLevel || 0) >= TUNING.investments.sharpenedPicks.maxLevel;
-  }
-  if (investment.id === "harvest_baskets") {
-    return (state.harvestBasketLevel || 0) >= TUNING.investments.harvestBaskets.maxLevel;
-  }
-  if (investment.id === "build_olive_press") {
-    return (state.olivePressCount || 1) - 1 >= TUNING.investments.olivePressExpansion.maxAdditionalPresses;
-  }
-  if (investment.id === "auto_ship_oil") {
-    return !!state.autoShipOilUnlocked;
-  }
-  if (investment.id === "shipping_crates") {
-    return (state.shippingCrateLevel || 0) >= TUNING.investments.shippingCrates.maxLevel;
-  }
-  return !!state.upgrades[investment.id];
+  return investment.isOwned(state, TUNING);
 }
 
 /**
  * Compute sort bucket for an investment:
- *   0 = purchasable now (prerequisites met + affordable)
- *   1 = locked (prerequisites not met)
- *   2 = unaffordable (prerequisites met but can't afford)
+ *   0 = purchasable now
+ *   1 = not purchasable (locked or unaffordable)
  */
 function getInvestmentSortBucket(investment) {
   return investment.canPurchase(state, TUNING) ? 0 : 1;
@@ -3644,21 +3600,14 @@ initInvestments();
 updateUI();
 setShipUIIdle();
 
-// Set arborist salary from TUNING (display as negative cost)
-const arboristSalary = TUNING.managers.arborist.salaryPerMin;
-arboristSalaryEl.textContent = "-" + arboristSalary.toFixed(2) + " fl/min";
-
-// Set foreman salary from TUNING (display as negative cost)
-const foremanSalary = TUNING.managers.foreman.salaryPerMin;
-foremanSalaryEl.textContent = "-" + foremanSalary.toFixed(2) + " fl/min";
-
-// Set quarry manager salary from TUNING (display as negative cost)
-const quarryManagerSalary = TUNING.managers.quarryManager.salaryPerMin;
-quarryManagerSalaryEl.textContent = "-" + quarryManagerSalary.toFixed(2) + " fl/min";
-
-// Set press manager salary from TUNING (display as negative cost)
-const pressManagerSalary = TUNING.managers.pressManager.salaryPerMin;
-pressManagerSalaryEl.textContent = "-" + pressManagerSalary.toFixed(2) + " fl/min";
+// Set manager salary displays from TUNING
+for (const mgr of MANAGER_REGISTRY) {
+  const el = document.getElementById(mgr.salaryElId);
+  if (el) {
+    const salary = TUNING.managers[mgr.tuningKey].salaryPerMin;
+    el.textContent = "-" + salary.toFixed(2) + " fl/min";
+  }
+}
 
 if (Number(state.era) < 2) {
   startLoop();

@@ -1,10 +1,11 @@
 /**
  * Investments Registry
- * 
+ *
  * Design principles:
  * - All numeric UI text must be generated from TUNING/state; no hardcoded numbers in effect lines.
  * - State-aware previews should be computed only when safe (known formulas, no side effects).
  * - Each investment defines its own cost, unlock conditions, purchase logic, and effect descriptions.
+ * - Each investment defines isOwned(state, tuning) so game.js doesn't need a switch statement.
  * - Effect lines use short category prefixes (Behavior:, Harvest:, Arborist:, Ongoing:).
  * - Numeric formatting conventions:
  *   - Multipliers: ×0.5
@@ -25,28 +26,31 @@ export const INVESTMENTS = [
     id: "arborist",
     title: "Hire an Arborist",
     group: "manager",
-    
+
     cost: (tuning, state) => tuning.managers.arborist.hireCost,
-    
+
     isUnlocked: (state, tuning) => true,
-    
+
+    isOwned: (state, tuning) => !!state.arboristHired,
+
     canPurchase: (state, tuning) => {
-      return !state.arboristHired && 
+      return !state.arboristHired &&
              state.florinCount >= tuning.managers.arborist.hireCost;
     },
-    
+
     purchase: (state, tuning) => {
-      if (!INVESTMENTS[0].canPurchase(state, tuning)) return false;
+      const inv = INVESTMENTS.find(i => i.id === "arborist");
+      if (!inv.canPurchase(state, tuning)) return false;
       state.florinCount -= tuning.managers.arborist.hireCost;
       state.arboristHired = true;
       return true;
     },
-    
+
     effectLines: (state, tuning) => {
       const salary = tuning.managers.arborist.salaryPerMin;
       const poorMult = tuning.harvest.arborist.poorReductionMult;
       const efficientBonus = tuning.harvest.arborist.efficientBonus;
-      
+
       return [
         `Behavior: Auto-harvest when batch is ready`,
         `Harvest (while paid): Poor multiplier ×${poorMult}, Efficient +${efficientBonus.toFixed(2)}`,
@@ -59,16 +63,18 @@ export const INVESTMENTS = [
     id: "foreman",
     title: "Hire a Foreman",
     group: "manager",
-    
+
     cost: (tuning, state) => tuning.managers.foreman.hireCost,
-    
+
     isUnlocked: (state, tuning) => true,
-    
+
+    isOwned: (state, tuning) => !!state.foremanHired,
+
     canPurchase: (state, tuning) => {
-      return !state.foremanHired && 
+      return !state.foremanHired &&
              state.florinCount >= tuning.managers.foreman.hireCost;
     },
-    
+
     purchase: (state, tuning) => {
       const inv = INVESTMENTS.find(i => i.id === "foreman");
       if (!inv.canPurchase(state, tuning)) return false;
@@ -76,12 +82,12 @@ export const INVESTMENTS = [
       state.foremanHired = true;
       return true;
     },
-    
+
     effectLines: (state, tuning) => {
       const salary = tuning.managers.foreman.salaryPerMin;
       const multiplier = tuning.managers.foreman.growthMultiplier;
       const bonusPct = ((multiplier - 1) * 100).toFixed(0);
-      
+
       return [
         `Cultivators (while paid): Growth bonus ×${multiplier} (+${bonusPct}% more from cultivators)`,
         `Ongoing: Salary ${salary} florins/min`,
@@ -93,16 +99,18 @@ export const INVESTMENTS = [
     id: "pressManager",
     title: "Hire a Press Manager",
     group: "manager",
-    
+
     cost: (tuning, state) => tuning.managers.pressManager.hireCost,
-    
+
     isUnlocked: (state, tuning) => true,
-    
+
+    isOwned: (state, tuning) => !!state.pressManagerHired,
+
     canPurchase: (state, tuning) => {
-      return !state.pressManagerHired && 
+      return !state.pressManagerHired &&
              state.florinCount >= tuning.managers.pressManager.hireCost;
     },
-    
+
     purchase: (state, tuning) => {
       const inv = INVESTMENTS.find(i => i.id === "pressManager");
       if (!inv.canPurchase(state, tuning)) return false;
@@ -110,7 +118,7 @@ export const INVESTMENTS = [
       state.pressManagerHired = true;
       return true;
     },
-    
+
     effectLines: (state, tuning) => {
       const salary = tuning.managers.pressManager.salaryPerMin;
 
@@ -124,7 +132,7 @@ export const INVESTMENTS = [
       ];
     },
   },
-  
+
   {
     id: "quarryManager",
     title: "Hire a Quarry Manager",
@@ -133,6 +141,8 @@ export const INVESTMENTS = [
     cost: (tuning, state) => tuning.managers.quarryManager.hireCost,
 
     isUnlocked: (state, tuning) => true,
+
+    isOwned: (state, tuning) => !!state.quarryManagerHired,
 
     canPurchase: (state, tuning) => {
       return !state.quarryManagerHired &&
@@ -167,6 +177,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => true,
 
+    isOwned: (state, tuning) => !!state.upgrades.improved_harvesting,
+
     canPurchase: (state, tuning) => {
       return !state.upgrades.improved_harvesting &&
              state.florinCount >= tuning.investments.costs.improved_harvesting;
@@ -192,7 +204,7 @@ export const INVESTMENTS = [
       ];
     },
   },
-  
+
   // --- Grove Expansion Upgrades ---
   {
     id: "expand_grove_1",
@@ -207,6 +219,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => !state.upgrades.expand_grove_1,
+
+    isOwned: (state, tuning) => !!state.upgrades.expand_grove_1,
 
     canPurchase: (state, tuning) => {
       const tier = tuning.investments.groveExpansion[0];
@@ -247,6 +261,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => state.upgrades.expand_grove_1 && !state.upgrades.expand_grove_2,
+
+    isOwned: (state, tuning) => !!state.upgrades.expand_grove_2,
 
     prerequisitesMet: (state, tuning) => !!state.upgrades.expand_grove_1,
 
@@ -294,6 +310,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => state.upgrades.expand_grove_2 && !state.upgrades.expand_grove_3,
+
+    isOwned: (state, tuning) => !!state.upgrades.expand_grove_3,
 
     prerequisitesMet: (state, tuning) => !!state.upgrades.expand_grove_2,
 
@@ -343,6 +361,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => true,
 
+    isOwned: (state, tuning) => (Number(state.marketAutosellRateUpgrades) || 0) >= tuning.market.autosell.maxRateUpgrades,
+
     canPurchase: (state, tuning) => {
       const cost = tuning.investments.marketAutosell.rateUpgradeCost;
       const current = Number(state.marketAutosellRateUpgrades) || 0;
@@ -389,6 +409,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => true,
+
+    isOwned: (state, tuning) => (Number(state.marketLanesPurchased) || 0) >= tuning.market.lanes.maxAdditionalLanes,
 
     canPurchase: (state, tuning) => {
       const cost = tuning.investments.marketAutosell.laneUpgradeCost;
@@ -437,6 +459,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => true,
+
+    isOwned: (state, tuning) => (Number(state.marketPriceUpgrades) || 0) >= tuning.market.price.maxUpgrades,
 
     canPurchase: (state, tuning) => {
       const cost = tuning.investments.marketPrice.upgradeCost;
@@ -493,6 +517,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => true,
 
+    isOwned: (state, tuning) => (state.shippingCrateLevel || 0) >= tuning.investments.shippingCrates.maxLevel,
+
     canPurchase: (state, tuning) => {
       const cfg = tuning.investments.shippingCrates;
       const level = state.shippingCrateLevel || 0;
@@ -548,6 +574,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => true,
 
+    isOwned: (state, tuning) => ((state.olivePressCount || 1) - 1) >= tuning.investments.olivePressExpansion.maxAdditionalPresses,
+
     canPurchase: (state, tuning) => {
       const cfg = tuning.investments.olivePressExpansion;
       const additional = (state.olivePressCount || 1) - 1;
@@ -595,6 +623,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => !!state.pressManagerHired,
+
+    isOwned: (state, tuning) => !!state.autoShipOilUnlocked,
 
     prerequisitesMet: (state, tuning) => !!state.pressManagerHired,
 
@@ -649,6 +679,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => true,
+
+    isOwned: (state, tuning) => (state.quarryCartLevel || 0) >= tuning.investments.pulleyCart.maxLevel,
 
     canPurchase: (state, tuning) => {
       const cfg = tuning.investments.pulleyCart;
@@ -705,6 +737,8 @@ export const INVESTMENTS = [
 
     isUnlocked: (state, tuning) => true,
 
+    isOwned: (state, tuning) => (state.quarryPickLevel || 0) >= tuning.investments.sharpenedPicks.maxLevel,
+
     canPurchase: (state, tuning) => {
       const cfg = tuning.investments.sharpenedPicks;
       const level = state.quarryPickLevel || 0;
@@ -759,6 +793,8 @@ export const INVESTMENTS = [
     },
 
     isUnlocked: (state, tuning) => true,
+
+    isOwned: (state, tuning) => (state.harvestBasketLevel || 0) >= tuning.investments.harvestBaskets.maxLevel,
 
     canPurchase: (state, tuning) => {
       const cfg = tuning.investments.harvestBaskets;
