@@ -1,24 +1,57 @@
 // Prototype Template JS
 // Storage convention (rename STORAGE_PREFIX when you copy this template into a new prototype)
+
+import { TUNING } from "./tuning.js";
+import * as Calc from "./gameCalc.js";
+import { INVESTMENTS } from "./investments.js";
+
 const STORAGE_PREFIX = "TEMPLATE_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 
-// Prefer time + outcomes over instant conversion.
-// Logs explain loss/delay/causality; they aren’t cosmetic.
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
+// --- Persisted State ---
+// Only keys listed here are saved to / loaded from localStorage.
+// Add new keys here AND in createDefaultState() when extending the game.
+const PERSISTED_STATE_KEYS = [
+  "oliveCount",
+  "oilCount",
+  "florinCount",
+  "sharperPickOwned",
+  "meta",
+];
+
+function createDefaultState() {
+  return {
+    oliveCount: 0,
+    oilCount: 0,
+    florinCount: 0,
+    sharperPickOwned: false,
+
+    // Click tracking for OPS (transient — not persisted)
+    olivesPickedThisWindow: 0,
+    clickWindowSeconds: 5,
+    lastClickTimestamps: [],
+
+    meta: {
+      createdAt: null,
+      version: "template",
+    },
+  };
 }
 
-function rollWeighted(outcomes) {
-  const totalWeight = outcomes.reduce((sum, entry) => sum + (entry.weight || 0), 0);
-  if (totalWeight <= 0) return outcomes[0];
-
-  let roll = Math.random() * totalWeight;
-  for (const entry of outcomes) {
-    roll -= entry.weight || 0;
-    if (roll <= 0) return entry;
+function buildPersistedState(state) {
+  const out = {};
+  for (const key of PERSISTED_STATE_KEYS) {
+    if (key in state) out[key] = state[key];
   }
-  return outcomes[outcomes.length - 1];
+  return out;
+}
+
+function pickPersistedState(parsed) {
+  const out = {};
+  for (const key of PERSISTED_STATE_KEYS) {
+    if (key in parsed) out[key] = parsed[key];
+  }
+  return out;
 }
 
 // --- Reset safety ---
@@ -27,22 +60,7 @@ let isResetting = false;
 let mainLoopInterval = null;
 
 // --- Game State ---
-let state = {
-  oliveCount: 0,
-  oilCount: 0,
-  florinCount: 0,
-
-  // Click tracking for OPS
-  olivesPickedThisWindow: 0,
-  clickWindowSeconds: 5,
-  lastClickTimestamps: [],
-
-  // For future expansion
-  meta: {
-    createdAt: null,
-    version: "template",
-  },
-};
+let state = createDefaultState();
 
 // --- DOM ---
 const oliveCountEl = document.getElementById("olive-count");
@@ -87,8 +105,9 @@ function loadGame() {
 
   try {
     const parsed = JSON.parse(raw);
+    const persisted = pickPersistedState(parsed);
     // Shallow merge so missing fields get defaults
-    state = { ...state, ...parsed, meta: { ...state.meta, ...(parsed.meta || {}) } };
+    state = { ...state, ...persisted, meta: { ...state.meta, ...(persisted.meta || {}) } };
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state.meta.createdAt = new Date().toISOString();
@@ -98,7 +117,7 @@ function loadGame() {
 
 function saveGame() {
   if (isResetting) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
 }
 
 function resetGame() {
@@ -137,13 +156,13 @@ function computeOps() {
 
 // --- UI ---
 function updateUI() {
-  oliveCountEl.textContent = String(state.oliveCount);
-  opsCountEl.textContent = computeOps().toFixed(1);
+  oliveCountEl.textContent = String(Calc.getDisplayCount(state.oliveCount));
+  opsCountEl.textContent = Calc.formatRate(computeOps());
 }
 
 // --- Actions ---
 function pickOlive() {
-  state.oliveCount += 1;
+  state.oliveCount += TUNING.production.baseClickYield;
   recordClick();
   saveGame();
   updateUI();
@@ -151,8 +170,6 @@ function pickOlive() {
 
 // --- Main Loop ---
 function startLoop() {
-  const tickMs = 200;
-
   let last = Date.now();
   mainLoopInterval = setInterval(() => {
     const now = Date.now();
@@ -167,7 +184,7 @@ function startLoop() {
 
     // Save occasionally if desired. Keeping it light:
     // saveGame();
-  }, tickMs);
+  }, TUNING.production.tickMs);
 }
 
 // --- Debug Modal ---
