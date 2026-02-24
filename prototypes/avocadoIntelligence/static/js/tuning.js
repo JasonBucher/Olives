@@ -11,7 +11,7 @@ export const TUNING = {
   producers: {
     sapling:       { baseCost: 10,     costGrowth: 1.15, baseRate: 0.2,    title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
     orchard_row:   { baseCost: 100,    costGrowth: 1.15, baseRate: 1,      title: "Orchard Row",        desc: "Now we're farming." },
-    influencer:    { baseCost: 50,     costGrowth: 1.15, baseRate: 0, clickBonus: 0.1, title: "Avocado Influencer", desc: "Posts reel. Gets clicks. +0.1 click power each." },
+    influencer:    { baseCost: 5,      costGrowth: 1.11, baseRate: 0, clickBonus: 0.1, title: "Avocado Influencer", desc: "Posts reel. Gets clicks. +0.1 click power each." },
     drone:         { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
     guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
     guac_refinery: { baseCost: 50000,  costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
@@ -68,6 +68,6 @@ export const TUNING = {
 };
 
 export const PRODUCER_ORDER = [
-  "sapling", "orchard_row", "influencer", "drone", "guac_lab", "guac_refinery",
+  "influencer", "sapling", "orchard_row", "drone", "guac_lab", "guac_refinery",
   "exchange", "pit_miner", "neural_pit", "orchard_cloud",
 ];

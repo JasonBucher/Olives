@@ -14,7 +14,7 @@ const tuning = {
   producers: {
     sapling:     { baseCost: 10,    costGrowth: 1.15, baseRate: 0.2 },
     orchard_row: { baseCost: 100,   costGrowth: 1.15, baseRate: 1 },
-    influencer:  { baseCost: 50,    costGrowth: 1.15, baseRate: 0, clickBonus: 0.1 },
+    influencer:  { baseCost: 5,     costGrowth: 1.11, baseRate: 0, clickBonus: 0.1 },
     drone:       { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
     guac_lab:    { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
   },

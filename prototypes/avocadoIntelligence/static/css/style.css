@@ -141,6 +141,8 @@ h1 {
 
 .btn:hover { background: var(--btnHover); }
 
+.btn:active:not(:disabled) { transform: scale(0.95); }
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -249,6 +251,29 @@ h1 {
   font-size: 12px;
   padding: 6px 10px;
 }
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.tab:hover { background: rgba(255,255,255,0.06); }
+.tab.active { background: var(--btn); color: var(--text); }
 
 /* Upgrade rows */
 .upgrade-row {

@@ -128,6 +128,7 @@ const logEl = document.getElementById("log");
 const pickAvocadoBtn = document.getElementById("pick-avocado-btn");
 const producersListEl = document.getElementById("producers-list");
 const upgradesListEl = document.getElementById("upgrades-list");
+const upgradesOwnedListEl = document.getElementById("upgrades-owned-list");
 
 // Prestige UI
 const prestigeLockedEl = document.getElementById("prestige-locked");
@@ -444,22 +445,41 @@ function updateUI() {
     if (buyBtn) buyBtn.disabled = !canAfford;
   }
 
-  // Upgrade rows: show/hide, owned state, disable
+  // Upgrade rows: move between Research / Owned tabs
   for (const inv of INVESTMENTS) {
-    const row = upgradesListEl.querySelector(`[data-id="${inv.id}"]`);
+    const row = upgradesListEl.querySelector(`[data-id="${inv.id}"]`)
+             || upgradesOwnedListEl.querySelector(`[data-id="${inv.id}"]`);
     if (!row) continue;
 
     const unlocked = inv.isUnlocked(state);
     const owned = inv.isOwned(state);
 
-    row.style.display = unlocked ? "" : "none";
-
     if (owned) {
-      row.classList.add("owned");
-      const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
-      if (btn) { btn.disabled = true; btn.textContent = "Owned"; }
+      // Move to owned list if not already there
+      if (row.parentNode !== upgradesOwnedListEl) {
+        row.classList.add("owned");
+        const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
+        if (btn) btn.remove();
+        upgradesOwnedListEl.appendChild(row);
+      }
+      row.style.display = "";
     } else {
-      row.classList.remove("owned");
+      // Move back to research list if needed (e.g. after prestige)
+      if (row.parentNode !== upgradesListEl) {
+        row.classList.remove("owned");
+        // Restore buy button
+        const info = row.querySelector(".upgrade-info");
+        if (!row.querySelector(`[data-upgrade="${inv.id}"]`) && info) {
+          const btn = document.createElement("button");
+          btn.className = "btn upgrade-buy";
+          btn.dataset.upgrade = inv.id;
+          btn.type = "button";
+          btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
+          row.appendChild(btn);
+        }
+        upgradesListEl.appendChild(row);
+      }
+      row.style.display = unlocked ? "" : "none";
       const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
       if (btn) {
         btn.disabled = !inv.canPurchase(state);
@@ -467,7 +487,6 @@ function updateUI() {
         if (costEl) {
           costEl.textContent = Calc.formatNumber(inv.cost());
         } else {
-          // Recreate span (e.g. after prestige resets "Owned" text back to cost)
           btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
         }
       }
@@ -602,6 +621,9 @@ function prestige() {
   lastMilestoneReached = 0;
   lastGuacMultMilestone = 1;
 
+  // Reset research tab to "Research"
+  setResearchTab("research");
+
   logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`\u2728 You gained ${wisdomGain} Wisdom. (Prestige #${newPrestigeCount})`);
 
@@ -683,6 +705,19 @@ function closeDebug() {
   debugModal.classList.remove("active");
   debugModal.setAttribute("aria-hidden", "true");
 }
+
+// --- Tab switching ---
+function setResearchTab(tabName) {
+  const tabs = document.querySelectorAll(".tab-bar .tab");
+  tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+  upgradesListEl.style.display = tabName === "research" ? "" : "none";
+  upgradesOwnedListEl.style.display = tabName === "owned" ? "" : "none";
+}
+
+document.querySelector(".tab-bar").addEventListener("click", (e) => {
+  const tab = e.target.closest(".tab");
+  if (tab) setResearchTab(tab.dataset.tab);
+});
 
 // --- Wire Events ---
 pickAvocadoBtn.addEventListener("click", pickAvocado);
