@@ -169,14 +169,35 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
 }
 
 /** Calculate click power (avocados per click). */
-export function calcClickPower(upgrades, wisdom, guacCount, tuning) {
+export function calcClickPower(upgrades, producers, wisdom, guacCount, aps, tuning) {
   let power = tuning.production.baseClickYield;
+
+  // Flat click bonus from producers (e.g. influencers)
+  for (const [id, count] of Object.entries(producers)) {
+    const p = tuning.producers[id];
+    if (p && p.clickBonus && count > 0) {
+      power += p.clickBonus * count;
+    }
+  }
+
   // Click multiplier upgrades
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
     if (upgrade.clickMult && upgrades[upgradeId]) {
       power *= upgrade.clickMult;
     }
   }
+
+  // APS percentage bonus from Throughput Clicking chain (highest tier wins)
+  let apsPct = 0;
+  for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
+    if (upgrade.apsPctPerClick && upgrades[upgradeId]) {
+      apsPct = Math.max(apsPct, upgrade.apsPctPerClick);
+    }
+  }
+  if (apsPct > 0 && aps > 0) {
+    power += aps * apsPct;
+  }
+
   // Global multipliers
   let globalMult = 1;
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {

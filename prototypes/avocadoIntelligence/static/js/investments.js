@@ -23,10 +23,10 @@ function makeUpgrade(id) {
     group: cfg.producerId ? "production" : cfg.clickMult ? "click" : "global",
     cost: () => cfg.cost,
     isUnlocked: (state) => {
-      // Guac-gated upgrades: unlock based on total guac produced
-      if (cfg.guacUnlockAt) {
-        return (state.guacCount || 0) >= cfg.guacUnlockAt;
-      }
+      // Prerequisite upgrade must be owned first
+      if (cfg.requiresUpgrade && !state.upgrades[cfg.requiresUpgrade]) return false;
+      // Guac-gated upgrades: must have enough guac
+      if (cfg.guacUnlockAt && (state.guacCount || 0) < cfg.guacUnlockAt) return false;
       if (cfg.unlockAt <= 0) return true;
       // unlockAt means "need this many of the target producer"
       return cfg.producerId ? (state.producers[cfg.producerId] || 0) >= cfg.unlockAt : true;
@@ -57,4 +57,7 @@ export const INVESTMENTS = [
   makeUpgrade("superlinear_synth"),
   makeUpgrade("exponential_ripen"),
   makeUpgrade("concentrate_proto"),
+  makeUpgrade("throughput_click_1"),
+  makeUpgrade("throughput_click_2"),
+  makeUpgrade("throughput_click_3"),
 ];

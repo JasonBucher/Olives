@@ -11,6 +11,7 @@ export const TUNING = {
   producers: {
     sapling:       { baseCost: 10,     costGrowth: 1.15, baseRate: 0.2,    title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
     orchard_row:   { baseCost: 100,    costGrowth: 1.15, baseRate: 1,      title: "Orchard Row",        desc: "Now we're farming." },
+    influencer:    { baseCost: 50,     costGrowth: 1.15, baseRate: 0, clickBonus: 0.1, title: "Avocado Influencer", desc: "Posts reel. Gets clicks. +0.1 click power each." },
     drone:         { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
     guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
     guac_refinery: { baseCost: 50000,  costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
@@ -47,6 +48,10 @@ export const TUNING = {
     superlinear_synth:  { cost: 100000,  guacUnlockAt: 25,  produceExpDelta: +0.05,  title: "Superlinear Synthesis",  desc: "Guac output scaling +0.05" },
     exponential_ripen:  { cost: 500000,  guacUnlockAt: 100, produceExpDelta: +0.10,  title: "Exponential Ripening",   desc: "Guac output scaling +0.10" },
     concentrate_proto:  { cost: 75000,   unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5, title: "Concentrate Protocol",  desc: "Base guac output x1.5" },
+    // Throughput Clicking chain — scales clicks with APS
+    throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.01, title: "Throughput Clicking I",   desc: "Each click also adds 1% of your APS." },
+    throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.02, title: "Throughput Clicking II",  desc: "Each click also adds 2% of your APS." },
+    throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.05, title: "Throughput Clicking III", desc: "Each click also adds 5% of your APS." },
   },
 
   wisdomUnlocks: {
@@ -63,6 +68,6 @@ export const TUNING = {
 };
 
 export const PRODUCER_ORDER = [
-  "sapling", "orchard_row", "drone", "guac_lab", "guac_refinery",
+  "sapling", "orchard_row", "influencer", "drone", "guac_lab", "guac_refinery",
   "exchange", "pit_miner", "neural_pit", "orchard_cloud",
 ];

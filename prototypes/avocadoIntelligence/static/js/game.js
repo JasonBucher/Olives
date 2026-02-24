@@ -29,7 +29,7 @@ function createDefaultState() {
     guacCount: 0,
 
     producers: {
-      sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0, guac_refinery: 0,
+      sapling: 0, orchard_row: 0, influencer: 0, drone: 0, guac_lab: 0, guac_refinery: 0,
       exchange: 0, pit_miner: 0, neural_pit: 0, orchard_cloud: 0,
     },
     upgrades: {},
@@ -146,6 +146,8 @@ const debugCloseBtn = document.getElementById("debug-close-btn");
 const debugResetBtn = document.getElementById("debug-reset-btn");
 const debugAddAvocadosBtn = document.getElementById("debug-add-avocados-btn");
 const debugAddBigAvocadosBtn = document.getElementById("debug-add-big-avocados-btn");
+const debugAdd100kAvocadosBtn = document.getElementById("debug-add-100k-avocados-btn");
+const debugAdd1mAvocadosBtn = document.getElementById("debug-add-1m-avocados-btn");
 const debugAddWisdomBtn = document.getElementById("debug-add-wisdom-btn");
 
 // --- Logging ---
@@ -318,7 +320,7 @@ let tickCount = 0;
 
 function updateUI() {
   const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
-  const clickPower = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, aps, TUNING);
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
   apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -389,6 +391,7 @@ function updateUI() {
       if (buyBtn) buyBtn.disabled = true;
       if (rateEl) rateEl.textContent = "";
       if (countEl) countEl.textContent = "";
+      if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
       continue;
     }
     // Guac refinery gating — need at least 1 guac_lab
@@ -398,6 +401,7 @@ function updateUI() {
       if (buyBtn) buyBtn.disabled = true;
       if (rateEl) rateEl.textContent = "";
       if (countEl) countEl.textContent = "";
+      if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
       continue;
     }
     if (row) row.classList.remove("locked");
@@ -421,6 +425,13 @@ function updateUI() {
       } else {
         rateText += ` | Also converts avocados \u2192 guac`;
       }
+    }
+    // Show click bonus on influencer rows
+    if (id === "influencer") {
+      const clickBonus = TUNING.producers.influencer.clickBonus;
+      rateText = owned > 0
+        ? `+${Calc.formatRate(clickBonus * owned)} click power (${Calc.formatRate(clickBonus)} each)`
+        : `Each adds +${Calc.formatRate(clickBonus)} click power`;
     }
     // Show refinery effect on guac_refinery rows
     if (id === "guac_refinery") {
@@ -452,7 +463,13 @@ function updateUI() {
       const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
       if (btn) {
         btn.disabled = !inv.canPurchase(state);
-        btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
+        const costEl = btn.querySelector(`[data-ucost="${inv.id}"]`);
+        if (costEl) {
+          costEl.textContent = Calc.formatNumber(inv.cost());
+        } else {
+          // Recreate span (e.g. after prestige resets "Owned" text back to cost)
+          btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
+        }
       }
     }
   }
@@ -513,7 +530,8 @@ function spawnClickEmoji() {
 }
 
 function pickAvocado() {
-  const power = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, aps, TUNING);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -690,6 +708,24 @@ debugAddBigAvocadosBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +10,000 avocados");
+});
+
+debugAdd100kAvocadosBtn.addEventListener("click", () => {
+  state.avocadoCount += 100000;
+  state.totalAvocadosThisRun += 100000;
+  state.totalAvocadosAllTime += 100000;
+  saveGame();
+  updateUI();
+  logLine("Debug: +100,000 avocados");
+});
+
+debugAdd1mAvocadosBtn.addEventListener("click", () => {
+  state.avocadoCount += 1000000;
+  state.totalAvocadosThisRun += 1000000;
+  state.totalAvocadosAllTime += 1000000;
+  saveGame();
+  updateUI();
+  logLine("Debug: +1,000,000 avocados");
 });
 
 debugAddWisdomBtn.addEventListener("click", () => {
