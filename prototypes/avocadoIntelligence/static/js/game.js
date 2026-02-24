@@ -321,7 +321,8 @@ let tickCount = 0;
 
 function updateUI() {
   const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
-  const clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, aps, TUNING);
+  const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
+  const clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING);
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
   apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -549,8 +550,8 @@ function spawnClickEmoji() {
 }
 
 function pickAvocado() {
-  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
-  const power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, aps, TUNING);
+  const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
+  const power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;

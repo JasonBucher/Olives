@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   clamp, formatRate, getDisplayCount, rollWeighted, canPrestige,
   formatNumber, calcProducerCost, calcProducerUnitRate,
-  calcTotalAps, calcClickPower, calcWisdomEarned, calcWisdomBonus,
+  calcBaseAps, calcTotalAps, calcClickPower, calcWisdomEarned, calcWisdomBonus,
   calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
   calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
   calcEffectiveBaseProduction,
@@ -40,9 +40,9 @@ const tuning = {
     superlinear_synth:  { cost: 100000, guacUnlockAt: 25,  produceExpDelta: +0.05 },
     exponential_ripen:  { cost: 500000, guacUnlockAt: 100, produceExpDelta: +0.10 },
     concentrate_proto:  { cost: 75000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5 },
-    throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.01 },
-    throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", apsPctPerClick: 0.02 },
-    throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", apsPctPerClick: 0.05 },
+    throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.03 },
+    throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", apsPctPerClick: 0.06 },
+    throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", apsPctPerClick: 0.10 },
   },
   prestige: {
     unlockThreshold: 1e6,
@@ -258,6 +258,31 @@ describe("calcGuacProduction", () => {
   });
 });
 
+describe("calcBaseAps", () => {
+  it("returns 0 with no producers", () => {
+    const producers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+    expect(calcBaseAps(producers, {}, tuning)).toBe(0);
+  });
+
+  it("sums production from multiple producer types", () => {
+    const producers = { sapling: 5, orchard_row: 2, drone: 0, guac_lab: 0 };
+    // 5 * 0.2 + 2 * 1 = 3
+    expect(calcBaseAps(producers, {}, tuning)).toBe(3);
+  });
+
+  it("applies per-producer upgrades", () => {
+    const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+    // 10 * 0.4 = 4
+    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBe(4);
+  });
+
+  it("does not apply global multipliers", () => {
+    const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+    // 10 * 0.2 = 2 (global_boost_1 should NOT affect this)
+    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBe(2);
+  });
+});
+
 describe("calcTotalAps", () => {
   it("returns 0 with no producers", () => {
     const producers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
@@ -358,31 +383,31 @@ describe("calcClickPower", () => {
     )).toBeCloseTo(6);
   });
 
-  // --- Throughput Clicking (APS % bonus, highest tier wins) ---
-  it("adds APS percentage from throughput_click_1", () => {
-    // base 1, aps 100, 1% = +1, total = 2
-    expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 100, tuning)).toBe(2);
+  // --- Throughput Clicking (base APS % bonus, highest tier wins) ---
+  it("adds base APS percentage from throughput_click_1", () => {
+    // base 1, baseAps 100, 3% = +3, total = 4
+    expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 100, tuning)).toBe(4);
   });
 
   it("highest throughput tier wins (not additive)", () => {
-    // base 1, aps 100, max(1%, 2%, 5%) = 5% = +5, total = 6
+    // base 1, baseAps 100, max(3%, 6%, 10%) = 10% = +10, total = 11
     const upgrades = { throughput_click_1: true, throughput_click_2: true, throughput_click_3: true };
-    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(6);
+    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(11);
   });
 
-  it("throughput bonus is zero when aps is zero", () => {
+  it("throughput bonus is zero when baseAps is zero", () => {
     expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 0, tuning)).toBe(1);
   });
 
   it("combines influencer bonus and throughput clicking", () => {
     // base 1 + 4*0.1 = 1.4 (from influencers)
     // clickMult: * 2 (strong_thumb) = 2.8
-    // APS bonus: 100 * 0.01 = +1 → 3.8
-    // global/wisdom/guac = 1 each → 3.8
+    // baseAps bonus: 100 * 0.03 = +3 → 5.8
+    // global/wisdom/guac = 1 each → 5.8
     const producers = { ...noProducers, influencer: 4 };
     expect(calcClickPower(
       { strong_thumb: true, throughput_click_1: true }, producers, 0, 0, 100, tuning
-    )).toBeCloseTo(3.8);
+    )).toBeCloseTo(5.8);
   });
 });
 

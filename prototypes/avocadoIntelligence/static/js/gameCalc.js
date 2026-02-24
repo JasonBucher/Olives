@@ -146,13 +146,19 @@ export function calcGuacMultiplier(guacCount, tuning) {
   return 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
 }
 
-/** Calculate total avocados per second from all producers. */
-export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
+/** Calculate base APS (producer rates only, no global/wisdom/guac multipliers). */
+export function calcBaseAps(producers, upgrades, tuning) {
   let total = 0;
   for (const [id, count] of Object.entries(producers)) {
     if (count <= 0) continue;
     total += calcProducerUnitRate(id, upgrades, tuning) * count;
   }
+  return total;
+}
+
+/** Calculate total avocados per second from all producers. */
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
+  let total = calcBaseAps(producers, upgrades, tuning);
   // Apply global multipliers from upgrades
   let globalMult = 1;
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
@@ -168,8 +174,8 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
   return total;
 }
 
-/** Calculate click power (avocados per click). */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, aps, tuning) {
+/** Calculate click power (avocados per click). baseAps is pre-multiplier APS. */
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning) {
   let power = tuning.production.baseClickYield;
 
   // Flat click bonus from producers (e.g. influencers)
@@ -194,8 +200,8 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, aps, tuni
       apsPct = Math.max(apsPct, upgrade.apsPctPerClick);
     }
   }
-  if (apsPct > 0 && aps > 0) {
-    power += aps * apsPct;
+  if (apsPct > 0 && baseAps > 0) {
+    power += baseAps * apsPct;
   }
 
   // Global multipliers
