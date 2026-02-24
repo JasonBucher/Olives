@@ -256,7 +256,7 @@ function updateUI() {
   const clickPower = Calc.calcClickPower(state.upgrades, state.wisdom, TUNING);
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
-  apsCountEl.textContent = Calc.formatNumber(aps);
+  apsCountEl.textContent = aps < 10 ? aps.toFixed(1) : Calc.formatNumber(aps);
   clickPowerEl.textContent = Calc.formatNumber(clickPower);
 
   // Guac row
