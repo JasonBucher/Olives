@@ -90,12 +90,12 @@ h1 {
     vertical-align: middle;
 }
 
-.tag.stable {
-    background: #d4edda;
-    color: #155724;
+.tag.active {
+    background: #4a7c3f;
+    color: #fff;
 }
 
-.tag.experimental {
-    background: #fff3cd;
-    color: #856404;
+.tag.frozen {
+    background: #dee2e6;
+    color: #495057;
 }

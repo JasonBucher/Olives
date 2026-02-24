@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Avocado Intelligence</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <div class="title">
+        <h1>Avocado Intelligence</h1>
+        <div class="subtitle">Click. Grow. Prestige.</div>
+      </div>
+      <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+    </header>
+
+    <hr class="divider" />
+
+    <div class="layout">
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Upgrades</div>
+          <div class="muted note">Coming soon — spend avocados on upgrades</div>
+        </section>
+      </div>
+
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Farm</div>
+
+          <div id="production-section" class="stack">
+            <div class="row">
+              <div class="label">Avocados</div>
+              <div class="value"><span id="avocado-count">0</span></div>
+            </div>
+
+            <div class="row">
+              <div class="label">APS</div>
+              <div class="value"><span id="aps-count">0.0</span></div>
+            </div>
+
+            <div class="actions">
+              <button id="pick-avocado-btn" class="btn btn-primary" type="button">Pick Avocado</button>
+            </div>
+          </div>
+
+          <div id="log-section" class="stack">
+            <div class="subsection-title">Log</div>
+            <div id="log" class="log"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Prestige</div>
+          <div id="prestige-locked" class="muted note">Reach <span id="prestige-threshold">1,000</span> total avocados to unlock prestige.</div>
+          <div id="prestige-unlocked" class="stack" style="display: none;">
+            <div class="row">
+              <div class="label">Prestige Count</div>
+              <div class="value"><span id="prestige-count">0</span></div>
+            </div>
+            <div class="row">
+              <div class="label">Multiplier</div>
+              <div class="value"><span id="prestige-multiplier">1.0</span>x</div>
+            </div>
+            <div class="row">
+              <div class="label">Total Avocados</div>
+              <div class="value"><span id="total-avocados">0</span></div>
+            </div>
+            <div class="actions">
+              <button id="prestige-btn" class="btn btn-primary" type="button">Prestige</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Modal -->
+  <div id="debug-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Debug</div>
+        <button id="debug-close-btn" class="btn btn-quiet" type="button">Close</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="muted">
+          Debug tools for Avocado Intelligence.
+        </div>
+
+        <div class="debug-actions">
+          <button id="debug-add-avocados-btn" class="btn" type="button">+100 Avocados</button>
+        </div>
+
+        <hr class="divider" />
+
+        <button id="debug-reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="static/js/game.js"></script>
+</body>
+</html>
