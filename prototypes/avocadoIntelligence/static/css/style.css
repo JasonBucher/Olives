@@ -149,7 +149,22 @@ h1 {
 
 .btn-primary { background: var(--primary); }
 .btn-primary:hover { background: var(--primaryHover); }
+.btn-primary:active { background: #3a6230; transform: scale(0.95); }
 .btn-primary:disabled:hover { background: var(--primary); }
+
+/* Click emoji float */
+.click-emoji {
+  position: fixed;
+  pointer-events: none;
+  font-size: 22px;
+  z-index: 1000;
+  animation: emoji-float 0.8s ease-out forwards;
+}
+
+@keyframes emoji-float {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), -80px) scale(0.6); }
+}
 
 .btn-danger { background: var(--danger); }
 .btn-danger:hover { background: var(--dangerHover); }

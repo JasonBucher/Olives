@@ -497,12 +497,28 @@ function updateUI() {
 }
 
 // --- Actions ---
+function spawnClickEmoji() {
+  const rect = pickAvocadoBtn.getBoundingClientRect();
+  const el = document.createElement("div");
+  el.className = "click-emoji";
+  el.textContent = "\u{1f951}";
+  // Random angle within ±15° from straight up
+  const angle = (Math.random() - 0.5) * 60 * (Math.PI / 180);
+  const dx = Math.sin(angle) * 80;
+  el.style.left = `${rect.left + rect.width / 2 - 11}px`;
+  el.style.top = `${rect.top - 10}px`;
+  el.style.setProperty("--dx", `${dx}px`);
+  document.body.appendChild(el);
+  el.addEventListener("animationend", () => el.remove());
+}
+
 function pickAvocado() {
   const power = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
   recordClick();
+  spawnClickEmoji();
 
   // Flavor text (1-in-10 chance)
   if (Math.random() < 0.1) {
