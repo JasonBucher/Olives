@@ -19,13 +19,15 @@
     <hr class="divider" />
 
     <div class="layout">
+      <!-- Left Column: Producers -->
       <div class="column">
         <section class="section">
-          <div class="section-title">Upgrades</div>
-          <div class="muted note">Coming soon — spend avocados on upgrades</div>
+          <div class="section-title">Producers</div>
+          <div id="producers-list"></div>
         </section>
       </div>
 
+      <!-- Center Column: Farm -->
       <div class="column">
         <section class="section">
           <div class="section-title">Farm</div>
@@ -37,8 +39,23 @@
             </div>
 
             <div class="row">
-              <div class="label">APS</div>
-              <div class="value"><span id="aps-count">0.0</span></div>
+              <div class="label">Avocados/sec</div>
+              <div class="value"><span id="aps-count">0</span></div>
+            </div>
+
+            <div class="row">
+              <div class="label">Per Click</div>
+              <div class="value"><span id="click-power">1</span></div>
+            </div>
+
+            <div class="row" id="guac-row" style="display: none;">
+              <div class="label">Guacamole</div>
+              <div class="value"><span id="guac-count">0</span></div>
+            </div>
+
+            <div class="row" id="wisdom-row" style="display: none;">
+              <div class="label">Wisdom</div>
+              <div class="value"><span id="wisdom-count">0</span></div>
             </div>
 
             <div class="actions">
@@ -53,25 +70,28 @@
         </section>
       </div>
 
+      <!-- Right Column: Research + Prestige -->
       <div class="column">
         <section class="section">
-          <div class="section-title">Prestige</div>
-          <div id="prestige-locked" class="muted note">Reach <span id="prestige-threshold">1,000</span> total avocados to unlock prestige.</div>
+          <div class="section-title">Research</div>
+          <div id="upgrades-list"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Compost Heap</div>
+          <div id="prestige-locked" class="muted note">Reach 1M total avocados this run to unlock composting.</div>
           <div id="prestige-unlocked" class="stack" style="display: none;">
             <div class="row">
-              <div class="label">Prestige Count</div>
-              <div class="value"><span id="prestige-count">0</span></div>
+              <div class="label">This Run</div>
+              <div class="value"><span id="total-avocados-run">0</span></div>
             </div>
             <div class="row">
-              <div class="label">Multiplier</div>
-              <div class="value"><span id="prestige-multiplier">1.0</span>x</div>
+              <div class="label">Wisdom Gain</div>
+              <div class="value">+<span id="wisdom-preview">0</span></div>
             </div>
-            <div class="row">
-              <div class="label">Total Avocados</div>
-              <div class="value"><span id="total-avocados">0</span></div>
-            </div>
+            <div class="muted">Composting resets avocados, producers, and research. Wisdom persists and boosts everything.</div>
             <div class="actions">
-              <button id="prestige-btn" class="btn btn-primary" type="button">Prestige</button>
+              <button id="prestige-btn" class="btn btn-primary" type="button">Compost</button>
             </div>
           </div>
         </section>
@@ -94,6 +114,8 @@
 
         <div class="debug-actions">
           <button id="debug-add-avocados-btn" class="btn" type="button">+100 Avocados</button>
+          <button id="debug-add-big-avocados-btn" class="btn" type="button">+10,000 Avocados</button>
+          <button id="debug-add-wisdom-btn" class="btn" type="button">+10 Wisdom</button>
         </div>
 
         <hr class="divider" />
