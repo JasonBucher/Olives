@@ -274,7 +274,7 @@ function updateUI() {
   const clickPower = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
-  apsCountEl.textContent = Calc.formatNumber(aps);
+  apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   clickPowerEl.textContent = Calc.formatNumber(clickPower);
 
   // Guac row — show when guac protocol owned
@@ -283,8 +283,7 @@ function updateUI() {
   if (hasGuac) {
     const labs = state.producers.guac_lab || 0;
     if (labs > 0) {
-      const desiredPerSec = TUNING.guac.baseConsumptionPerLab * labs;
-      const guacPerSec = desiredPerSec / TUNING.guac.baseConsumptionPerLab;
+      const guacPerSec = labs;
       guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (+${Calc.formatRate(guacPerSec)}/sec)`;
     } else {
       guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (need Guac Labs)`;
@@ -386,7 +385,10 @@ function updateUI() {
     } else {
       row.classList.remove("owned");
       const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
-      if (btn) btn.disabled = !inv.canPurchase(state);
+      if (btn) {
+        btn.disabled = !inv.canPurchase(state);
+        btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
+      }
     }
   }
 
