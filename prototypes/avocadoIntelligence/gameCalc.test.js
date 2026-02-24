@@ -3,7 +3,9 @@ import {
   clamp, formatRate, getDisplayCount, rollWeighted, canPrestige,
   formatNumber, calcProducerCost, calcProducerUnitRate,
   calcTotalAps, calcClickPower, calcWisdomEarned, calcWisdomBonus,
-  calcGuacMultiplier,
+  calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
+  calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
+  calcEffectiveBaseProduction,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -16,7 +18,11 @@ const tuning = {
     guac_lab:    { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
   },
   guac: {
-    baseConsumptionPerLab: 50,
+    baseConsumption: 50,
+    consumeExponent: 0.85,
+    consumeExponentFloor: 0.5,
+    baseProduction: 1,
+    produceExponent: 1.0,
     multiplierPerSqrt: 0.10,
     labUnlockAps: 50,
   },
@@ -28,6 +34,11 @@ const tuning = {
     global_boost_1:     { cost: 10000, unlockAt: 0, globalMult: 1.5 },
     global_boost_2:     { cost: 500000, unlockAt: 0, globalMult: 2 },
     wisdom_boost:       { cost: 1e6, unlockAt: 0, wisdomMult: 0.05 },
+    guac_recycler:      { cost: 50000,  unlockAt: 5,  producerId: "guac_lab", consumeExpDelta: -0.05 },
+    bulk_fermentation:  { cost: 200000, unlockAt: 10, producerId: "guac_lab", consumeExpDelta: -0.05 },
+    superlinear_synth:  { cost: 100000, guacUnlockAt: 25,  produceExpDelta: +0.05 },
+    exponential_ripen:  { cost: 500000, guacUnlockAt: 100, produceExpDelta: +0.10 },
+    concentrate_proto:  { cost: 75000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5 },
   },
   prestige: {
     unlockThreshold: 1e6,
@@ -178,6 +189,71 @@ describe("calcGuacMultiplier", () => {
   });
 });
 
+describe("calcGuacConsumption", () => {
+  it("returns 0 with no labs", () => {
+    expect(calcGuacConsumption(0, tuning)).toBe(0);
+  });
+
+  it("returns base consumption with 1 lab", () => {
+    // 50 * 1^0.85 = 50
+    expect(calcGuacConsumption(1, tuning)).toBe(50);
+  });
+
+  it("scales sublinearly with more labs", () => {
+    // 50 * 10^0.85 ≈ 354
+    const c10 = calcGuacConsumption(10, tuning);
+    expect(c10).toBeCloseTo(354, 0);
+    // Should be less than linear (500)
+    expect(c10).toBeLessThan(500);
+  });
+
+  it("scales further sublinearly at 100 labs", () => {
+    // 50 * 100^0.85 ≈ 2506
+    const c100 = calcGuacConsumption(100, tuning);
+    expect(c100).toBeCloseTo(2506, 0);
+    // Should be less than linear (5000)
+    expect(c100).toBeLessThan(5000);
+  });
+});
+
+describe("calcGuacConsumption — exponent floor", () => {
+  it("clamps exponent at floor when pushed below", () => {
+    const lowExpTuning = {
+      ...tuning,
+      guac: { ...tuning.guac, consumeExponent: 0.2 },  // below floor of 0.5
+    };
+    // Should use floor (0.5), not 0.2
+    // 50 * 10^0.5 ≈ 158.1
+    const result = calcGuacConsumption(10, lowExpTuning);
+    expect(result).toBeCloseTo(50 * Math.pow(10, 0.5), 0);
+  });
+});
+
+describe("calcGuacProduction", () => {
+  it("returns 0 with no labs", () => {
+    expect(calcGuacProduction(0, tuning)).toBe(0);
+  });
+
+  it("returns 1 guac/sec with 1 lab (produceExponent=1)", () => {
+    // 1 * 1^1 = 1
+    expect(calcGuacProduction(1, tuning)).toBe(1);
+  });
+
+  it("scales linearly with produceExponent=1", () => {
+    // 1 * 10^1 = 10
+    expect(calcGuacProduction(10, tuning)).toBe(10);
+  });
+
+  it("respects custom produceExponent", () => {
+    const superTuning = {
+      ...tuning,
+      guac: { ...tuning.guac, produceExponent: 1.1 },
+    };
+    // 1 * 10^1.1 ≈ 12.59
+    expect(calcGuacProduction(10, superTuning)).toBeCloseTo(12.59, 1);
+  });
+});
+
 describe("calcTotalAps", () => {
   it("returns 0 with no producers", () => {
     const producers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
@@ -317,5 +393,132 @@ describe("canPrestige", () => {
 
   it("returns false at zero", () => {
     expect(canPrestige(0, tuning)).toBe(false);
+  });
+});
+
+// ---------- Effective exponent tests ----------
+
+describe("calcEffectiveConsumeExponent", () => {
+  it("returns base exponent with no modifiers", () => {
+    expect(calcEffectiveConsumeExponent(0, {}, {}, 0, tuning)).toBe(0.85);
+  });
+
+  it("reduces by 0.01 per refinery", () => {
+    expect(calcEffectiveConsumeExponent(5, {}, {}, 0, tuning)).toBeCloseTo(0.80);
+  });
+
+  it("applies guac_recycler upgrade reduction", () => {
+    expect(calcEffectiveConsumeExponent(0, { guac_recycler: true }, {}, 0, tuning)).toBeCloseTo(0.80);
+  });
+
+  it("stacks refineries and upgrades", () => {
+    // 0.85 - 5*0.01 - 0.05 = 0.75
+    expect(calcEffectiveConsumeExponent(5, { guac_recycler: true }, {}, 0, tuning)).toBeCloseTo(0.75);
+  });
+
+  it("stacks both consume upgrades", () => {
+    // 0.85 - 0.05 - 0.05 = 0.75
+    expect(calcEffectiveConsumeExponent(0, { guac_recycler: true, bulk_fermentation: true }, {}, 0, tuning)).toBeCloseTo(0.75);
+  });
+
+  it("clamps at floor", () => {
+    // 35 refineries: 0.85 - 0.35 = 0.50 (at floor)
+    expect(calcEffectiveConsumeExponent(35, {}, {}, 0, tuning)).toBe(0.50);
+  });
+
+  it("does not go below floor even with many refineries", () => {
+    expect(calcEffectiveConsumeExponent(100, {}, {}, 0, tuning)).toBe(0.50);
+  });
+
+  it("applies Guac Memory II wisdom unlock", () => {
+    // 0.85 - 0.01 * 5 prestiges = 0.80
+    expect(calcEffectiveConsumeExponent(0, {}, { guac_memory_2: true }, 5, tuning)).toBeCloseTo(0.80);
+  });
+
+  it("stacks refineries, upgrades, and wisdom unlock", () => {
+    // 0.85 - 5*0.01 - 0.05 - 0.01*3 = 0.85 - 0.05 - 0.05 - 0.03 = 0.72
+    expect(calcEffectiveConsumeExponent(5, { guac_recycler: true }, { guac_memory_2: true }, 3, tuning)).toBeCloseTo(0.72);
+  });
+
+  it("Infinite Guac Theory lowers floor to 0.35", () => {
+    // With infinite_guac, floor is 0.35 instead of 0.50
+    expect(calcEffectiveConsumeExponent(100, {}, { infinite_guac: true }, 0, tuning)).toBe(0.35);
+  });
+
+  it("Infinite Guac Theory allows going below old floor", () => {
+    // 0.85 - 40*0.01 = 0.45, below old floor 0.50 but above new floor 0.35
+    expect(calcEffectiveConsumeExponent(40, {}, { infinite_guac: true }, 0, tuning)).toBeCloseTo(0.45);
+  });
+});
+
+describe("calcEffectiveProduceExponent", () => {
+  it("returns base exponent with no modifiers", () => {
+    expect(calcEffectiveProduceExponent({}, {}, 0, tuning)).toBe(1.0);
+  });
+
+  it("applies superlinear_synth upgrade", () => {
+    expect(calcEffectiveProduceExponent({ superlinear_synth: true }, {}, 0, tuning)).toBeCloseTo(1.05);
+  });
+
+  it("stacks both produce upgrades", () => {
+    // 1.0 + 0.05 + 0.10 = 1.15
+    expect(calcEffectiveProduceExponent({ superlinear_synth: true, exponential_ripen: true }, {}, 0, tuning)).toBeCloseTo(1.15);
+  });
+
+  it("applies Guac Memory I wisdom unlock", () => {
+    // 1.0 + 0.02 * 5 = 1.10
+    expect(calcEffectiveProduceExponent({}, { guac_memory_1: true }, 5, tuning)).toBeCloseTo(1.10);
+  });
+
+  it("stacks upgrades and wisdom unlock", () => {
+    // 1.0 + 0.05 + 0.10 + 0.02*3 = 1.21
+    expect(calcEffectiveProduceExponent(
+      { superlinear_synth: true, exponential_ripen: true },
+      { guac_memory_1: true }, 3, tuning
+    )).toBeCloseTo(1.21);
+  });
+
+  it("wisdom unlock has no effect with 0 prestiges", () => {
+    expect(calcEffectiveProduceExponent({}, { guac_memory_1: true }, 0, tuning)).toBe(1.0);
+  });
+});
+
+describe("calcEffectiveBaseProduction", () => {
+  it("returns base production with no upgrades", () => {
+    expect(calcEffectiveBaseProduction({}, tuning)).toBe(1);
+  });
+
+  it("applies concentrate_proto multiplier", () => {
+    expect(calcEffectiveBaseProduction({ concentrate_proto: true }, tuning)).toBe(1.5);
+  });
+});
+
+describe("calcGuacConsumption — effective tuning", () => {
+  it("uses effective exponent when extra args provided", () => {
+    // 5 refineries: exp = 0.80
+    // 50 * 10^0.80
+    const expected = 50 * Math.pow(10, 0.80);
+    const result = calcGuacConsumption(10, tuning, 5, {}, {}, 0);
+    expect(result).toBeCloseTo(expected, 0);
+  });
+
+  it("still works with old 2-arg signature", () => {
+    // 50 * 10^0.85
+    const expected = 50 * Math.pow(10, 0.85);
+    expect(calcGuacConsumption(10, tuning)).toBeCloseTo(expected, 0);
+  });
+});
+
+describe("calcGuacProduction — effective tuning", () => {
+  it("uses effective exponent and base when extra args provided", () => {
+    // superlinear_synth: exp = 1.05, concentrate_proto: base = 1.5
+    // 1.5 * 10^1.05
+    const expected = 1.5 * Math.pow(10, 1.05);
+    const result = calcGuacProduction(10, tuning, { superlinear_synth: true, concentrate_proto: true }, {}, 0);
+    expect(result).toBeCloseTo(expected, 0);
+  });
+
+  it("still works with old 2-arg signature", () => {
+    expect(calcGuacProduction(10, tuning)).toBe(10);
   });
 });

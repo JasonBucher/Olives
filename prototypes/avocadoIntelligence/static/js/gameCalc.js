@@ -63,6 +63,84 @@ export function calcProducerUnitRate(id, upgrades, tuning) {
   return rate;
 }
 
+/** Calculate effective consume exponent after refinery reductions and upgrades. */
+export function calcEffectiveConsumeExponent(refineryCount, upgrades, wisdomUnlocks, prestigeCount, tuning) {
+  let exp = tuning.guac.consumeExponent;
+  // Refinery reduction: -0.01 per refinery
+  exp -= refineryCount * 0.01;
+  // Research upgrade reductions (consumeExpDelta)
+  for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
+    if (upgrade.consumeExpDelta && upgrades[upgradeId]) {
+      exp += upgrade.consumeExpDelta; // negative values reduce
+    }
+  }
+  // Wisdom unlock: Guac Memory II (-0.01 per prestige)
+  if (wisdomUnlocks.guac_memory_2) {
+    exp -= 0.01 * prestigeCount;
+  }
+  // Floor
+  let floor = tuning.guac.consumeExponentFloor;
+  if (wisdomUnlocks.infinite_guac) {
+    floor = 0.35;
+  }
+  return Math.max(exp, floor);
+}
+
+/** Calculate effective produce exponent after upgrades and wisdom unlocks. */
+export function calcEffectiveProduceExponent(upgrades, wisdomUnlocks, prestigeCount, tuning) {
+  let exp = tuning.guac.produceExponent;
+  // Research upgrade boosts (produceExpDelta)
+  for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
+    if (upgrade.produceExpDelta && upgrades[upgradeId]) {
+      exp += upgrade.produceExpDelta;
+    }
+  }
+  // Wisdom unlock: Guac Memory I (+0.02 per prestige)
+  if (wisdomUnlocks.guac_memory_1) {
+    exp += 0.02 * prestigeCount;
+  }
+  return exp;
+}
+
+/** Calculate effective base guac production after upgrades. */
+export function calcEffectiveBaseProduction(upgrades, tuning) {
+  let base = tuning.guac.baseProduction;
+  for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
+    if (upgrade.baseProdMult && upgrades[upgradeId]) {
+      base *= upgrade.baseProdMult;
+    }
+  }
+  return base;
+}
+
+/** Calculate total guac lab avocado consumption per second (sublinear). */
+export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, wisdomUnlocks, prestigeCount) {
+  if (labCount <= 0) return 0;
+  // Support both old signature (labCount, tuning) and new signature with extra args
+  let exp;
+  if (refineryCount !== undefined) {
+    exp = calcEffectiveConsumeExponent(refineryCount, upgrades || {}, wisdomUnlocks || {}, prestigeCount || 0, tuning);
+  } else {
+    exp = Math.max(tuning.guac.consumeExponent, tuning.guac.consumeExponentFloor);
+  }
+  return tuning.guac.baseConsumption * Math.pow(labCount, exp);
+}
+
+/** Calculate guac produced per second at full feed. */
+export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount) {
+  if (labCount <= 0) return 0;
+  let exp;
+  let base;
+  if (upgrades !== undefined) {
+    exp = calcEffectiveProduceExponent(upgrades, wisdomUnlocks || {}, prestigeCount || 0, tuning);
+    base = calcEffectiveBaseProduction(upgrades, tuning);
+  } else {
+    exp = tuning.guac.produceExponent;
+    base = tuning.guac.baseProduction;
+  }
+  return base * Math.pow(labCount, exp);
+}
+
 /** Calculate the guac global multiplier. */
 export function calcGuacMultiplier(guacCount, tuning) {
   return 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
