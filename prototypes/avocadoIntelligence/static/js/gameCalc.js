@@ -39,10 +39,11 @@ export function getDisplayCount(value) {
   return Math.floor(value);
 }
 
-/** Format numbers with commas. Shows 1 decimal for values under 10. */
+/** Format numbers with commas. Shows one decimal when non-zero, drops trailing .0. */
 export function formatNumber(value) {
-  if (value < 10) return parseFloat(value.toFixed(1)).toLocaleString();
-  return Math.floor(value).toLocaleString();
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded % 1 === 0) return Math.floor(rounded).toLocaleString();
+  return rounded.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 /** Calculate the cost of the next producer unit. */
@@ -62,8 +63,13 @@ export function calcProducerUnitRate(id, upgrades, tuning) {
   return rate;
 }
 
+/** Calculate the guac global multiplier. */
+export function calcGuacMultiplier(guacCount, tuning) {
+  return 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
+}
+
 /** Calculate total avocados per second from all producers. */
-export function calcTotalAps(producers, upgrades, wisdom, tuning) {
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
   let total = 0;
   for (const [id, count] of Object.entries(producers)) {
     if (count <= 0) continue;
@@ -79,11 +85,13 @@ export function calcTotalAps(producers, upgrades, wisdom, tuning) {
   total *= globalMult;
   // Apply wisdom bonus
   total *= calcWisdomBonus(wisdom, upgrades, tuning);
+  // Apply guac multiplier
+  total *= calcGuacMultiplier(guacCount, tuning);
   return total;
 }
 
 /** Calculate click power (avocados per click). */
-export function calcClickPower(upgrades, wisdom, tuning) {
+export function calcClickPower(upgrades, wisdom, guacCount, tuning) {
   let power = tuning.production.baseClickYield;
   // Click multiplier upgrades
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
@@ -101,13 +109,15 @@ export function calcClickPower(upgrades, wisdom, tuning) {
   power *= globalMult;
   // Wisdom bonus
   power *= calcWisdomBonus(wisdom, upgrades, tuning);
+  // Guac multiplier
+  power *= calcGuacMultiplier(guacCount, tuning);
   return power;
 }
 
 /** Calculate wisdom points earned from total avocados this run. */
 export function calcWisdomEarned(totalAvocadosThisRun, tuning) {
   if (totalAvocadosThisRun < tuning.prestige.unlockThreshold) return 0;
-  return Math.floor(Math.pow(totalAvocadosThisRun / tuning.prestige.wisdomDivisor, tuning.prestige.wisdomExponent));
+  return Math.floor(Math.sqrt(totalAvocadosThisRun) / tuning.prestige.divisor);
 }
 
 /** Calculate the wisdom bonus multiplier. */

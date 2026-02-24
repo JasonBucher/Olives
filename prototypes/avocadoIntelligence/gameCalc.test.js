@@ -3,6 +3,7 @@ import {
   clamp, formatRate, getDisplayCount, rollWeighted, canPrestige,
   formatNumber, calcProducerCost, calcProducerUnitRate,
   calcTotalAps, calcClickPower, calcWisdomEarned, calcWisdomBonus,
+  calcGuacMultiplier,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -14,6 +15,11 @@ const tuning = {
     drone:       { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
     guac_lab:    { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
   },
+  guac: {
+    baseConsumptionPerLab: 50,
+    multiplierPerSqrt: 0.10,
+    labUnlockAps: 50,
+  },
   upgrades: {
     strong_thumb:       { cost: 100,  unlockAt: 0, clickMult: 2 },
     iron_thumb:         { cost: 500,  unlockAt: 0, clickMult: 2 },
@@ -21,13 +27,12 @@ const tuning = {
     drip_irrigation:    { cost: 5000, unlockAt: 5,  producerId: "orchard_row", prodMult: 2 },
     global_boost_1:     { cost: 10000, unlockAt: 0, globalMult: 1.5 },
     global_boost_2:     { cost: 500000, unlockAt: 0, globalMult: 2 },
-    wisdom_boost:       { cost: 1e6, unlockAt: 0, wisdomMult: 0.5 },
+    wisdom_boost:       { cost: 1e6, unlockAt: 0, wisdomMult: 0.05 },
   },
   prestige: {
     unlockThreshold: 1e6,
-    wisdomDivisor: 1e6,
-    wisdomExponent: 0.5,
-    wisdomMultPerPoint: 0.02,
+    divisor: 1000,
+    wisdomMultPerPoint: 0.10,
   },
 };
 
@@ -90,32 +95,28 @@ describe("rollWeighted", () => {
 // ---------- New function tests ----------
 
 describe("formatNumber", () => {
-  it("shows 1 decimal for values under 10", () => {
-    expect(formatNumber(0.2)).toBe("0.2");
-  });
-
-  it("drops trailing zero for whole numbers under 10", () => {
+  it("drops .0 for whole numbers", () => {
+    expect(formatNumber(0)).toBe("0");
     expect(formatNumber(5)).toBe("5");
-  });
-
-  it("returns plain integer for values 10-999", () => {
     expect(formatNumber(42)).toBe("42");
   });
 
-  it("floors fractional values 10-999", () => {
-    expect(formatNumber(999.9)).toBe("999");
+  it("shows one decimal when non-zero", () => {
+    expect(formatNumber(0.2)).toBe("0.2");
+    expect(formatNumber(3.7)).toBe("3.7");
+  });
+
+  it("rounds to one decimal", () => {
+    expect(formatNumber(3.75)).toBe("3.8");
   });
 
   it("adds commas to thousands", () => {
     expect(formatNumber(1500)).toBe("1,500");
+    expect(formatNumber(1500.3)).toBe("1,500.3");
   });
 
   it("adds commas to millions", () => {
     expect(formatNumber(2500000)).toBe("2,500,000");
-  });
-
-  it("returns 0 for zero", () => {
-    expect(formatNumber(0)).toBe("0");
   });
 });
 
@@ -125,18 +126,15 @@ describe("calcProducerCost", () => {
   });
 
   it("scales cost by costGrowth^owned", () => {
-    // 10 * 1.15^1 = 11.5 → floor → 11
     expect(calcProducerCost("sapling", 1, tuning)).toBe(11);
   });
 
   it("grows exponentially", () => {
-    // 10 * 1.15^10 ≈ 40.45 → 40
     expect(calcProducerCost("sapling", 10, tuning)).toBe(40);
   });
 
   it("works for higher-tier producers", () => {
     expect(calcProducerCost("orchard_row", 0, tuning)).toBe(100);
-    // 100 * 1.15^5 ≈ 201.13 → 201
     expect(calcProducerCost("orchard_row", 5, tuning)).toBe(201);
   });
 });
@@ -159,65 +157,102 @@ describe("calcProducerUnitRate", () => {
   });
 });
 
+describe("calcGuacMultiplier", () => {
+  it("returns 1.0 with no guac", () => {
+    expect(calcGuacMultiplier(0, tuning)).toBe(1);
+  });
+
+  it("applies sqrt scaling", () => {
+    // 1 + sqrt(100) * 0.10 = 1 + 10 * 0.10 = 2.0
+    expect(calcGuacMultiplier(100, tuning)).toBe(2);
+  });
+
+  it("grows with diminishing returns", () => {
+    // 1 + sqrt(400) * 0.10 = 1 + 20 * 0.10 = 3.0
+    expect(calcGuacMultiplier(400, tuning)).toBe(3);
+  });
+
+  it("handles small guac amounts", () => {
+    // 1 + sqrt(1) * 0.10 = 1.10
+    expect(calcGuacMultiplier(1, tuning)).toBeCloseTo(1.1);
+  });
+});
+
 describe("calcTotalAps", () => {
   it("returns 0 with no producers", () => {
     const producers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
-    expect(calcTotalAps(producers, {}, 0, tuning)).toBe(0);
+    expect(calcTotalAps(producers, {}, 0, 0, tuning)).toBe(0);
   });
 
   it("sums production from multiple producer types", () => {
     const producers = { sapling: 5, orchard_row: 2, drone: 0, guac_lab: 0 };
-    // 5 * 0.2 + 2 * 1 = 1 + 2 = 3
-    expect(calcTotalAps(producers, {}, 0, tuning)).toBe(3);
+    // 5 * 0.2 + 2 * 1 = 3
+    expect(calcTotalAps(producers, {}, 0, 0, tuning)).toBe(3);
   });
 
   it("applies global multiplier upgrade", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 = 2, * 1.5 global = 3
-    expect(calcTotalAps(producers, { global_boost_1: true }, 0, tuning)).toBe(3);
+    // 10 * 0.2 = 2, * 1.5 = 3
+    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBe(3);
   });
 
   it("stacks global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
     // 10 * 0.2 = 2, * 1.5 * 2 = 6
-    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, tuning)).toBe(6);
+    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBe(6);
   });
 
   it("applies wisdom bonus", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, wisdom bonus = 1 + 10 * 0.02 = 1.2, total = 2.4
-    expect(calcTotalAps(producers, {}, 10, tuning)).toBeCloseTo(2.4);
+    // base = 2, wisdom = 1 + 10 * 0.10 = 2.0, total = 4
+    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(4);
+  });
+
+  it("applies guac multiplier", () => {
+    const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+    // base = 2, guac mult = 1 + sqrt(100) * 0.10 = 2.0, total = 4
+    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(4);
+  });
+
+  it("stacks guac and wisdom multipliers", () => {
+    const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+    // base = 2, wisdom = 2.0, guac = 2.0, total = 2 * 2 * 2 = 8
+    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(8);
   });
 });
 
 describe("calcClickPower", () => {
   it("returns base click yield with no upgrades", () => {
-    expect(calcClickPower({}, 0, tuning)).toBe(1);
+    expect(calcClickPower({}, 0, 0, tuning)).toBe(1);
   });
 
   it("doubles with strong_thumb", () => {
-    expect(calcClickPower({ strong_thumb: true }, 0, tuning)).toBe(2);
+    expect(calcClickPower({ strong_thumb: true }, 0, 0, tuning)).toBe(2);
   });
 
   it("stacks click multipliers", () => {
-    expect(calcClickPower({ strong_thumb: true, iron_thumb: true }, 0, tuning)).toBe(4);
+    expect(calcClickPower({ strong_thumb: true, iron_thumb: true }, 0, 0, tuning)).toBe(4);
   });
 
   it("applies global multiplier", () => {
-    // 1 * 1.5 = 1.5
-    expect(calcClickPower({ global_boost_1: true }, 0, tuning)).toBe(1.5);
+    expect(calcClickPower({ global_boost_1: true }, 0, 0, tuning)).toBe(1.5);
   });
 
   it("applies wisdom bonus to clicks", () => {
-    // base 1, wisdom bonus 1 + 5 * 0.02 = 1.10
-    expect(calcClickPower({}, 5, tuning)).toBeCloseTo(1.1);
+    // base 1, wisdom = 1 + 5 * 0.10 = 1.50
+    expect(calcClickPower({}, 5, 0, tuning)).toBeCloseTo(1.5);
+  });
+
+  it("applies guac multiplier to clicks", () => {
+    // base 1, guac = 1 + sqrt(100) * 0.10 = 2.0
+    expect(calcClickPower({}, 0, 100, tuning)).toBeCloseTo(2);
   });
 
   it("stacks all multipliers", () => {
-    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 1.2 (10 wisdom) = 7.2
+    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 2 (10 wisdom) = 12, * 2 (100 guac) = 24
     expect(calcClickPower(
-      { strong_thumb: true, iron_thumb: true, global_boost_1: true }, 10, tuning
-    )).toBeCloseTo(7.2);
+      { strong_thumb: true, iron_thumb: true, global_boost_1: true }, 10, 100, tuning
+    )).toBeCloseTo(24);
   });
 });
 
@@ -227,17 +262,17 @@ describe("calcWisdomEarned", () => {
   });
 
   it("returns 1 at exactly threshold (1e6)", () => {
-    // floor((1e6 / 1e6)^0.5) = floor(1) = 1
+    // floor(sqrt(1e6) / 1000) = floor(1000 / 1000) = 1
     expect(calcWisdomEarned(1e6, tuning)).toBe(1);
   });
 
   it("returns floor of sqrt scaling", () => {
-    // floor((4e6 / 1e6)^0.5) = floor(2) = 2
+    // floor(sqrt(4e6) / 1000) = floor(2000 / 1000) = 2
     expect(calcWisdomEarned(4e6, tuning)).toBe(2);
   });
 
   it("grows with sqrt of total", () => {
-    // floor((100e6 / 1e6)^0.5) = floor(10) = 10
+    // floor(sqrt(100e6) / 1000) = floor(10000 / 1000) = 10
     expect(calcWisdomEarned(100e6, tuning)).toBe(10);
   });
 
@@ -251,15 +286,15 @@ describe("calcWisdomBonus", () => {
     expect(calcWisdomBonus(0, {}, tuning)).toBe(1);
   });
 
-  it("adds 2% per wisdom point", () => {
-    // 1 + 10 * 0.02 = 1.20
-    expect(calcWisdomBonus(10, {}, tuning)).toBeCloseTo(1.2);
+  it("adds 10% per wisdom point", () => {
+    // 1 + 10 * 0.10 = 2.0
+    expect(calcWisdomBonus(10, {}, tuning)).toBeCloseTo(2);
   });
 
   it("wisdom_boost upgrade increases effectiveness", () => {
-    // with wisdom_boost: mult = 0.02 + 0.5 = 0.52
-    // 1 + 10 * 0.52 = 6.2
-    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning)).toBeCloseTo(6.2);
+    // with wisdom_boost: mult = 0.10 + 0.05 = 0.15
+    // 1 + 10 * 0.15 = 2.5
+    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning)).toBeCloseTo(2.5);
   });
 
   it("returns 1.0 with wisdom_boost but no wisdom points", () => {

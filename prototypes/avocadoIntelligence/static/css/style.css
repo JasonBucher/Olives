@@ -194,6 +194,7 @@ h1 {
   border-bottom: 1px solid var(--divider);
 }
 .producer-row:last-child { border-bottom: 0; }
+.producer-row.locked { opacity: 0.5; }
 
 .producer-header {
   display: flex;

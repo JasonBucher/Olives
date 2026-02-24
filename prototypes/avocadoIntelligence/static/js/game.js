@@ -79,6 +79,15 @@ const APS_MILESTONE_MESSAGES = {
 };
 let lastMilestoneReached = 0;
 
+// --- Guac multiplier milestone tracking ---
+const GUAC_MULT_MESSAGES = [
+  "\u{1f951} The orchard compresses into efficiency.",
+  "\u{1f7e2} Guac density increased.",
+  "\u{1f951} The avocados are condensing.",
+  "\u{1f7e2} Guac pressure rising.",
+];
+let lastGuacMultMilestone = 1; // tracks last logged floor at 0.25 increments
+
 // --- Click flavor text ---
 const CLICK_MESSAGES = [
   "A perfectly ripe one!",
@@ -93,14 +102,23 @@ const CLICK_MESSAGES = [
   "This one sparks joy.",
 ];
 
+// --- Guac underfed throttle ---
+let lastUnderfedLogTime = 0;
+
 // --- DOM ---
 const avocadoCountEl = document.getElementById("avocado-count");
 const apsCountEl = document.getElementById("aps-count");
 const clickPowerEl = document.getElementById("click-power");
 const guacRowEl = document.getElementById("guac-row");
 const guacCountEl = document.getElementById("guac-count");
+const guacMultRowEl = document.getElementById("guac-mult-row");
+const guacMultEl = document.getElementById("guac-mult");
 const wisdomRowEl = document.getElementById("wisdom-row");
 const wisdomCountEl = document.getElementById("wisdom-count");
+const wisdomMultRowEl = document.getElementById("wisdom-mult-row");
+const wisdomMultEl = document.getElementById("wisdom-mult");
+const totalMultRowEl = document.getElementById("total-mult-row");
+const totalMultEl = document.getElementById("total-mult");
 const logEl = document.getElementById("log");
 
 const pickAvocadoBtn = document.getElementById("pick-avocado-btn");
@@ -204,7 +222,7 @@ function renderProducerList() {
       <div class="producer-header">
         <div>
           <div class="producer-title">${cfg.title} <span class="producer-count" data-count="${id}">0</span></div>
-          <div class="producer-desc">${cfg.desc}</div>
+          <div class="producer-desc" data-desc="${id}">${cfg.desc}</div>
         </div>
         <button class="btn producer-buy" data-buy="${id}" type="button">
           Buy — <span data-cost="${id}">10</span>
@@ -252,44 +270,102 @@ function renderUpgradeList() {
 let tickCount = 0;
 
 function updateUI() {
-  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, TUNING);
-  const clickPower = Calc.calcClickPower(state.upgrades, state.wisdom, TUNING);
+  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const clickPower = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
-  apsCountEl.textContent = aps < 10 ? aps.toFixed(1) : Calc.formatNumber(aps);
+  apsCountEl.textContent = Calc.formatNumber(aps);
   clickPowerEl.textContent = Calc.formatNumber(clickPower);
 
-  // Guac row
+  // Guac row — show when guac protocol owned
   const hasGuac = !!state.upgrades.guac_unlock;
   guacRowEl.style.display = hasGuac ? "" : "none";
   if (hasGuac) {
-    guacCountEl.textContent = Calc.formatNumber(state.guacCount);
+    const labs = state.producers.guac_lab || 0;
+    if (labs > 0) {
+      const desiredPerSec = TUNING.guac.baseConsumptionPerLab * labs;
+      const guacPerSec = desiredPerSec / TUNING.guac.baseConsumptionPerLab;
+      guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (+${Calc.formatRate(guacPerSec)}/sec)`;
+    } else {
+      guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (need Guac Labs)`;
+    }
+  }
+
+  // Guac multiplier row — show when guac > 0
+  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING);
+  guacMultRowEl.style.display = state.guacCount > 0 ? "" : "none";
+  if (state.guacCount > 0) {
+    guacMultEl.textContent = `x${guacMult.toFixed(2)}`;
   }
 
   // Wisdom row
   wisdomRowEl.style.display = state.wisdom > 0 ? "" : "none";
   if (state.wisdom > 0) {
-    const bonus = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING);
-    wisdomCountEl.textContent = `${state.wisdom} (${Calc.formatRate(bonus)}x)`;
+    wisdomCountEl.textContent = String(state.wisdom);
   }
 
-  // Producer rows: update counts, costs, rates, disable state
+  // Wisdom multiplier row
+  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING);
+  wisdomMultRowEl.style.display = state.wisdom > 0 ? "" : "none";
+  if (state.wisdom > 0) {
+    wisdomMultEl.textContent = `x${wisdomMult.toFixed(2)}`;
+  }
+
+  // Total multiplier row — show when any multiplier is active
+  const hasMultipliers = state.guacCount > 0 || state.wisdom > 0;
+  totalMultRowEl.style.display = hasMultipliers ? "" : "none";
+  if (hasMultipliers) {
+    totalMultEl.textContent = `x${(guacMult * wisdomMult).toFixed(2)}`;
+  }
+
+  // Producer rows: update counts, costs, rates, disable state, guac_lab gating
+  const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
+
   for (const id of PRODUCER_ORDER) {
     const owned = state.producers[id] || 0;
     const cost = Calc.calcProducerCost(id, owned, TUNING);
     const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
     const canAfford = state.avocadoCount >= cost;
 
+    const row = producersListEl.querySelector(`[data-id="${id}"]`);
     const countEl = producersListEl.querySelector(`[data-count="${id}"]`);
     const costEl = producersListEl.querySelector(`[data-cost="${id}"]`);
     const rateEl = producersListEl.querySelector(`[data-rate="${id}"]`);
     const buyBtn = producersListEl.querySelector(`[data-buy="${id}"]`);
+    const descEl = producersListEl.querySelector(`[data-desc="${id}"]`);
+
+    // Guac lab gating
+    if (id === "guac_lab" && !guacLabUnlocked && owned === 0) {
+      if (row) row.classList.add("locked");
+      if (descEl) descEl.textContent = `Requires ${TUNING.guac.labUnlockAps} avocados/sec to unlock.`;
+      if (buyBtn) buyBtn.disabled = true;
+      if (rateEl) rateEl.textContent = "";
+      if (countEl) countEl.textContent = "";
+      continue;
+    }
+    if (row) row.classList.remove("locked");
+    if (descEl) descEl.textContent = TUNING.producers[id].desc;
 
     if (countEl) countEl.textContent = owned > 0 ? `(${owned} owned)` : "";
     if (costEl) costEl.textContent = Calc.formatNumber(cost);
-    if (rateEl) rateEl.textContent = owned > 0
-      ? `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`
-      : `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
+    let rateText;
+    if (owned > 0) {
+      rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
+    } else {
+      rateText = `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
+    }
+    // Show guac conversion info on guac_lab rows
+    if (id === "guac_lab" && state.upgrades.guac_unlock) {
+      const consumption = TUNING.guac.baseConsumptionPerLab * (owned || 1);
+      const guacOut = consumption / TUNING.guac.baseConsumptionPerLab;
+      if (owned > 0) {
+        rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
+      } else {
+        rateText += ` | Also converts avocados \u2192 guac`;
+      }
+    }
+    if (rateEl) rateEl.textContent = rateText;
     if (buyBtn) buyBtn.disabled = !canAfford;
   }
 
@@ -330,7 +406,7 @@ function updateUI() {
 
 // --- Actions ---
 function pickAvocado() {
-  const power = Calc.calcClickPower(state.upgrades, state.wisdom, TUNING);
+  const power = Calc.calcClickPower(state.upgrades, state.wisdom, state.guacCount, TUNING);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -346,6 +422,12 @@ function pickAvocado() {
 }
 
 function buyProducer(id) {
+  // Guac lab gating — need enough APS to feed the lab
+  if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
+    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+    if (currentAps < TUNING.guac.labUnlockAps) return;
+  }
+
   const owned = state.producers[id] || 0;
   const cost = Calc.calcProducerCost(id, owned, TUNING);
   if (state.avocadoCount < cost) return;
@@ -388,16 +470,10 @@ function prestige() {
 
   // Reset milestones
   lastMilestoneReached = 0;
+  lastGuacMultMilestone = 1;
 
-  const PRESTIGE_MESSAGES = [
-    "The avocados have been composted. Wisdom remains.",
-    "Back to seed. But the roots remember.",
-    "The orchard sleeps. The mind grows.",
-    "Composting complete. You smell... enlightened.",
-    "Reset? No. Rebirth.",
-  ];
-  const msg = PRESTIGE_MESSAGES[Math.floor(Math.random() * PRESTIGE_MESSAGES.length)];
-  logLine(`Prestige! +${wisdomGain} wisdom. ${msg}`);
+  logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
+  logLine(`\u2728 You gained ${wisdomGain} Wisdom.`);
 
   saveGame();
   updateUI();
@@ -414,7 +490,7 @@ function startLoop() {
     last = now;
 
     // Production
-    const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, TUNING);
+    const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
     if (aps > 0) {
       const produced = aps * dt;
       state.avocadoCount += produced;
@@ -422,15 +498,29 @@ function startLoop() {
       state.totalAvocadosAllTime += produced;
     }
 
-    // Guac conversion
+    // Guac conversion — capped at available surplus
     if (state.upgrades.guac_unlock && (state.producers.guac_lab || 0) > 0) {
-      const guacPerSec = TUNING.guac.labConversionRate * state.producers.guac_lab;
-      const guacThisTick = guacPerSec * dt;
-      const avocadoCost = guacThisTick * TUNING.guac.avocadosPerGuac;
-      if (state.avocadoCount >= avocadoCost) {
-        state.avocadoCount -= avocadoCost;
-        state.guacCount += guacThisTick;
+      const labs = state.producers.guac_lab;
+      const desiredConsumption = TUNING.guac.baseConsumptionPerLab * labs * dt;
+      const actualConsumption = Math.min(desiredConsumption, state.avocadoCount);
+      if (actualConsumption > 0) {
+        state.avocadoCount -= actualConsumption;
+        state.guacCount += actualConsumption / TUNING.guac.baseConsumptionPerLab;
       }
+      // Debug log when underfed (throttled to every ~5s)
+      if (actualConsumption < desiredConsumption && now - lastUnderfedLogTime > 5000) {
+        lastUnderfedLogTime = now;
+        logLine("\u26a0\ufe0f Guac Labs are underfed.");
+      }
+    }
+
+    // Guac multiplier milestones (log every 0.25 increase)
+    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING);
+    const nextMilestone = lastGuacMultMilestone + 0.25;
+    if (guacMult >= nextMilestone) {
+      lastGuacMultMilestone = Math.floor(guacMult * 4) / 4; // snap to 0.25 grid
+      const msg = GUAC_MULT_MESSAGES[Math.floor(Math.random() * GUAC_MULT_MESSAGES.length)];
+      logLine(`${msg} (x${guacMult.toFixed(2)})`);
     }
 
     // APS milestones

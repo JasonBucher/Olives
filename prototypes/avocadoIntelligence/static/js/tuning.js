@@ -12,7 +12,7 @@ export const TUNING = {
     sapling:       { baseCost: 10,     costGrowth: 1.15, baseRate: 0.2,    title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
     orchard_row:   { baseCost: 100,    costGrowth: 1.15, baseRate: 1,      title: "Orchard Row",        desc: "Now we're farming." },
     drone:         { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
-    guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 47,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes." },
+    guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 47,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes 50 avocados/sec to produce guac." },
     exchange:      { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
     pit_miner:     { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400,   title: "Pit Miner",          desc: "Extracting data from pits." },
     neural_pit:    { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800,   title: "Neural Pit Network", desc: "The pits are thinking." },
@@ -20,8 +20,9 @@ export const TUNING = {
   },
 
   guac: {
-    avocadosPerGuac: 100,    // conversion ratio
-    labConversionRate: 0.5,  // guac/sec per guac_lab owned
+    baseConsumptionPerLab: 50,  // avocados consumed per lab per second
+    multiplierPerSqrt: 0.10,    // guac multiplier = 1 + sqrt(guac) * this
+    labUnlockAps: 50,           // avocados/sec needed to buy guac labs
   },
 
   upgrades: {
@@ -34,14 +35,13 @@ export const TUNING = {
     global_boost_1:     { cost: 10000,   unlockAt: 0,  globalMult: 1.5, title: "Orchard-as-a-Service", desc: "All production +50%" },
     global_boost_2:     { cost: 500000,  unlockAt: 0,  globalMult: 2,   title: "Pit-to-Cloud Pipeline", desc: "All production 2x" },
     guac_unlock:        { cost: 5000,    unlockAt: 0,  unlocksGuac: true, title: "Guacamole Protocol",  desc: "Unlocks guac processing" },
-    wisdom_boost:       { cost: 1e6,     unlockAt: 0,  wisdomMult: 0.5,  title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective" },
+    wisdom_boost:       { cost: 1e6,     unlockAt: 0,  wisdomMult: 0.05,  title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective" },
   },
 
   prestige: {
-    unlockThreshold: 1e6,      // total avocados this run
-    wisdomDivisor: 1e6,        // wisdom = floor((total/divisor)^exp)
-    wisdomExponent: 0.5,       // sqrt scaling
-    wisdomMultPerPoint: 0.02,  // +2% per wisdom point
+    unlockThreshold: 1e6,         // total avocados this run to unlock prestige
+    divisor: 1000,                // wisdom = floor(sqrt(total) / divisor)
+    wisdomMultPerPoint: 0.10,     // +10% per wisdom point
   },
 };
 
