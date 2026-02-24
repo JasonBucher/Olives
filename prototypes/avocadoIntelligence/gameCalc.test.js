@@ -106,24 +106,12 @@ describe("formatNumber", () => {
     expect(formatNumber(999.9)).toBe("999");
   });
 
-  it("formats thousands with K suffix", () => {
-    expect(formatNumber(1500)).toBe("1.5K");
+  it("adds commas to thousands", () => {
+    expect(formatNumber(1500)).toBe("1,500");
   });
 
-  it("drops decimal for values >= 10K", () => {
-    expect(formatNumber(15000)).toBe("15K");
-  });
-
-  it("formats millions with M suffix", () => {
-    expect(formatNumber(2500000)).toBe("2.5M");
-  });
-
-  it("formats billions with B suffix", () => {
-    expect(formatNumber(1e9)).toBe("1B");
-  });
-
-  it("formats trillions with T suffix", () => {
-    expect(formatNumber(5e12)).toBe("5T");
+  it("adds commas to millions", () => {
+    expect(formatNumber(2500000)).toBe("2,500,000");
   });
 
   it("returns 0 for zero", () => {

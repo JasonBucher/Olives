@@ -39,25 +39,10 @@ export function getDisplayCount(value) {
   return Math.floor(value);
 }
 
-/** Format large numbers with K/M/B/T suffixes. Shows 1 decimal for small values. */
+/** Format numbers with commas. Shows 1 decimal for values under 10. */
 export function formatNumber(value) {
-  if (value < 10) return parseFloat(value.toFixed(1)).toString();
-  if (value < 1000) return String(Math.floor(value));
-  const suffixes = [
-    { threshold: 1e12, suffix: "T" },
-    { threshold: 1e9,  suffix: "B" },
-    { threshold: 1e6,  suffix: "M" },
-    { threshold: 1e3,  suffix: "K" },
-  ];
-  for (const { threshold, suffix } of suffixes) {
-    if (value >= threshold) {
-      const scaled = value / threshold;
-      // Show 1 decimal if < 10, otherwise integer
-      if (scaled < 10) return parseFloat(scaled.toFixed(1)) + suffix;
-      return Math.floor(scaled) + suffix;
-    }
-  }
-  return String(Math.floor(value));
+  if (value < 10) return parseFloat(value.toFixed(1)).toLocaleString();
+  return Math.floor(value).toLocaleString();
 }
 
 /** Calculate the cost of the next producer unit. */
