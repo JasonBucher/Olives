@@ -15,10 +15,13 @@ export const TUNING = {
     drone:         { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
     guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
     guac_refinery: { baseCost: 50000,  costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
-    exchange:      { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
-    pit_miner:     { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400,   title: "Pit Miner",          desc: "Extracting data from pits." },
-    neural_pit:    { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800,   title: "Neural Pit Network", desc: "The pits are thinking." },
-    orchard_cloud: { baseCost: 3.3e8,  costGrowth: 1.15, baseRate: 44000,  title: "Orchard Cloud",      desc: "Avocados-as-a-Service. AaaS." },
+    exchange:       { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
+    attention_head: { baseCost: 800000, costGrowth: 1.15, baseRate: 900,    title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
+    pit_miner:      { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400,   title: "Pit Miner",          desc: "Extracting data from pits." },
+    neural_pit:     { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800,   title: "Neural Pit Network", desc: "The pits are thinking." },
+    transformer:    { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000,  title: "Transformer Core",   desc: "Self-attention over the entire orchard. Context window: unlimited avocados." },
+    orchard_cloud:    { baseCost: 3.3e8,  costGrowth: 1.15, baseRate: 44000,  title: "Orchard Cloud",      desc: "Avocados-as-a-Service. AaaS." },
+    foundation_model: { baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000, title: "Foundation Model",   desc: "It learned everything. From avocados. Somehow that was enough." },
   },
 
   guac: {
@@ -52,6 +55,8 @@ export const TUNING = {
     throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.03, title: "Throughput Clicking I",   desc: "Each click also adds 3% of your base APS." },
     throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.06, title: "Throughput Clicking II",  desc: "Each click also adds 6% of your base APS." },
     throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.10, title: "Throughput Clicking III", desc: "Each click also adds 10% of your base APS." },
+    attention_focus:   { cost: 2e6,   unlockAt: 5,  producerId: "attention_head", prodMult: 2, title: "Multi-Head Attention",  desc: "Attention Heads produce 2x" },
+    transformer_scale: { cost: 5e8,   unlockAt: 5,  producerId: "transformer",    prodMult: 2, title: "Scaling Laws",          desc: "Transformer Cores produce 2x" },
   },
 
   wisdomUnlocks: {
@@ -60,14 +65,67 @@ export const TUNING = {
     infinite_guac:     { wisdomCost: 25, title: "Infinite Guac Theory",  desc: "consumeExponent floor lowered from 0.50 to 0.35" },
   },
 
+  benchmarks: {
+    first_inference:    { title: "First Inference",               desc: "Click once." },
+    hello_world:        { title: "Hello, World",                  desc: "Reach 1 APS.",                          globalMult: 0.02 },
+    batch_processing:   { title: "Batch Processing",              desc: "Own 10 Avocado Saplings." },
+    overfitting:        { title: "Overfitting",                   desc: "Buy all click upgrades.",               clickMult: 0.05 },
+    feature_extraction: { title: "Feature Extraction",            desc: "Reach 100 APS.",                        globalMult: 0.03 },
+    first_epoch:        { title: "First Epoch",                   desc: "Own 5+ of any 3 different producers." },
+    guac_online:        { title: "Guac Protocol Online",          desc: "Produce first guac.",                   guacProdMult: 0.05 },
+    data_pipeline:      { title: "Data Pipeline",                 desc: "Own 5 Irrigation Drones and 5 Orchard Rows." },
+    gradient_descent:   { title: "Gradient Descent",              desc: "Reach 1,000 APS.",                      globalMult: 0.05 },
+    attention_is_all:   { title: "Attention Is All You Need",     desc: "Own 1 Attention Head." },
+    loss_convergence:   { title: "Loss Convergence",              desc: "Accumulate 100 guac.",                  guacMult: 0.03 },
+    singularity:        { title: "The Singularity",               desc: "Reach 10,000 APS." },
+    convergence:        { title: "Convergence",                   desc: "Prestige for the first time.",          wisdomMult: 0.05 },
+    fine_tuning:        { title: "Fine-Tuning",                   desc: "Complete 3 prestiges.",                 globalMult: 0.03 },
+    transfer_learning:  { title: "Transfer Learning",             desc: "Buy all 3 wisdom unlocks." },
+    agi_achieved:       { title: "AGI Achieved",                  desc: "Accumulate 50 lifetime wisdom.",        globalMult: 0.05 },
+    superintelligence:  { title: "Superintelligence",             desc: "Reach 100,000 APS.",                    globalMult: 0.10 },
+    paperclip_moment:   { title: "The Paperclip Moment",          desc: "1 billion all-time avocados." },
+  },
+
+  hyperparams: {
+    cooldownMs: 180000, // 3 minutes
+    warmupDurationMs: 60000, // 60 seconds
+    learningRate: {
+      conservative: { label: "Conservative", desc: "No change.", apsMult: 1, guacConsumeMult: 1 },
+      aggressive:   { label: "Aggressive",   desc: "Fast convergence, high compute cost.", apsMult: 1.3, guacConsumeMult: 1.2 },
+      warmup:       { label: "Warmup",       desc: "Slow start, strong finish.", apsMult: 0.85, apsMultAfterWarmup: 1.2 },
+    },
+    batchSize: {
+      small: { label: "Small",  desc: "No change.", apsMult: 1, clickMult: 1 },
+      large: { label: "Large",  desc: "Parallelism over interactivity.", apsMult: 1.5, clickMult: 0.7 },
+      micro: { label: "Micro",  desc: "SGD with momentum. Click harder.", apsMult: 0.8, clickMult: 1.8 },
+    },
+    regularization: {
+      none:         { label: "None",         desc: "No change." },
+      dropout:      { label: "Dropout",      desc: "Prevents overfitting to current run.", freezeGuacMult: true, wisdomMult: 1.15 },
+      weight_decay: { label: "Weight Decay", desc: "Smaller model, same performance.", costMult: 0.9, globalMult: 0.95 },
+    },
+  },
+
   prestige: {
     unlockThreshold: 1e6,         // total avocados this run to unlock prestige
     divisor: 1000,                // wisdom = floor(sqrt(total) / divisor)
     wisdomMultPerPoint: 0.10,     // +10% per wisdom point
   },
+
+  distillation: {
+    costs: [100, 250, 500, 1000, 2000], // wisdom cost for each distillation (v1.0 through v5.0)
+    bonuses: [
+      { apsMult: 1.5, wisdomEarnMult: 1.2, desc: "Base APS x1.5, wisdom earn rate x1.2", flavor: "Knowledge compressed. Inference faster." },
+      { baseClickBonus: 1, guacProdMult: 1.3, desc: "+1 base click power, guac production x1.3", flavor: "Attention weights optimized." },
+      { costMult: 0.90, startingWisdom: 2, desc: "Producer costs x0.90, +2 starting wisdom on prestige", flavor: "Quantized. Smaller, same performance." },
+      { multiplierPerSqrtBonus: 0.02, consumeFloorBonus: -0.05, desc: "Guac mult 0.10\u21920.12, consume floor -0.05", flavor: "Architecture breakthrough." },
+      { allProdMult: 2.0, unlocksFoundationModel: true, desc: "All production x2.0, unlock Foundation Model", flavor: "You have built AGI." },
+    ],
+  },
 };
 
 export const PRODUCER_ORDER = [
   "influencer", "sapling", "orchard_row", "drone", "guac_lab", "guac_refinery",
-  "exchange", "pit_miner", "neural_pit", "orchard_cloud",
+  "exchange", "attention_head", "pit_miner", "neural_pit", "transformer", "orchard_cloud",
+  "foundation_model",
 ];

@@ -33,7 +33,7 @@ html, body {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 18px auto;
   padding: 0 14px 18px;
 }
@@ -313,6 +313,34 @@ h1 {
   padding: 6px 10px;
 }
 
+/* Benchmark rows */
+.benchmark-row {
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.benchmark-row:last-child { border-bottom: 0; }
+
+.benchmark-row.earned {
+  color: #7ec87e;
+}
+
+.benchmark-row.hint {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.benchmark-check {
+  color: #4a7c3f;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.benchmark-lock {
+  color: var(--muted);
+  margin-right: 4px;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -366,4 +394,29 @@ h1 {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Hyperparameter modal */
+.hp-section {
+  margin-top: 14px;
+}
+
+.hp-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.hp-option {
+  display: block;
+  font-size: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.hp-option input[type="radio"] {
+  margin-right: 6px;
 }

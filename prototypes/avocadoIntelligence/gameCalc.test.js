@@ -6,17 +6,22 @@ import {
   calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
   calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
   calcEffectiveBaseProduction,
+  calcBenchmarkBonus, calcHyperparamModifiers,
+  calcDistillationCost, canDistill, calcDistillationBonus,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
 const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
   producers: {
-    sapling:     { baseCost: 10,    costGrowth: 1.15, baseRate: 0.2 },
-    orchard_row: { baseCost: 100,   costGrowth: 1.15, baseRate: 1 },
-    influencer:  { baseCost: 5,     costGrowth: 1.11, baseRate: 0, clickBonus: 0.1 },
-    drone:       { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
-    guac_lab:    { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
+    sapling:         { baseCost: 10,    costGrowth: 1.15, baseRate: 0.2 },
+    orchard_row:     { baseCost: 100,   costGrowth: 1.15, baseRate: 1 },
+    influencer:      { baseCost: 5,     costGrowth: 1.11, baseRate: 0, clickBonus: 0.1 },
+    drone:           { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
+    guac_lab:        { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
+    attention_head:  { baseCost: 800000, costGrowth: 1.15, baseRate: 900 },
+    transformer:     { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000 },
+    foundation_model:{ baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000 },
   },
   guac: {
     baseConsumption: 50,
@@ -43,11 +48,50 @@ const tuning = {
     throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.03 },
     throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", apsPctPerClick: 0.06 },
     throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", apsPctPerClick: 0.10 },
+    attention_focus:    { cost: 2e6,   unlockAt: 5,  producerId: "attention_head", prodMult: 2 },
+    transformer_scale:  { cost: 5e8,   unlockAt: 5,  producerId: "transformer", prodMult: 2 },
+  },
+  benchmarks: {
+    hello_world:      { title: "Hello, World", globalMult: 0.02 },
+    overfitting:      { title: "Overfitting",  clickMult: 0.05 },
+    guac_online:      { title: "Guac Online",  guacProdMult: 0.05 },
+    loss_convergence: { title: "Loss Convergence", guacMult: 0.03 },
+    convergence:      { title: "Convergence",  wisdomMult: 0.05 },
+    no_bonus:         { title: "No Bonus" },
+  },
+  hyperparams: {
+    cooldownMs: 180000,
+    warmupDurationMs: 60000,
+    learningRate: {
+      conservative: { label: "Conservative", apsMult: 1, guacConsumeMult: 1 },
+      aggressive:   { label: "Aggressive", apsMult: 1.3, guacConsumeMult: 1.2 },
+      warmup:       { label: "Warmup", apsMult: 0.85, apsMultAfterWarmup: 1.2 },
+    },
+    batchSize: {
+      small: { label: "Small", apsMult: 1, clickMult: 1 },
+      large: { label: "Large", apsMult: 1.5, clickMult: 0.7 },
+      micro: { label: "Micro", apsMult: 0.8, clickMult: 1.8 },
+    },
+    regularization: {
+      none:         { label: "None" },
+      dropout:      { label: "Dropout", freezeGuacMult: true, wisdomMult: 1.15 },
+      weight_decay: { label: "Weight Decay", costMult: 0.9, globalMult: 0.95 },
+    },
   },
   prestige: {
     unlockThreshold: 1e6,
     divisor: 1000,
     wisdomMultPerPoint: 0.10,
+  },
+  distillation: {
+    costs: [100, 250, 500, 1000, 2000],
+    bonuses: [
+      { apsMult: 1.5, wisdomEarnMult: 1.2, desc: "test" },
+      { baseClickBonus: 1, guacProdMult: 1.3, desc: "test" },
+      { costMult: 0.90, startingWisdom: 2, desc: "test" },
+      { multiplierPerSqrtBonus: 0.02, consumeFloorBonus: -0.05, desc: "test" },
+      { allProdMult: 2.0, unlocksFoundationModel: true, desc: "test" },
+    ],
   },
 };
 
@@ -152,6 +196,14 @@ describe("calcProducerCost", () => {
     expect(calcProducerCost("orchard_row", 0, tuning)).toBe(100);
     expect(calcProducerCost("orchard_row", 5, tuning)).toBe(201);
   });
+
+  it("works for new attention_head producer", () => {
+    expect(calcProducerCost("attention_head", 0, tuning)).toBe(800000);
+  });
+
+  it("works for new transformer producer", () => {
+    expect(calcProducerCost("transformer", 0, tuning)).toBe(150000000);
+  });
 });
 
 describe("calcProducerUnitRate", () => {
@@ -169,6 +221,14 @@ describe("calcProducerUnitRate", () => {
 
   it("applies upgrade to correct producer", () => {
     expect(calcProducerUnitRate("orchard_row", { drip_irrigation: true }, tuning)).toBe(2);
+  });
+
+  it("applies attention_focus to attention_head", () => {
+    expect(calcProducerUnitRate("attention_head", { attention_focus: true }, tuning)).toBe(1800);
+  });
+
+  it("applies transformer_scale to transformer", () => {
+    expect(calcProducerUnitRate("transformer", { transformer_scale: true }, tuning)).toBe(56000);
   });
 });
 
@@ -324,6 +384,12 @@ describe("calcTotalAps", () => {
     // base = 2, wisdom = 2.0, guac = 2.0, total = 2 * 2 * 2 = 8
     expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(8);
   });
+
+  it("applies benchmark global multiplier", () => {
+    const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+    // base = 2, benchmark global = 1 + 0.02 = 1.02, total = 2 * 1.02 = 2.04
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(2.04);
+  });
 });
 
 describe("calcClickPower", () => {
@@ -454,6 +520,13 @@ describe("calcWisdomBonus", () => {
 
   it("returns 1.0 with wisdom_boost but no wisdom points", () => {
     expect(calcWisdomBonus(0, { wisdom_boost: true }, tuning)).toBe(1);
+  });
+
+  it("applies benchmark wisdom effectiveness bonus", () => {
+    // convergence benchmark: wisdomMult = 0.05
+    // mult = 0.10 * 1.05 = 0.105
+    // 1 + 10 * 0.105 = 2.05
+    expect(calcWisdomBonus(10, {}, tuning, { convergence: true })).toBeCloseTo(2.05);
   });
 });
 
@@ -599,5 +672,238 @@ describe("calcGuacProduction — effective tuning", () => {
 
   it("still works with old 2-arg signature", () => {
     expect(calcGuacProduction(10, tuning)).toBe(10);
+  });
+});
+
+// ---------- Benchmark bonus tests ----------
+
+describe("calcBenchmarkBonus", () => {
+  it("returns all-1 multipliers with no benchmarks", () => {
+    const b = calcBenchmarkBonus({}, tuning);
+    expect(b.globalMult).toBe(1);
+    expect(b.clickMult).toBe(1);
+    expect(b.guacProdMult).toBe(1);
+    expect(b.guacMult).toBe(1);
+    expect(b.wisdomMult).toBe(1);
+  });
+
+  it("sums global multiplier from benchmarks", () => {
+    const b = calcBenchmarkBonus({ hello_world: true }, tuning);
+    expect(b.globalMult).toBeCloseTo(1.02);
+  });
+
+  it("sums click multiplier", () => {
+    const b = calcBenchmarkBonus({ overfitting: true }, tuning);
+    expect(b.clickMult).toBeCloseTo(1.05);
+  });
+
+  it("sums guac production multiplier", () => {
+    const b = calcBenchmarkBonus({ guac_online: true }, tuning);
+    expect(b.guacProdMult).toBeCloseTo(1.05);
+  });
+
+  it("sums guac multiplier", () => {
+    const b = calcBenchmarkBonus({ loss_convergence: true }, tuning);
+    expect(b.guacMult).toBeCloseTo(1.03);
+  });
+
+  it("sums wisdom multiplier", () => {
+    const b = calcBenchmarkBonus({ convergence: true }, tuning);
+    expect(b.wisdomMult).toBeCloseTo(1.05);
+  });
+
+  it("ignores benchmarks with no bonus", () => {
+    const b = calcBenchmarkBonus({ no_bonus: true }, tuning);
+    expect(b.globalMult).toBe(1);
+    expect(b.clickMult).toBe(1);
+  });
+
+  it("stacks multiple benchmarks", () => {
+    const b = calcBenchmarkBonus({ hello_world: true, overfitting: true, convergence: true }, tuning);
+    expect(b.globalMult).toBeCloseTo(1.02);
+    expect(b.clickMult).toBeCloseTo(1.05);
+    expect(b.wisdomMult).toBeCloseTo(1.05);
+  });
+});
+
+// ---------- Hyperparameter modifier tests ----------
+
+describe("calcHyperparamModifiers", () => {
+  const defaultHp = { learningRate: "conservative", batchSize: "small", regularization: "none", lastTuneTime: 0, warmupStartTime: 0 };
+
+  it("returns all-neutral with defaults", () => {
+    const m = calcHyperparamModifiers(defaultHp, Date.now(), tuning);
+    expect(m.apsMult).toBe(1);
+    expect(m.clickMult).toBe(1);
+    expect(m.guacConsumeMult).toBe(1);
+    expect(m.wisdomMult).toBe(1);
+    expect(m.costMult).toBe(1);
+    expect(m.globalMult).toBe(1);
+    expect(m.freezeGuacMult).toBe(false);
+  });
+
+  it("returns all-neutral with null hyperparams", () => {
+    const m = calcHyperparamModifiers(null, Date.now(), tuning);
+    expect(m.apsMult).toBe(1);
+  });
+
+  it("aggressive learning rate boosts APS and guac consume", () => {
+    const hp = { ...defaultHp, learningRate: "aggressive" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    expect(m.apsMult).toBeCloseTo(1.3);
+    expect(m.guacConsumeMult).toBeCloseTo(1.2);
+  });
+
+  it("warmup learning rate reduces APS during warmup", () => {
+    const now = Date.now();
+    const hp = { ...defaultHp, learningRate: "warmup", warmupStartTime: now };
+    const m = calcHyperparamModifiers(hp, now + 1000, tuning); // 1s in
+    expect(m.apsMult).toBeCloseTo(0.85);
+  });
+
+  it("warmup learning rate boosts APS after warmup", () => {
+    const now = Date.now();
+    const hp = { ...defaultHp, learningRate: "warmup", warmupStartTime: now - 120000 }; // started 2 min ago
+    const m = calcHyperparamModifiers(hp, now, tuning);
+    expect(m.apsMult).toBeCloseTo(1.2);
+  });
+
+  it("large batch size boosts APS and reduces clicks", () => {
+    const hp = { ...defaultHp, batchSize: "large" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    expect(m.apsMult).toBeCloseTo(1.5);
+    expect(m.clickMult).toBeCloseTo(0.7);
+  });
+
+  it("micro batch size reduces APS and boosts clicks", () => {
+    const hp = { ...defaultHp, batchSize: "micro" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    expect(m.apsMult).toBeCloseTo(0.8);
+    expect(m.clickMult).toBeCloseTo(1.8);
+  });
+
+  it("dropout freezes guac mult and boosts wisdom", () => {
+    const hp = { ...defaultHp, regularization: "dropout" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    expect(m.freezeGuacMult).toBe(true);
+    expect(m.wisdomMult).toBeCloseTo(1.15);
+  });
+
+  it("weight_decay reduces costs and global mult", () => {
+    const hp = { ...defaultHp, regularization: "weight_decay" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    expect(m.costMult).toBeCloseTo(0.9);
+    expect(m.globalMult).toBeCloseTo(0.95);
+  });
+
+  it("stacks learning rate and batch size", () => {
+    const hp = { ...defaultHp, learningRate: "aggressive", batchSize: "large" };
+    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
+    // 1.3 * 1.5 = 1.95
+    expect(m.apsMult).toBeCloseTo(1.95);
+  });
+});
+
+// ---------- Distillation tests ----------
+
+describe("calcDistillationCost", () => {
+  it("returns first cost for distillation 0", () => {
+    expect(calcDistillationCost(0, tuning)).toBe(100);
+  });
+
+  it("returns second cost for distillation 1", () => {
+    expect(calcDistillationCost(1, tuning)).toBe(250);
+  });
+
+  it("returns last cost for distillation 4", () => {
+    expect(calcDistillationCost(4, tuning)).toBe(2000);
+  });
+
+  it("returns Infinity when all distillations are done", () => {
+    expect(calcDistillationCost(5, tuning)).toBe(Infinity);
+  });
+
+  it("returns Infinity with no distillation config", () => {
+    expect(calcDistillationCost(0, {})).toBe(Infinity);
+  });
+});
+
+describe("canDistill", () => {
+  it("returns false when wisdom is insufficient", () => {
+    expect(canDistill(50, 0, tuning)).toBe(false);
+  });
+
+  it("returns true when wisdom meets cost", () => {
+    expect(canDistill(100, 0, tuning)).toBe(true);
+  });
+
+  it("returns true when wisdom exceeds cost", () => {
+    expect(canDistill(200, 0, tuning)).toBe(true);
+  });
+
+  it("uses correct cost for second distillation", () => {
+    expect(canDistill(249, 1, tuning)).toBe(false);
+    expect(canDistill(250, 1, tuning)).toBe(true);
+  });
+
+  it("returns false when all distillations done", () => {
+    expect(canDistill(99999, 5, tuning)).toBe(false);
+  });
+});
+
+describe("calcDistillationBonus", () => {
+  it("returns neutral bonuses at version 0", () => {
+    const b = calcDistillationBonus(0, tuning);
+    expect(b.apsMult).toBe(1);
+    expect(b.clickBaseBonus).toBe(0);
+    expect(b.guacProdMult).toBe(1);
+    expect(b.costMult).toBe(1);
+    expect(b.startingWisdom).toBe(0);
+    expect(b.allProdMult).toBe(1);
+    expect(b.wisdomEarnMult).toBe(1);
+    expect(b.unlocksFoundationModel).toBe(false);
+  });
+
+  it("applies v1.0 bonuses", () => {
+    const b = calcDistillationBonus(1, tuning);
+    expect(b.apsMult).toBeCloseTo(1.5);
+    expect(b.wisdomEarnMult).toBeCloseTo(1.2);
+  });
+
+  it("cumulates v1.0 + v2.0 bonuses", () => {
+    const b = calcDistillationBonus(2, tuning);
+    expect(b.apsMult).toBeCloseTo(1.5);
+    expect(b.clickBaseBonus).toBe(1);
+    expect(b.guacProdMult).toBeCloseTo(1.3);
+  });
+
+  it("cumulates through v3.0", () => {
+    const b = calcDistillationBonus(3, tuning);
+    expect(b.costMult).toBeCloseTo(0.9);
+    expect(b.startingWisdom).toBe(2);
+  });
+
+  it("cumulates through v4.0", () => {
+    const b = calcDistillationBonus(4, tuning);
+    expect(b.multiplierPerSqrtBonus).toBeCloseTo(0.02);
+    expect(b.consumeFloorBonus).toBeCloseTo(-0.05);
+  });
+
+  it("cumulates through v5.0 with foundation model", () => {
+    const b = calcDistillationBonus(5, tuning);
+    expect(b.allProdMult).toBeCloseTo(2.0);
+    expect(b.unlocksFoundationModel).toBe(true);
+  });
+
+  it("returns neutral with no distillation config", () => {
+    const b = calcDistillationBonus(3, {});
+    expect(b.apsMult).toBe(1);
+  });
+
+  it("does not exceed available bonuses", () => {
+    // version 10 but only 5 bonuses defined
+    const b = calcDistillationBonus(10, tuning);
+    expect(b.allProdMult).toBeCloseTo(2.0);
+    expect(b.unlocksFoundationModel).toBe(true);
   });
 });

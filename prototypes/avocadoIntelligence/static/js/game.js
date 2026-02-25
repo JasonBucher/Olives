@@ -3,6 +3,7 @@
 import { TUNING, PRODUCER_ORDER } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
+import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
 
 const STORAGE_PREFIX = "AVO_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -18,6 +19,12 @@ const PERSISTED_STATE_KEYS = [
   "wisdom",
   "wisdomUnlocks",
   "prestigeCount",
+  "benchmarks",
+  "totalWisdomEarned",
+  "hyperparams",
+  "modelVersion",
+  "distillationCount",
+  "totalWisdomSinceLastDistill",
   "meta",
 ];
 
@@ -30,12 +37,25 @@ function createDefaultState() {
 
     producers: {
       sapling: 0, orchard_row: 0, influencer: 0, drone: 0, guac_lab: 0, guac_refinery: 0,
-      exchange: 0, pit_miner: 0, neural_pit: 0, orchard_cloud: 0,
+      exchange: 0, attention_head: 0, pit_miner: 0, neural_pit: 0, transformer: 0, orchard_cloud: 0,
+      foundation_model: 0,
     },
     upgrades: {},
     wisdom: 0,
     wisdomUnlocks: {},
     prestigeCount: 0,
+    benchmarks: {},
+    totalWisdomEarned: 0,
+    hyperparams: {
+      learningRate: "conservative",
+      batchSize: "small",
+      regularization: "none",
+      lastTuneTime: 0,
+      warmupStartTime: 0,
+    },
+    modelVersion: 0,
+    distillationCount: 0,
+    totalWisdomSinceLastDistill: 0,
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
@@ -140,6 +160,14 @@ const prestigeBtn = document.getElementById("prestige-btn");
 // Wisdom Unlocks UI
 const wisdomUnlocksListEl = document.getElementById("wisdom-unlocks-list");
 
+// Distillation UI
+const distillationSection = document.getElementById("distillation-section");
+const distillListEl = document.getElementById("distill-list");
+
+// Benchmarks UI
+const benchmarksListEl = document.getElementById("benchmarks-list");
+const benchmarksCounterEl = document.getElementById("benchmarks-counter");
+
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
 const debugModal = document.getElementById("debug-modal");
@@ -187,6 +215,8 @@ function loadGame() {
       producers: { ...defaults.producers, ...(persisted.producers || {}) },
       upgrades: { ...(persisted.upgrades || {}) },
       wisdomUnlocks: { ...(persisted.wisdomUnlocks || {}) },
+      benchmarks: { ...(persisted.benchmarks || {}) },
+      hyperparams: { ...defaults.hyperparams, ...(persisted.hyperparams || {}) },
       meta: { ...defaults.meta, ...(persisted.meta || {}) },
     };
   } catch (e) {
@@ -316,13 +346,119 @@ function buyWisdomUnlock(id) {
   updateUI();
 }
 
+// --- Distillation Rendering ---
+function renderDistillation() {
+  if (!distillListEl || !distillationSection) return;
+  const mv = state.modelVersion || 0;
+  const dc = state.distillationCount || 0;
+  const maxDistills = TUNING.distillation.costs.length;
+
+  // Show section when player has enough lifetime wisdom to be close, or has distilled before
+  const cost = Calc.calcDistillationCost(dc, TUNING);
+  const wsld = state.totalWisdomSinceLastDistill || 0;
+  const shouldShow = mv > 0 || wsld >= Math.floor(cost * 0.5);
+  distillationSection.style.display = shouldShow ? "" : "none";
+  if (!shouldShow) return;
+
+  distillListEl.innerHTML = "";
+
+  // Current model
+  const headerEl = document.createElement("div");
+  headerEl.className = "row";
+  headerEl.innerHTML = `<div class="label">Current Model</div><div class="value">v${mv}.0</div>`;
+  distillListEl.appendChild(headerEl);
+
+  // Progress to next
+  if (dc < maxDistills) {
+    const progressEl = document.createElement("div");
+    progressEl.className = "row";
+    progressEl.innerHTML = `<div class="label">Wisdom This Cycle</div><div class="value">${wsld} / ${cost}</div>`;
+    distillListEl.appendChild(progressEl);
+
+    const canDo = Calc.canDistill(wsld, dc, TUNING);
+    const btnEl = document.createElement("button");
+    btnEl.className = "btn btn-primary";
+    btnEl.type = "button";
+    btnEl.textContent = "Distill Model";
+    btnEl.disabled = !canDo;
+    btnEl.addEventListener("click", distill);
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "actions";
+    actionsEl.appendChild(btnEl);
+    distillListEl.appendChild(actionsEl);
+  } else {
+    const doneEl = document.createElement("div");
+    doneEl.className = "muted";
+    doneEl.textContent = "Maximum model version reached.";
+    distillListEl.appendChild(doneEl);
+  }
+
+  // Version history
+  const bonuses = TUNING.distillation.bonuses;
+  for (let i = 0; i < bonuses.length; i++) {
+    const b = bonuses[i];
+    const earned = i < mv;
+    const isNext = i === mv && dc < maxDistills;
+    const row = document.createElement("div");
+    row.className = `benchmark-row ${earned ? "earned" : "hint"}`;
+    let prefix = earned ? "\u2713" : (isNext ? "\u2190 next" : "");
+    row.innerHTML = `<strong>v${i + 1}.0</strong> ${prefix ? `<span class="${earned ? "benchmark-check" : "muted"}">${prefix}</span>` : ""} <span class="muted">${b.desc}</span>`;
+    distillListEl.appendChild(row);
+  }
+}
+
+// --- Benchmarks Rendering ---
+function renderBenchmarks() {
+  if (!benchmarksListEl) return;
+  benchmarksListEl.innerHTML = "";
+  const total = BENCHMARK_ORDER.length;
+  let earned = 0;
+  let hintCount = 0;
+
+  for (const id of BENCHMARK_ORDER) {
+    const cfg = TUNING.benchmarks[id];
+    const isEarned = !!state.benchmarks[id];
+    if (isEarned) earned++;
+
+    if (isEarned) {
+      const row = document.createElement("div");
+      row.className = "benchmark-row earned";
+      let bonusText = "";
+      if (cfg.globalMult) bonusText = ` (+${Math.round(cfg.globalMult * 100)}% global)`;
+      if (cfg.clickMult) bonusText = ` (+${Math.round(cfg.clickMult * 100)}% click)`;
+      if (cfg.guacProdMult) bonusText = ` (+${Math.round(cfg.guacProdMult * 100)}% guac prod)`;
+      if (cfg.guacMult) bonusText = ` (+${Math.round(cfg.guacMult * 100)}% guac mult)`;
+      if (cfg.wisdomMult) bonusText = ` (+${Math.round(cfg.wisdomMult * 100)}% wisdom)`;
+      row.innerHTML = `<span class="benchmark-check">\u2713</span> <strong>${cfg.title}</strong>${bonusText}`;
+      benchmarksListEl.appendChild(row);
+    } else if (hintCount < 3) {
+      hintCount++;
+      const row = document.createElement("div");
+      row.className = "benchmark-row hint";
+      row.innerHTML = `<span class="benchmark-lock">?</span> ${cfg.desc}`;
+      benchmarksListEl.appendChild(row);
+    }
+  }
+
+  if (benchmarksCounterEl) {
+    benchmarksCounterEl.textContent = `${earned} / ${total}`;
+  }
+}
+
 // --- UI Update (per tick) ---
 let tickCount = 0;
 
 function updateUI() {
-  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+  aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  const clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
+  clickPower *= hpMods.clickMult * hpMods.globalMult;
+  // Distillation click base bonus + multiplier
+  clickPower += distBonus.clickBaseBonus;
+  clickPower *= distBonus.apsMult * distBonus.allProdMult;
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
   apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -335,7 +471,7 @@ function updateUI() {
   const refineries = state.producers.guac_refinery || 0;
   if (hasGuac) {
     if (labs > 0) {
-      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
+      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
       guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (+${Calc.formatRate(guacPerSec)}/sec)`;
     } else {
       guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (need Guac Labs)`;
@@ -343,7 +479,7 @@ function updateUI() {
   }
 
   // Guac multiplier row — show when guac > 0
-  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING);
+  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
   guacMultRowEl.style.display = state.guacCount > 0 ? "" : "none";
   if (state.guacCount > 0) {
     guacMultEl.textContent = `x${guacMult.toFixed(2)}`;
@@ -356,7 +492,7 @@ function updateUI() {
   }
 
   // Wisdom multiplier row
-  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING);
+  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks);
   wisdomMultRowEl.style.display = state.wisdom > 0 ? "" : "none";
   if (state.wisdom > 0) {
     wisdomMultEl.textContent = `x${wisdomMult.toFixed(2)}`;
@@ -369,13 +505,52 @@ function updateUI() {
     totalMultEl.textContent = `x${(guacMult * wisdomMult).toFixed(2)}`;
   }
 
+  // Model version row — show when distilled
+  const modelRowEl = document.getElementById("model-version-row");
+  if (modelRowEl) {
+    modelRowEl.style.display = (state.modelVersion || 0) > 0 ? "" : "none";
+    const mvEl = document.getElementById("model-version-val");
+    if (mvEl) mvEl.textContent = `v${state.modelVersion || 0}.0`;
+  }
+
+  // Hyperparams row — show when tuned (any non-default)
+  const hpRowEl = document.getElementById("hyperparams-row");
+  if (hpRowEl) {
+    const isDefault = state.hyperparams.learningRate === "conservative"
+      && state.hyperparams.batchSize === "small"
+      && state.hyperparams.regularization === "none";
+    hpRowEl.style.display = (state.prestigeCount >= 1 && !isDefault) ? "" : "none";
+    if (!isDefault) {
+      const hpValEl = document.getElementById("hyperparams-val");
+      if (hpValEl) hpValEl.textContent = `${state.hyperparams.learningRate} / ${state.hyperparams.batchSize} / ${state.hyperparams.regularization}`;
+    }
+  }
+
+  // Tune button visibility
+  const tuneBtn = document.getElementById("tune-btn");
+  if (tuneBtn) {
+    tuneBtn.style.display = state.prestigeCount >= 1 ? "" : "none";
+    const now = Date.now();
+    const elapsed = now - (state.hyperparams.lastTuneTime || 0);
+    const cooldownMs = TUNING.hyperparams.cooldownMs;
+    if (elapsed < cooldownMs) {
+      const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
+      tuneBtn.disabled = true;
+      tuneBtn.textContent = `Tune Hyperparams (${remaining}s)`;
+    } else {
+      tuneBtn.disabled = false;
+      tuneBtn.textContent = "Tune Hyperparams";
+    }
+  }
+
   // Producer rows: update counts, costs, rates, disable state, guac_lab gating
-  const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+  const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
   const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
 
   for (const id of PRODUCER_ORDER) {
     const owned = state.producers[id] || 0;
-    const cost = Calc.calcProducerCost(id, owned, TUNING);
+    let cost = Calc.calcProducerCost(id, owned, TUNING);
+    cost = Math.floor(cost * distBonus.costMult * hpMods.costMult);
     const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
     const canAfford = state.avocadoCount >= cost;
 
@@ -406,6 +581,12 @@ function updateUI() {
       if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
       continue;
     }
+    // Foundation model gating — requires model v5.0
+    if (id === "foundation_model" && !distBonus.unlocksFoundationModel && owned === 0) {
+      if (row) row.style.display = "none";
+      continue;
+    }
+    if (id === "foundation_model" && row) row.style.display = "";
     if (row) row.classList.remove("locked");
     if (descEl) descEl.textContent = TUNING.producers[id].desc;
 
@@ -421,7 +602,7 @@ function updateUI() {
     if (id === "guac_lab" && state.upgrades.guac_unlock) {
       const labCount = owned || 1;
       const consumption = Calc.calcGuacConsumption(labCount, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
-      const guacOut = Calc.calcGuacProduction(labCount, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
+      const guacOut = Calc.calcGuacProduction(labCount, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
       if (owned > 0) {
         rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
       } else {
@@ -550,8 +731,10 @@ function spawnClickEmoji() {
 }
 
 function pickAvocado() {
+  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  const power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
+  power *= hpMods.clickMult * hpMods.globalMult;
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -567,15 +750,68 @@ function pickAvocado() {
   updateUI();
 }
 
+function distill() {
+  if (!Calc.canDistill(state.totalWisdomSinceLastDistill || 0, state.distillationCount || 0, TUNING)) return;
+  if (!confirm("Distill your model? This resets EVERYTHING including wisdom and wisdom unlocks. You gain a permanent Model Version upgrade.")) return;
+
+  const newModelVersion = (state.modelVersion || 0) + 1;
+  const newDistillationCount = (state.distillationCount || 0) + 1;
+  const keptBenchmarks = { ...state.benchmarks };
+  const keptAllTime = state.totalAvocadosAllTime;
+
+  // Full reset
+  const fresh = createDefaultState();
+  state.avocadoCount = 0;
+  state.totalAvocadosThisRun = 0;
+  state.totalAvocadosAllTime = keptAllTime;
+  state.guacCount = 0;
+  state.producers = fresh.producers;
+  state.upgrades = {};
+  state.wisdom = 0;
+  state.wisdomUnlocks = {};
+  state.prestigeCount = 0;
+  state.benchmarks = keptBenchmarks;
+  state.totalWisdomEarned = (state.totalWisdomEarned || 0); // keep lifetime total
+  state.totalWisdomSinceLastDistill = 0;
+  state.hyperparams = fresh.hyperparams;
+  state.modelVersion = newModelVersion;
+  state.distillationCount = newDistillationCount;
+
+  // Apply starting wisdom from new model version
+  const distBonus = Calc.calcDistillationBonus(newModelVersion, TUNING);
+  if (distBonus.startingWisdom > 0) {
+    state.wisdom += distBonus.startingWisdom;
+  }
+
+  // Reset milestones
+  lastMilestoneReached = 0;
+  lastGuacMultMilestone = 1;
+  setResearchTab("research");
+
+  logLine(`Model distilled to v${newModelVersion}.0!`);
+  const bonus = TUNING.distillation.bonuses[newModelVersion - 1];
+  if (bonus) logLine(bonus.flavor);
+
+  saveGame();
+  renderProducerList();
+  renderUpgradeList();
+  renderWisdomUnlocks();
+  renderBenchmarks();
+  renderDistillation();
+  updateUI();
+}
+
 function buyProducer(id) {
   // Guac lab gating — need enough APS to feed the lab
   if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
-    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
     if (currentAps < TUNING.guac.labUnlockAps) return;
   }
 
   const owned = state.producers[id] || 0;
-  const cost = Calc.calcProducerCost(id, owned, TUNING);
+  const hpModsBuy = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
+  const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  const cost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * distBonusBuy.costMult * hpModsBuy.costMult);
   if (state.avocadoCount < cost) return;
 
   state.avocadoCount -= cost;
@@ -601,11 +837,16 @@ function buyUpgrade(id) {
 function prestige() {
   if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING)) return;
 
-  const wisdomGain = Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  let wisdomGain = Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING);
+  wisdomGain = Math.floor(wisdomGain * distBonus.wisdomEarnMult);
   const allTime = state.totalAvocadosAllTime;
   const newWisdom = state.wisdom + wisdomGain;
   const keptWisdomUnlocks = { ...state.wisdomUnlocks };
   const newPrestigeCount = (state.prestigeCount || 0) + 1;
+  const keptBenchmarks = { ...state.benchmarks };
+  const newTotalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
+  const newTotalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + wisdomGain;
 
   // Reset run state
   state.avocadoCount = 0;
@@ -617,6 +858,15 @@ function prestige() {
   state.wisdom = newWisdom;
   state.wisdomUnlocks = keptWisdomUnlocks; // persists through prestige
   state.prestigeCount = newPrestigeCount;
+  state.benchmarks = keptBenchmarks; // benchmarks persist forever
+  state.totalWisdomEarned = newTotalWisdomEarned;
+  state.totalWisdomSinceLastDistill = newTotalWisdomSinceLastDistill;
+  state.hyperparams = createDefaultState().hyperparams;
+  // Distillation state persists through prestige
+  // Apply starting wisdom bonus from distillation
+  if (distBonus.startingWisdom > 0) {
+    state.wisdom += distBonus.startingWisdom;
+  }
 
   // Reset milestones
   lastMilestoneReached = 0;
@@ -643,7 +893,10 @@ function startLoop() {
     last = now;
 
     // Production
-    const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING);
+    const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, now, TUNING);
+    const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+    aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
     if (aps > 0) {
       const produced = aps * dt;
       state.avocadoCount += produced;
@@ -655,12 +908,12 @@ function startLoop() {
     if (state.upgrades.guac_unlock && (state.producers.guac_lab || 0) > 0) {
       const labs = state.producers.guac_lab;
       const refineries = state.producers.guac_refinery || 0;
-      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt;
+      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt * hpMods.guacConsumeMult;
       const actualConsumption = Math.min(desiredConsumption, state.avocadoCount);
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
         // Guac produced proportional to actual vs desired consumption
-        const fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt;
+        const fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks) * dt;
         state.guacCount += desiredConsumption > 0 ? fullGuac * (actualConsumption / desiredConsumption) : 0;
       }
       // Debug log when underfed (throttled to every ~5s)
@@ -671,7 +924,7 @@ function startLoop() {
     }
 
     // Guac multiplier milestones (log every 0.25 increase)
-    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING);
+    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
     const nextMilestone = lastGuacMultMilestone + 0.25;
     if (guacMult >= nextMilestone) {
       lastGuacMultMilestone = Math.floor(guacMult * 4) / 4; // snap to 0.25 grid
@@ -687,6 +940,20 @@ function startLoop() {
           logLine(APS_MILESTONE_MESSAGES[milestone]);
         }
       }
+    }
+
+    // Check benchmarks every 5th tick (~1/s)
+    if (tickCount % 5 === 0) {
+      const newBenchmarks = checkBenchmarks(state, aps);
+      for (const id of newBenchmarks) {
+        state.benchmarks[id] = true;
+        const cfg = TUNING.benchmarks[id];
+        logLine(`Benchmark: ${cfg.title}`);
+      }
+      if (newBenchmarks.length > 0) {
+        renderBenchmarks();
+      }
+      renderDistillation();
     }
 
     // Auto-save every ~5s
@@ -706,6 +973,55 @@ function closeDebug() {
   debugModal.classList.remove("active");
   debugModal.setAttribute("aria-hidden", "true");
 }
+
+// --- Hyperparameter Modal ---
+const hpModal = document.getElementById("hp-modal");
+const hpCloseBtn = document.getElementById("hp-close-btn");
+const hpApplyBtn = document.getElementById("hp-apply-btn");
+const tuneBtn = document.getElementById("tune-btn");
+
+function openHpModal() {
+  // Set radio buttons to current state
+  const lrRadio = hpModal.querySelector(`input[name="hp-lr"][value="${state.hyperparams.learningRate}"]`);
+  const bsRadio = hpModal.querySelector(`input[name="hp-bs"][value="${state.hyperparams.batchSize}"]`);
+  const regRadio = hpModal.querySelector(`input[name="hp-reg"][value="${state.hyperparams.regularization}"]`);
+  if (lrRadio) lrRadio.checked = true;
+  if (bsRadio) bsRadio.checked = true;
+  if (regRadio) regRadio.checked = true;
+  hpModal.classList.add("active");
+  hpModal.setAttribute("aria-hidden", "false");
+}
+
+function closeHpModal() {
+  hpModal.classList.remove("active");
+  hpModal.setAttribute("aria-hidden", "true");
+}
+
+function applyHyperparams() {
+  const lr = hpModal.querySelector('input[name="hp-lr"]:checked').value;
+  const bs = hpModal.querySelector('input[name="hp-bs"]:checked').value;
+  const reg = hpModal.querySelector('input[name="hp-reg"]:checked').value;
+
+  state.hyperparams.learningRate = lr;
+  state.hyperparams.batchSize = bs;
+  state.hyperparams.regularization = reg;
+  state.hyperparams.lastTuneTime = Date.now();
+  if (lr === "warmup") {
+    state.hyperparams.warmupStartTime = Date.now();
+  }
+
+  logLine(`Hyperparams tuned: ${lr} / ${bs} / ${reg}`);
+  closeHpModal();
+  saveGame();
+  updateUI();
+}
+
+if (tuneBtn) tuneBtn.addEventListener("click", openHpModal);
+if (hpCloseBtn) hpCloseBtn.addEventListener("click", closeHpModal);
+if (hpApplyBtn) hpApplyBtn.addEventListener("click", applyHyperparams);
+if (hpModal) hpModal.addEventListener("click", (e) => {
+  if (e.target === hpModal) closeHpModal();
+});
 
 // --- Tab switching ---
 function setResearchTab(tabName) {
@@ -766,9 +1082,22 @@ debugAdd1mAvocadosBtn.addEventListener("click", () => {
 
 debugAddWisdomBtn.addEventListener("click", () => {
   state.wisdom += 10;
+  state.totalWisdomEarned = (state.totalWisdomEarned || 0) + 10;
+  state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + 10;
   saveGame();
+  renderDistillation();
   updateUI();
   logLine("Debug: +10 wisdom");
+});
+
+const debugAdd10bAvocadosBtn = document.getElementById("debug-add-10b-avocados-btn");
+if (debugAdd10bAvocadosBtn) debugAdd10bAvocadosBtn.addEventListener("click", () => {
+  state.avocadoCount += 1e10;
+  state.totalAvocadosThisRun += 1e10;
+  state.totalAvocadosAllTime += 1e10;
+  saveGame();
+  updateUI();
+  logLine("Debug: +10,000,000,000 avocados");
 });
 
 debugModal.addEventListener("click", (e) => {
@@ -780,6 +1109,8 @@ loadGame();
 renderProducerList();
 renderUpgradeList();
 renderWisdomUnlocks();
+renderBenchmarks();
+renderDistillation();
 updateUI();
 startLoop();
 logLine("Avocado Intelligence loaded.");

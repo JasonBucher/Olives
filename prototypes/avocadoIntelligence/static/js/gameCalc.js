@@ -127,7 +127,7 @@ export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, w
 }
 
 /** Calculate guac produced per second at full feed. */
-export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount) {
+export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount, benchmarks) {
   if (labCount <= 0) return 0;
   let exp;
   let base;
@@ -138,12 +138,22 @@ export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, pr
     exp = tuning.guac.produceExponent;
     base = tuning.guac.baseProduction;
   }
-  return base * Math.pow(labCount, exp);
+  let result = base * Math.pow(labCount, exp);
+  if (benchmarks) {
+    const bb = calcBenchmarkBonus(benchmarks, tuning);
+    result *= bb.guacProdMult;
+  }
+  return result;
 }
 
 /** Calculate the guac global multiplier. */
-export function calcGuacMultiplier(guacCount, tuning) {
-  return 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
+export function calcGuacMultiplier(guacCount, tuning, benchmarks) {
+  let mult = 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
+  if (benchmarks) {
+    const bb = calcBenchmarkBonus(benchmarks, tuning);
+    mult = 1 + (mult - 1) * bb.guacMult;
+  }
+  return mult;
 }
 
 /** Calculate base APS (producer rates only, no global/wisdom/guac multipliers). */
@@ -157,7 +167,7 @@ export function calcBaseAps(producers, upgrades, tuning) {
 }
 
 /** Calculate total avocados per second from all producers. */
-export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks) {
   let total = calcBaseAps(producers, upgrades, tuning);
   // Apply global multipliers from upgrades
   let globalMult = 1;
@@ -168,14 +178,19 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning) {
   }
   total *= globalMult;
   // Apply wisdom bonus
-  total *= calcWisdomBonus(wisdom, upgrades, tuning);
+  total *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks);
   // Apply guac multiplier
-  total *= calcGuacMultiplier(guacCount, tuning);
+  total *= calcGuacMultiplier(guacCount, tuning, benchmarks);
+  // Apply benchmark global bonus
+  if (benchmarks) {
+    const bb = calcBenchmarkBonus(benchmarks, tuning);
+    total *= bb.globalMult;
+  }
   return total;
 }
 
 /** Calculate click power (avocados per click). baseAps is pre-multiplier APS. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning) {
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks) {
   let power = tuning.production.baseClickYield;
 
   // Flat click bonus from producers (e.g. influencers)
@@ -213,9 +228,15 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   }
   power *= globalMult;
   // Wisdom bonus
-  power *= calcWisdomBonus(wisdom, upgrades, tuning);
+  power *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks);
   // Guac multiplier
-  power *= calcGuacMultiplier(guacCount, tuning);
+  power *= calcGuacMultiplier(guacCount, tuning, benchmarks);
+  // Benchmark bonuses
+  if (benchmarks) {
+    const bb = calcBenchmarkBonus(benchmarks, tuning);
+    power *= bb.globalMult;
+    power *= bb.clickMult;
+  }
   return power;
 }
 
@@ -226,11 +247,16 @@ export function calcWisdomEarned(totalAvocadosThisRun, tuning) {
 }
 
 /** Calculate the wisdom bonus multiplier. */
-export function calcWisdomBonus(wisdom, upgrades, tuning) {
+export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks) {
   let mult = tuning.prestige.wisdomMultPerPoint;
   // wisdom_boost upgrade increases effectiveness
   if (upgrades.wisdom_boost) {
     mult += tuning.upgrades.wisdom_boost.wisdomMult;
+  }
+  // Benchmark wisdom effectiveness bonus
+  if (benchmarks) {
+    const bb = calcBenchmarkBonus(benchmarks, tuning);
+    mult *= bb.wisdomMult;
   }
   return 1 + wisdom * mult;
 }
@@ -238,4 +264,113 @@ export function calcWisdomBonus(wisdom, upgrades, tuning) {
 /** Check whether the player can prestige based on total avocados earned this run. */
 export function canPrestige(totalAvocadosThisRun, tuning) {
   return totalAvocadosThisRun >= tuning.prestige.unlockThreshold;
+}
+
+/**
+ * Calculate hyperparameter modifiers.
+ * Returns { apsMult, clickMult, guacConsumeMult, wisdomMult, costMult, globalMult, freezeGuacMult }.
+ */
+export function calcHyperparamModifiers(hyperparams, now, tuning) {
+  const result = { apsMult: 1, clickMult: 1, guacConsumeMult: 1, wisdomMult: 1, costMult: 1, globalMult: 1, freezeGuacMult: false };
+  if (!hyperparams || !tuning.hyperparams) return result;
+
+  // Learning Rate
+  const lr = tuning.hyperparams.learningRate[hyperparams.learningRate];
+  if (lr) {
+    if (hyperparams.learningRate === "warmup") {
+      const elapsed = now - (hyperparams.warmupStartTime || 0);
+      if (elapsed < tuning.hyperparams.warmupDurationMs) {
+        result.apsMult *= lr.apsMult; // -15% during warmup
+      } else {
+        result.apsMult *= lr.apsMultAfterWarmup; // +20% after warmup
+      }
+    } else {
+      result.apsMult *= lr.apsMult || 1;
+    }
+    result.guacConsumeMult *= lr.guacConsumeMult || 1;
+  }
+
+  // Batch Size
+  const bs = tuning.hyperparams.batchSize[hyperparams.batchSize];
+  if (bs) {
+    result.apsMult *= bs.apsMult || 1;
+    result.clickMult *= bs.clickMult || 1;
+  }
+
+  // Regularization
+  const reg = tuning.hyperparams.regularization[hyperparams.regularization];
+  if (reg) {
+    if (reg.freezeGuacMult) result.freezeGuacMult = true;
+    result.wisdomMult *= reg.wisdomMult || 1;
+    result.costMult *= reg.costMult || 1;
+    result.globalMult *= reg.globalMult || 1;
+  }
+
+  return result;
+}
+
+/**
+ * Calculate benchmark bonus multipliers from earned benchmarks.
+ * Returns { globalMult, clickMult, guacProdMult, guacMult, wisdomMult }.
+ */
+export function calcBenchmarkBonus(benchmarks, tuning) {
+  const result = { globalMult: 1, clickMult: 1, guacProdMult: 1, guacMult: 1, wisdomMult: 1 };
+  if (!tuning.benchmarks) return result;
+  for (const [id, cfg] of Object.entries(tuning.benchmarks)) {
+    if (!benchmarks[id]) continue;
+    if (cfg.globalMult)   result.globalMult   += cfg.globalMult;
+    if (cfg.clickMult)    result.clickMult    += cfg.clickMult;
+    if (cfg.guacProdMult) result.guacProdMult += cfg.guacProdMult;
+    if (cfg.guacMult)     result.guacMult     += cfg.guacMult;
+    if (cfg.wisdomMult)   result.wisdomMult   += cfg.wisdomMult;
+  }
+  return result;
+}
+
+/**
+ * Calculate the distillation cost (wisdom required) for the next distillation.
+ */
+export function calcDistillationCost(distillationCount, tuning) {
+  if (!tuning.distillation) return Infinity;
+  const costs = tuning.distillation.costs;
+  if (distillationCount >= costs.length) return Infinity;
+  return costs[distillationCount];
+}
+
+/**
+ * Check if the player can distill.
+ */
+export function canDistill(totalWisdomSinceLastDistill, distillationCount, tuning) {
+  const cost = calcDistillationCost(distillationCount, tuning);
+  return totalWisdomSinceLastDistill >= cost;
+}
+
+/**
+ * Calculate cumulative distillation bonuses for a given model version.
+ * Returns { apsMult, clickBaseBonus, guacProdMult, costMult, startingWisdom,
+ *           multiplierPerSqrtBonus, consumeFloorBonus, allProdMult, wisdomEarnMult,
+ *           unlocksFoundationModel }.
+ */
+export function calcDistillationBonus(modelVersion, tuning) {
+  const result = {
+    apsMult: 1, clickBaseBonus: 0, guacProdMult: 1, costMult: 1,
+    startingWisdom: 0, multiplierPerSqrtBonus: 0, consumeFloorBonus: 0,
+    allProdMult: 1, wisdomEarnMult: 1, unlocksFoundationModel: false,
+  };
+  if (!tuning.distillation || modelVersion <= 0) return result;
+  const bonuses = tuning.distillation.bonuses;
+  for (let i = 0; i < Math.min(modelVersion, bonuses.length); i++) {
+    const b = bonuses[i];
+    if (b.apsMult) result.apsMult *= b.apsMult;
+    if (b.baseClickBonus) result.clickBaseBonus += b.baseClickBonus;
+    if (b.guacProdMult) result.guacProdMult *= b.guacProdMult;
+    if (b.costMult) result.costMult *= b.costMult;
+    if (b.startingWisdom) result.startingWisdom += b.startingWisdom;
+    if (b.multiplierPerSqrtBonus) result.multiplierPerSqrtBonus += b.multiplierPerSqrtBonus;
+    if (b.consumeFloorBonus) result.consumeFloorBonus += b.consumeFloorBonus;
+    if (b.allProdMult) result.allProdMult *= b.allProdMult;
+    if (b.wisdomEarnMult) result.wisdomEarnMult *= b.wisdomEarnMult;
+    if (b.unlocksFoundationModel) result.unlocksFoundationModel = true;
+  }
+  return result;
 }

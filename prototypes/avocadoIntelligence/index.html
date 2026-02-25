@@ -73,8 +73,19 @@
               <div class="value"><span id="total-mult">x1.00</span></div>
             </div>
 
+            <div class="row" id="model-version-row" style="display: none;">
+              <div class="label">Model Version</div>
+              <div class="value"><span id="model-version-val">v0.0</span></div>
+            </div>
+
+            <div class="row" id="hyperparams-row" style="display: none;">
+              <div class="label">Hyperparams</div>
+              <div class="value"><span id="hyperparams-val"></span></div>
+            </div>
+
             <div class="actions">
               <button id="pick-avocado-btn" class="btn btn-primary" type="button">Pick Avocado</button>
+              <button id="tune-btn" class="btn" type="button" style="display: none;">Tune Hyperparams</button>
             </div>
           </div>
 
@@ -86,14 +97,27 @@
           <div id="wisdom-unlocks-list" style="margin-top: 8px;"></div>
         </section>
 
+        <section class="section" id="benchmarks-section">
+          <div class="section-title">Benchmarks</div>
+          <div class="muted">AI milestones. Some grant permanent bonuses.</div>
+          <div id="benchmarks-list" style="margin-top: 8px;"></div>
+          <div class="muted" id="benchmarks-counter" style="margin-top: 6px;">0 / 18</div>
+        </section>
+
         <section class="section">
           <div class="section-title">Log</div>
           <div id="log" class="log"></div>
         </section>
       </div>
 
-      <!-- Right Column: Prestige + Research -->
+      <!-- Right Column: Distillation + Prestige + Research -->
       <div class="column">
+        <section class="section" id="distillation-section" style="display: none;">
+          <div class="section-title">Model Distillation</div>
+          <div class="muted">Compress all knowledge into a new model version. Resets everything including wisdom.</div>
+          <div id="distill-list" class="stack" style="margin-top: 8px;"></div>
+        </section>
+
         <section class="section">
           <div class="section-title">Compost Heap</div>
           <div id="prestige-locked" class="muted note">Reach 1M total avocados this run to unlock composting.</div>
@@ -145,11 +169,50 @@
           <button id="debug-add-100k-avocados-btn" class="btn" type="button">+100K Avocados</button>
           <button id="debug-add-1m-avocados-btn" class="btn" type="button">+1M Avocados</button>
           <button id="debug-add-wisdom-btn" class="btn" type="button">+10 Wisdom</button>
+          <button id="debug-add-10b-avocados-btn" class="btn" type="button">+10B Avocados</button>
         </div>
 
         <hr class="divider" />
 
         <button id="debug-reset-btn" class="btn btn-danger" type="button">Reset Game State</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hyperparameter Tuning Modal -->
+  <div id="hp-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Hyperparameter Tuning</div>
+        <button id="hp-close-btn" class="btn btn-quiet" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="muted">Adjust parameters. Effects last until next prestige or next tune.</div>
+
+        <div class="hp-section">
+          <div class="hp-label">Learning Rate</div>
+          <label class="hp-option"><input type="radio" name="hp-lr" value="conservative" checked> <strong>Conservative</strong> — No change.</label>
+          <label class="hp-option"><input type="radio" name="hp-lr" value="aggressive"> <strong>Aggressive</strong> — +30% APS, +20% guac consumption.</label>
+          <label class="hp-option"><input type="radio" name="hp-lr" value="warmup"> <strong>Warmup</strong> — -15% APS for 60s, then +20% APS.</label>
+        </div>
+
+        <div class="hp-section">
+          <div class="hp-label">Batch Size</div>
+          <label class="hp-option"><input type="radio" name="hp-bs" value="small" checked> <strong>Small</strong> — No change.</label>
+          <label class="hp-option"><input type="radio" name="hp-bs" value="large"> <strong>Large</strong> — +50% passive APS, -30% click power.</label>
+          <label class="hp-option"><input type="radio" name="hp-bs" value="micro"> <strong>Micro</strong> — -20% passive APS, +80% click power.</label>
+        </div>
+
+        <div class="hp-section">
+          <div class="hp-label">Regularization</div>
+          <label class="hp-option"><input type="radio" name="hp-reg" value="none" checked> <strong>None</strong> — No change.</label>
+          <label class="hp-option"><input type="radio" name="hp-reg" value="dropout"> <strong>Dropout</strong> — Guac mult frozen, +15% wisdom earned.</label>
+          <label class="hp-option"><input type="radio" name="hp-reg" value="weight_decay"> <strong>Weight Decay</strong> — Costs -10%, -5% global multiplier.</label>
+        </div>
+
+        <div class="actions">
+          <button id="hp-apply-btn" class="btn btn-primary" type="button">Apply</button>
+        </div>
       </div>
     </div>
   </div>

@@ -60,4 +60,6 @@ export const INVESTMENTS = [
   makeUpgrade("throughput_click_1"),
   makeUpgrade("throughput_click_2"),
   makeUpgrade("throughput_click_3"),
+  makeUpgrade("attention_focus"),
+  makeUpgrade("transformer_scale"),
 ];
