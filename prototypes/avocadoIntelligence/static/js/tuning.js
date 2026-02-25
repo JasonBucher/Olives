@@ -9,18 +9,29 @@ export const TUNING = {
   },
 
   producers: {
-    sapling:       { baseCost: 10,     costGrowth: 1.15, baseRate: 0.2,    title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
-    orchard_row:   { baseCost: 100,    costGrowth: 1.15, baseRate: 1,      title: "Orchard Row",        desc: "Now we're farming." },
-    influencer:    { baseCost: 5,      costGrowth: 1.11, baseRate: 0, clickBonus: 0.1, title: "Avocado Influencer", desc: "Posts reel. Gets clicks. +0.1 click power each." },
-    drone:         { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
-    guac_lab:      { baseCost: 12000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
-    guac_refinery: { baseCost: 50000,  costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
-    exchange:       { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
-    attention_head: { baseCost: 800000, costGrowth: 1.15, baseRate: 900,    title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
-    pit_miner:      { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400,   title: "Pit Miner",          desc: "Extracting data from pits." },
-    neural_pit:     { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800,   title: "Neural Pit Network", desc: "The pits are thinking." },
-    transformer:    { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000,  title: "Transformer Core",   desc: "Self-attention over the entire orchard. Context window: unlimited avocados." },
+    sapling:          { baseCost: 10,     costGrowth: 1.15, baseRate: 0.2,    title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
+    seed_bank:        { baseCost: 35,     costGrowth: 1.15, baseRate: 0.5,    title: "Seed Bank",          desc: "Stores genetic potential. Grows interest." },
+    orchard_row:      { baseCost: 100,    costGrowth: 1.15, baseRate: 1,      title: "Orchard Row",        desc: "Now we're farming." },
+    compost_bin:      { baseCost: 400,    costGrowth: 1.15, baseRate: 3,      title: "Compost Bin",        desc: "Garbage in, fertilizer out. Nature's neural net." },
+    drone:            { baseCost: 1100,   costGrowth: 1.15, baseRate: 8,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
+    greenhouse:       { baseCost: 4000,   costGrowth: 1.15, baseRate: 18,     title: "Greenhouse",         desc: "Controlled environment. Uncontrolled ambitions." },
+    harvest_bot:      { baseCost: 45000,  costGrowth: 1.15, baseRate: 80,     title: "Harvest Bot",        desc: "Picks faster than you. Doesn't need lunch." },
+    guac_lab:         { baseCost: 12000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
+    guac_refinery:    { baseCost: 50000,  costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
+    guac_centrifuge:  { baseCost: 200000, costGrowth: 1.15, baseRate: 0,      title: "Guac Centrifuge",    desc: "Spins faster. Separates more. Consumes less." },
+    exchange:         { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
+    data_grove:       { baseCost: 350000, costGrowth: 1.15, baseRate: 450,    title: "Data Grove",         desc: "Every tree is a data point. The forest is the model." },
+    attention_head:   { baseCost: 800000, costGrowth: 1.15, baseRate: 900,    title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
+    pit_miner:        { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400,   title: "Pit Miner",          desc: "Extracting data from pits." },
+    gpu_cluster:      { baseCost: 5e6,    costGrowth: 1.15, baseRate: 2800,   title: "GPU Cluster",        desc: "Training on avocado data. 8xH100s. Still not enough.", minPrestigeCount: 2 },
+    neural_pit:       { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800,   title: "Neural Pit Network", desc: "The pits are thinking." },
+    synth_orchard:    { baseCost: 3e7,    costGrowth: 1.15, baseRate: 11000,  title: "Synthetic Orchard",  desc: "Lab-grown trees. Real avocados. Nobody can tell.", minPrestigeCount: 4 },
+    transformer:      { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000,  title: "Transformer Core",   desc: "Self-attention over the entire orchard. Context window: unlimited avocados." },
     orchard_cloud:    { baseCost: 3.3e8,  costGrowth: 1.15, baseRate: 44000,  title: "Orchard Cloud",      desc: "Avocados-as-a-Service. AaaS." },
+    quantum_grove:    { baseCost: 5e8,    costGrowth: 1.15, baseRate: 55000,  title: "Quantum Grove",      desc: "The avocados exist in superposition until picked.", minPrestigeCount: 7 },
+    agi_nexus:        { baseCost: 5e9,    costGrowth: 1.15, baseRate: 180000, title: "AGI Nexus",          desc: "It understands avocados. Truly understands them.", minPrestigeCount: 10 },
+    dyson_orchard:    { baseCost: 8e10,   costGrowth: 1.15, baseRate: 600000, title: "Dyson Orchard",      desc: "Harvesting the energy of a star. For avocados.", minPrestigeCount: 14 },
+    omega_harvest:    { baseCost: 1e12,   costGrowth: 1.15, baseRate: 2500000, title: "Omega Harvest",     desc: "The final harvest. Or is it?", minPrestigeCount: 18 },
     foundation_model: { baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000, title: "Foundation Model",   desc: "It learned everything. From avocados. Somehow that was enough." },
   },
 
@@ -52,11 +63,21 @@ export const TUNING = {
     exponential_ripen:  { cost: 500000,  guacUnlockAt: 100, produceExpDelta: +0.10,  title: "Exponential Ripening",   desc: "Guac output scaling +0.10" },
     concentrate_proto:  { cost: 75000,   unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5, title: "Concentrate Protocol",  desc: "Base guac output x1.5" },
     // Throughput Clicking chain — scales clicks with base APS (before multipliers)
-    throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.03, title: "Throughput Clicking I",   desc: "Each click also adds 3% of your base APS." },
-    throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.06, title: "Throughput Clicking II",  desc: "Each click also adds 6% of your base APS." },
-    throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.10, title: "Throughput Clicking III", desc: "Each click also adds 10% of your base APS." },
+    throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03, title: "Throughput Clicking I",   desc: "Each click also adds 3% of your base APS." },
+    throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.06, title: "Throughput Clicking II",  desc: "Each click also adds 6% of your base APS." },
+    throughput_click_3: { cost: 50000, apsUnlockAt: 100, requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.10, title: "Throughput Clicking III", desc: "Each click also adds 10% of your base APS." },
+    dark_pool:         { cost: 650000, unlockAt: 5,  producerId: "exchange",       prodMult: 2, title: "Dark Pool Access",       desc: "Avocado Exchanges produce 2x" },
+    pit_optimization:  { cost: 7e6,   unlockAt: 5,  producerId: "pit_miner",      prodMult: 2, title: "Pit Optimization",       desc: "Pit Miners produce 2x" },
     attention_focus:   { cost: 2e6,   unlockAt: 5,  producerId: "attention_head", prodMult: 2, title: "Multi-Head Attention",  desc: "Attention Heads produce 2x" },
     transformer_scale: { cost: 5e8,   unlockAt: 5,  producerId: "transformer",    prodMult: 2, title: "Scaling Laws",          desc: "Transformer Cores produce 2x" },
+    // New producer upgrades
+    seed_catalog:      { cost: 500,     unlockAt: 10, producerId: "seed_bank",   prodMult: 2, title: "Seed Catalog",       desc: "Seed Banks produce 2x" },
+    hot_compost:       { cost: 3000,    unlockAt: 5,  producerId: "compost_bin", prodMult: 2, title: "Hot Composting",      desc: "Compost Bins produce 2x" },
+    climate_control:   { cost: 25000,   unlockAt: 5,  producerId: "greenhouse",  prodMult: 2, title: "Climate Control",     desc: "Greenhouses produce 2x" },
+    harvest_fleet:     { cost: 250000,  unlockAt: 5,  producerId: "harvest_bot", prodMult: 2, title: "Harvest Fleet",       desc: "Harvest Bots produce 2x" },
+    data_lake:         { cost: 1.5e6,   unlockAt: 5,  producerId: "data_grove",  prodMult: 2, title: "Data Lake",           desc: "Data Groves produce 2x" },
+    gpu_overclock:     { cost: 2e7,     unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2, title: "GPU Overclocking",    desc: "GPU Clusters produce 2x" },
+    global_boost_3:    { cost: 5e7,     unlockAt: 0,  globalMult: 2, title: "Distributed Training", desc: "All production 2x" },
   },
 
   wisdomUnlocks: {
@@ -107,9 +128,16 @@ export const TUNING = {
   },
 
   prestige: {
-    unlockThreshold: 1e6,         // total avocados this run to unlock prestige
+    unlockThreshold: 1e7,         // total avocados this run to unlock prestige
     divisor: 1000,                // wisdom = floor(sqrt(total) / divisor)
     wisdomMultPerPoint: 0.10,     // +10% per wisdom point
+  },
+
+  reveal: {
+    costThreshold: 0.6,           // reveal when player has >= 60% of cost
+    producerLookahead: 2,         // max unowned standard producers visible
+    guacProducerLookahead: 1,     // max unowned guac producers visible
+    upgradeLookahead: 3,          // max unowned research upgrades visible
   },
 
   distillation: {
@@ -124,8 +152,15 @@ export const TUNING = {
   },
 };
 
+// Standard producers — middle column
 export const PRODUCER_ORDER = [
-  "influencer", "sapling", "orchard_row", "drone", "guac_lab", "guac_refinery",
-  "exchange", "attention_head", "pit_miner", "neural_pit", "transformer", "orchard_cloud",
-  "foundation_model",
+  "sapling", "seed_bank", "orchard_row", "compost_bin", "drone",
+  "greenhouse", "harvest_bot", "exchange", "data_grove",
+  "attention_head", "pit_miner", "gpu_cluster",
+  "neural_pit", "synth_orchard", "transformer",
+  "orchard_cloud", "quantum_grove", "agi_nexus",
+  "dyson_orchard", "omega_harvest", "foundation_model",
 ];
+
+// Guac producers — left column, own section
+export const GUAC_PRODUCER_ORDER = ["guac_lab", "guac_refinery", "guac_centrifuge"];

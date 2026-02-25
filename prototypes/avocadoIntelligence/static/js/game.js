@@ -1,6 +1,6 @@
 // Avocado Intelligence — main game loop and state
 
-import { TUNING, PRODUCER_ORDER } from "./tuning.js";
+import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
 import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
@@ -29,17 +29,17 @@ const PERSISTED_STATE_KEYS = [
 ];
 
 function createDefaultState() {
+  const producers = {};
+  for (const id of [...PRODUCER_ORDER, ...GUAC_PRODUCER_ORDER]) {
+    producers[id] = 0;
+  }
   return {
     avocadoCount: 0,
     totalAvocadosThisRun: 0,
     totalAvocadosAllTime: 0,
     guacCount: 0,
 
-    producers: {
-      sapling: 0, orchard_row: 0, influencer: 0, drone: 0, guac_lab: 0, guac_refinery: 0,
-      exchange: 0, attention_head: 0, pit_miner: 0, neural_pit: 0, transformer: 0, orchard_cloud: 0,
-      foundation_model: 0,
-    },
+    producers,
     upgrades: {},
     wisdom: 0,
     wisdomUnlocks: {},
@@ -90,6 +90,10 @@ let mainLoopInterval = null;
 
 // --- Game State ---
 let state = createDefaultState();
+
+// --- Revealed tracking (session-only, not persisted) ---
+const revealedProducers = new Set();
+const revealedUpgrades = new Set();
 
 // --- APS milestone tracking ---
 const APS_MILESTONES = [1, 10, 100, 1000, 10000, 100000];
@@ -147,6 +151,8 @@ const logEl = document.getElementById("log");
 
 const pickAvocadoBtn = document.getElementById("pick-avocado-btn");
 const producersListEl = document.getElementById("producers-list");
+const guacProducersListEl = document.getElementById("guac-producers-list");
+const guacSectionEl = document.getElementById("guac-section");
 const upgradesListEl = document.getElementById("upgrades-list");
 const upgradesOwnedListEl = document.getElementById("upgrades-owned-list");
 
@@ -157,12 +163,14 @@ const wisdomPreviewEl = document.getElementById("wisdom-preview");
 const totalAvocadosRunEl = document.getElementById("total-avocados-run");
 const prestigeBtn = document.getElementById("prestige-btn");
 
-// Wisdom Unlocks UI
-const wisdomUnlocksListEl = document.getElementById("wisdom-unlocks-list");
+// Prestige Overlay UI
+const prestigeOverlay = document.getElementById("prestige-overlay");
+const prestigeSummaryEl = document.getElementById("prestige-summary");
+const prestigeWisdomUnlocksEl = document.getElementById("prestige-wisdom-unlocks");
+const prestigeRebornBtn = document.getElementById("prestige-reborn-btn");
 
-// Distillation UI
-const distillationSection = document.getElementById("distillation-section");
-const distillListEl = document.getElementById("distill-list");
+// Distillation UI (inside prestige overlay)
+const prestigeDistillationEl = document.getElementById("prestige-distillation");
 
 // Benchmarks UI
 const benchmarksListEl = document.getElementById("benchmarks-list");
@@ -253,9 +261,9 @@ function recordClick() {
 }
 
 // --- Dynamic UI rendering ---
-function renderProducerList() {
-  producersListEl.innerHTML = "";
-  for (const id of PRODUCER_ORDER) {
+function renderProducerRows(listEl, order) {
+  listEl.innerHTML = "";
+  for (const id of order) {
     const cfg = TUNING.producers[id];
     const row = document.createElement("div");
     row.className = "producer-row";
@@ -272,14 +280,22 @@ function renderProducerList() {
       </div>
       <div class="producer-rate muted" data-rate="${id}"></div>
     `;
-    producersListEl.appendChild(row);
+    listEl.appendChild(row);
   }
 
   // Wire buy buttons
-  producersListEl.addEventListener("click", (e) => {
+  listEl.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-buy]");
     if (btn) buyProducer(btn.dataset.buy);
   });
+}
+
+function renderProducerList() {
+  renderProducerRows(producersListEl, PRODUCER_ORDER);
+}
+
+function renderGuacProducerList() {
+  renderProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER);
 }
 
 function renderUpgradeList() {
@@ -308,31 +324,7 @@ function renderUpgradeList() {
   });
 }
 
-function renderWisdomUnlocks() {
-  if (!wisdomUnlocksListEl) return;
-  wisdomUnlocksListEl.innerHTML = "";
-  for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
-    const row = document.createElement("div");
-    row.className = "upgrade-row";
-    row.dataset.wid = id;
-    row.innerHTML = `
-      <div class="upgrade-info">
-        <div class="upgrade-title">${cfg.title}</div>
-        <div class="upgrade-desc">${cfg.desc}</div>
-      </div>
-      <button class="btn upgrade-buy" data-wbuy="${id}" type="button">
-        ${cfg.wisdomCost} Wisdom
-      </button>
-    `;
-    wisdomUnlocksListEl.appendChild(row);
-  }
-
-  wisdomUnlocksListEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-wbuy]");
-    if (btn) buyWisdomUnlock(btn.dataset.wbuy);
-  });
-}
-
+// --- Wisdom Unlock Purchasing (used in prestige overlay) ---
 function buyWisdomUnlock(id) {
   const cfg = TUNING.wisdomUnlocks[id];
   if (!cfg) return;
@@ -346,51 +338,69 @@ function buyWisdomUnlock(id) {
   updateUI();
 }
 
-// --- Distillation Rendering ---
+// --- Distillation Rendering (inside prestige overlay) ---
 function renderDistillation() {
-  if (!distillListEl || !distillationSection) return;
+  if (!prestigeDistillationEl) return;
   const mv = state.modelVersion || 0;
   const dc = state.distillationCount || 0;
   const maxDistills = TUNING.distillation.costs.length;
 
-  // Show section when player has enough lifetime wisdom to be close, or has distilled before
+  // Compute wisdom that will be available after prestige (including the gain from this compost)
+  const wsld = (state.totalWisdomSinceLastDistill || 0) + overlayWisdomGain;
   const cost = Calc.calcDistillationCost(dc, TUNING);
-  const wsld = state.totalWisdomSinceLastDistill || 0;
   const shouldShow = mv > 0 || wsld >= Math.floor(cost * 0.5);
-  distillationSection.style.display = shouldShow ? "" : "none";
-  if (!shouldShow) return;
 
-  distillListEl.innerHTML = "";
+  const blockEl = document.getElementById("prestige-distillation-block");
+  prestigeDistillationEl.innerHTML = "";
+  if (!shouldShow) {
+    if (blockEl) blockEl.style.display = "none";
+    return;
+  }
+  if (blockEl) blockEl.style.display = "";
+
+  const descEl = document.createElement("div");
+  descEl.className = "muted";
+  descEl.textContent = "Compress all knowledge into a new model version. Resets everything including wisdom.";
+  prestigeDistillationEl.appendChild(descEl);
 
   // Current model
   const headerEl = document.createElement("div");
   headerEl.className = "row";
   headerEl.innerHTML = `<div class="label">Current Model</div><div class="value">v${mv}.0</div>`;
-  distillListEl.appendChild(headerEl);
+  prestigeDistillationEl.appendChild(headerEl);
 
   // Progress to next
   if (dc < maxDistills) {
     const progressEl = document.createElement("div");
     progressEl.className = "row";
-    progressEl.innerHTML = `<div class="label">Wisdom This Cycle</div><div class="value">${wsld} / ${cost}</div>`;
-    distillListEl.appendChild(progressEl);
+    progressEl.innerHTML = `<div class="label">Wisdom This Cycle (after compost)</div><div class="value">${wsld} / ${cost}</div>`;
+    prestigeDistillationEl.appendChild(progressEl);
 
-    const canDo = Calc.canDistill(wsld, dc, TUNING);
+    const canDo = wsld >= cost;
     const btnEl = document.createElement("button");
-    btnEl.className = "btn btn-primary";
+    btnEl.className = "btn btn-danger";
     btnEl.type = "button";
-    btnEl.textContent = "Distill Model";
+    btnEl.textContent = "Compost & Distill";
     btnEl.disabled = !canDo;
-    btnEl.addEventListener("click", distill);
+    btnEl.addEventListener("click", () => {
+      confirmPrestigeAndDistill();
+    });
     const actionsEl = document.createElement("div");
     actionsEl.className = "actions";
     actionsEl.appendChild(btnEl);
-    distillListEl.appendChild(actionsEl);
+    prestigeDistillationEl.appendChild(actionsEl);
+    if (canDo) {
+      const warnEl = document.createElement("div");
+      warnEl.className = "muted";
+      warnEl.style.marginTop = "4px";
+      warnEl.textContent = "Warning: This will compost AND distill, resetting everything including wisdom and wisdom unlocks.";
+      prestigeDistillationEl.appendChild(warnEl);
+    }
   } else {
     const doneEl = document.createElement("div");
     doneEl.className = "muted";
     doneEl.textContent = "Maximum model version reached.";
-    distillListEl.appendChild(doneEl);
+    prestigeDistillationEl.appendChild(doneEl);
   }
 
   // Version history
@@ -403,7 +413,7 @@ function renderDistillation() {
     row.className = `benchmark-row ${earned ? "earned" : "hint"}`;
     let prefix = earned ? "\u2713" : (isNext ? "\u2190 next" : "");
     row.innerHTML = `<strong>v${i + 1}.0</strong> ${prefix ? `<span class="${earned ? "benchmark-check" : "muted"}">${prefix}</span>` : ""} <span class="muted">${b.desc}</span>`;
-    distillListEl.appendChild(row);
+    prestigeDistillationEl.appendChild(row);
   }
 }
 
@@ -469,6 +479,7 @@ function updateUI() {
   guacRowEl.style.display = hasGuac ? "" : "none";
   const labs = state.producers.guac_lab || 0;
   const refineries = state.producers.guac_refinery || 0;
+  const centrifuges = state.producers.guac_centrifuge || 0;
   if (hasGuac) {
     if (labs > 0) {
       const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
@@ -543,101 +554,39 @@ function updateUI() {
     }
   }
 
-  // Producer rows: update counts, costs, rates, disable state, guac_lab gating
-  const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
-  const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
-
-  for (const id of PRODUCER_ORDER) {
-    const owned = state.producers[id] || 0;
-    let cost = Calc.calcProducerCost(id, owned, TUNING);
-    cost = Math.floor(cost * distBonus.costMult * hpMods.costMult);
-    const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
-    const canAfford = state.avocadoCount >= cost;
-
-    const row = producersListEl.querySelector(`[data-id="${id}"]`);
-    const countEl = producersListEl.querySelector(`[data-count="${id}"]`);
-    const costEl = producersListEl.querySelector(`[data-cost="${id}"]`);
-    const rateEl = producersListEl.querySelector(`[data-rate="${id}"]`);
-    const buyBtn = producersListEl.querySelector(`[data-buy="${id}"]`);
-    const descEl = producersListEl.querySelector(`[data-desc="${id}"]`);
-
-    // Guac lab gating
-    if (id === "guac_lab" && !guacLabUnlocked && owned === 0) {
-      if (row) row.classList.add("locked");
-      if (descEl) descEl.textContent = `Requires ${TUNING.guac.labUnlockAps} avocados/sec to unlock.`;
-      if (buyBtn) buyBtn.disabled = true;
-      if (rateEl) rateEl.textContent = "";
-      if (countEl) countEl.textContent = "";
-      if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
-      continue;
-    }
-    // Guac refinery gating — need at least 1 guac_lab
-    if (id === "guac_refinery" && (state.producers.guac_lab || 0) === 0 && owned === 0) {
-      if (row) row.classList.add("locked");
-      if (descEl) descEl.textContent = "Requires at least 1 Guacamole Lab.";
-      if (buyBtn) buyBtn.disabled = true;
-      if (rateEl) rateEl.textContent = "";
-      if (countEl) countEl.textContent = "";
-      if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
-      continue;
-    }
-    // Foundation model gating — requires model v5.0
-    if (id === "foundation_model" && !distBonus.unlocksFoundationModel && owned === 0) {
-      if (row) row.style.display = "none";
-      continue;
-    }
-    if (id === "foundation_model" && row) row.style.display = "";
-    if (row) row.classList.remove("locked");
-    if (descEl) descEl.textContent = TUNING.producers[id].desc;
-
-    if (countEl) countEl.textContent = owned > 0 ? `(${owned} owned)` : "";
-    if (costEl) costEl.textContent = Calc.formatNumber(cost);
-    let rateText;
-    if (owned > 0) {
-      rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
-    } else {
-      rateText = `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
-    }
-    // Show guac conversion info on guac_lab rows
-    if (id === "guac_lab" && state.upgrades.guac_unlock) {
-      const labCount = owned || 1;
-      const consumption = Calc.calcGuacConsumption(labCount, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
-      const guacOut = Calc.calcGuacProduction(labCount, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
-      if (owned > 0) {
-        rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
-      } else {
-        rateText += ` | Also converts avocados \u2192 guac`;
-      }
-    }
-    // Show click bonus on influencer rows
-    if (id === "influencer") {
-      const clickBonus = TUNING.producers.influencer.clickBonus;
-      rateText = owned > 0
-        ? `+${Calc.formatRate(clickBonus * owned)} click power (${Calc.formatRate(clickBonus)} each)`
-        : `Each adds +${Calc.formatRate(clickBonus)} click power`;
-    }
-    // Show refinery effect on guac_refinery rows
-    if (id === "guac_refinery") {
-      const effExp = Calc.calcEffectiveConsumeExponent(owned, state.upgrades, state.wisdomUnlocks, state.prestigeCount, TUNING);
-      rateText = owned > 0
-        ? `Consume exponent: ${effExp.toFixed(2)} (base ${TUNING.guac.consumeExponent})`
-        : `Each refinery lowers consume exponent by 0.01`;
-    }
-    if (rateEl) rateEl.textContent = rateText;
-    if (buyBtn) buyBtn.disabled = !canAfford;
+  // Guac section visibility — show when guac is unlocked
+  if (guacSectionEl) {
+    guacSectionEl.style.display = hasGuac ? "" : "none";
   }
 
-  // Upgrade rows: move between Research / Owned tabs
+  // Current APS for gating
+  const currentAps = aps;
+  const ctx = { currentAps };
+
+  // Guac lab unlock gating
+  const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
+
+  // --- Standard producer rows ---
+  updateProducerRows(producersListEl, PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.producerLookahead);
+
+  // --- Guac producer rows ---
+  updateProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.guacProducerLookahead);
+
+  // Upgrade rows: move between Research / Owned tabs (with lookahead + threshold)
+  const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
+  const upgradeCostThreshold = TUNING.reveal.costThreshold;
+  let upgradeLookaheadUsed = 0;
+  let firstEligibleUpgradeSeen = false;
+
   for (const inv of INVESTMENTS) {
     const row = upgradesListEl.querySelector(`[data-id="${inv.id}"]`)
              || upgradesOwnedListEl.querySelector(`[data-id="${inv.id}"]`);
     if (!row) continue;
 
-    const unlocked = inv.isUnlocked(state);
     const owned = inv.isOwned(state);
 
+    // 1. Owned: move to Owned tab, no lookahead consumed
     if (owned) {
-      // Move to owned list if not already there
       if (row.parentNode !== upgradesOwnedListEl) {
         row.classList.add("owned");
         const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
@@ -645,32 +594,64 @@ function updateUI() {
         upgradesOwnedListEl.appendChild(row);
       }
       row.style.display = "";
-    } else {
-      // Move back to research list if needed (e.g. after prestige)
-      if (row.parentNode !== upgradesListEl) {
-        row.classList.remove("owned");
-        // Restore buy button
-        const info = row.querySelector(".upgrade-info");
-        if (!row.querySelector(`[data-upgrade="${inv.id}"]`) && info) {
-          const btn = document.createElement("button");
-          btn.className = "btn upgrade-buy";
-          btn.dataset.upgrade = inv.id;
-          btn.type = "button";
-          btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
-          row.appendChild(btn);
-        }
-        upgradesListEl.appendChild(row);
+      continue;
+    }
+
+    // Move back to research list if needed (e.g. after prestige)
+    if (row.parentNode !== upgradesListEl) {
+      row.classList.remove("owned");
+      const info = row.querySelector(".upgrade-info");
+      if (!row.querySelector(`[data-upgrade="${inv.id}"]`) && info) {
+        const btn = document.createElement("button");
+        btn.className = "btn upgrade-buy";
+        btn.dataset.upgrade = inv.id;
+        btn.type = "button";
+        btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
+        row.appendChild(btn);
       }
-      row.style.display = unlocked ? "" : "none";
-      const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
-      if (btn) {
-        btn.disabled = !inv.canPurchase(state);
-        const costEl = btn.querySelector(`[data-ucost="${inv.id}"]`);
-        if (costEl) {
-          costEl.textContent = Calc.formatNumber(inv.cost());
-        } else {
-          btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(inv.cost())}</span>`;
-        }
+      upgradesListEl.appendChild(row);
+    }
+
+    // 2. isUnlocked gate: fails and not already revealed → hidden, no slot consumed
+    const unlocked = inv.isUnlocked(state, ctx);
+    if (!unlocked && !revealedUpgrades.has(inv.id)) {
+      row.style.display = "none";
+      continue;
+    }
+
+    // 3. Lookahead check: if at limit and not already revealed → hidden
+    if (upgradeLookaheadUsed >= upgradeLookaheadLimit && !revealedUpgrades.has(inv.id)) {
+      row.style.display = "none";
+      continue;
+    }
+
+    // 4. Consume a lookahead slot
+    upgradeLookaheadUsed++;
+
+    // 5. Threshold check: first eligible always visible; others need >= costThreshold
+    const upgradeCost = inv.cost();
+    if (!firstEligibleUpgradeSeen) {
+      firstEligibleUpgradeSeen = true;
+      revealedUpgrades.add(inv.id);
+    } else if (state.avocadoCount >= upgradeCost * upgradeCostThreshold) {
+      revealedUpgrades.add(inv.id);
+    }
+
+    // 6. If revealed → show; otherwise hidden (slot consumed)
+    if (!revealedUpgrades.has(inv.id)) {
+      row.style.display = "none";
+      continue;
+    }
+
+    row.style.display = "";
+    const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
+    if (btn) {
+      btn.disabled = !inv.canPurchase(state);
+      const costEl = btn.querySelector(`[data-ucost="${inv.id}"]`);
+      if (costEl) {
+        costEl.textContent = Calc.formatNumber(upgradeCost);
+      } else {
+        btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(upgradeCost)}</span>`;
       }
     }
   }
@@ -687,30 +668,132 @@ function updateUI() {
     prestigeLockedEl.style.display = "";
     prestigeUnlockedEl.style.display = "none";
   }
+}
 
-  // Wisdom unlocks section — show when player has wisdom
-  if (wisdomUnlocksListEl) {
-    const wisdomUnlocksSection = wisdomUnlocksListEl.closest(".section");
-    if (wisdomUnlocksSection) {
-      wisdomUnlocksSection.style.display = state.wisdom > 0 || Object.keys(state.wisdomUnlocks).length > 0 ? "" : "none";
+function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLabUnlocked, lookaheadLimit) {
+  const refineries = state.producers.guac_refinery || 0;
+  const centrifuges = state.producers.guac_centrifuge || 0;
+  const costThreshold = TUNING.reveal.costThreshold;
+  let lookaheadUsed = 0;
+  let firstEligibleSeen = false;
+
+  for (const id of order) {
+    const owned = state.producers[id] || 0;
+    let cost = Calc.calcProducerCost(id, owned, TUNING);
+    cost = Math.floor(cost * distBonus.costMult * hpMods.costMult);
+    const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
+    const canAfford = state.avocadoCount >= cost;
+
+    const row = listEl.querySelector(`[data-id="${id}"]`);
+    const countEl = listEl.querySelector(`[data-count="${id}"]`);
+    const costEl = listEl.querySelector(`[data-cost="${id}"]`);
+    const rateEl = listEl.querySelector(`[data-rate="${id}"]`);
+    const buyBtn = listEl.querySelector(`[data-buy="${id}"]`);
+    const descEl = listEl.querySelector(`[data-desc="${id}"]`);
+
+    const cfg = TUNING.producers[id];
+
+    // 1. Hard gate: prestige-gated producers hidden until enough prestiges
+    if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount && owned === 0) {
+      if (row) row.style.display = "none";
+      continue;
     }
-    for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
-      const row = wisdomUnlocksListEl.querySelector(`[data-wid="${id}"]`);
-      if (!row) continue;
-      const owned = !!state.wisdomUnlocks[id];
-      if (owned) {
-        row.classList.add("owned");
-        const btn = row.querySelector(`[data-wbuy="${id}"]`);
-        if (btn) { btn.disabled = true; btn.textContent = "Owned"; }
-      } else {
-        row.classList.remove("owned");
-        const btn = row.querySelector(`[data-wbuy="${id}"]`);
-        if (btn) {
-          btn.disabled = state.wisdom < cfg.wisdomCost;
-          btn.textContent = `${cfg.wisdomCost} Wisdom`;
-        }
+
+    // 1b. Hard gate: foundation model requires model v5.0
+    if (id === "foundation_model" && !distBonus.unlocksFoundationModel && owned === 0) {
+      if (row) row.style.display = "none";
+      continue;
+    }
+
+    // 2. Owned: always visible, no lookahead consumed
+    if (owned > 0) {
+      if (row) { row.style.display = ""; row.classList.remove("locked"); }
+      if (descEl) descEl.textContent = cfg.desc;
+      if (countEl) countEl.textContent = `(${owned} owned)`;
+      if (costEl) costEl.textContent = Calc.formatNumber(cost);
+      let rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
+      if (id === "guac_lab" && state.upgrades.guac_unlock) {
+        const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
+        const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
+        rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
       }
+      if (id === "guac_refinery") {
+        const effExp = Calc.calcEffectiveConsumeExponent(owned, state.upgrades, state.wisdomUnlocks, state.prestigeCount, TUNING);
+        rateText = `Consume exponent: ${effExp.toFixed(2)} (base ${TUNING.guac.consumeExponent})`;
+      }
+      if (id === "guac_centrifuge") {
+        rateText = `Centrifuge effect: -${(centrifuges * 0.005).toFixed(3)} consume exponent`;
+      }
+      if (rateEl) rateEl.textContent = rateText;
+      if (buyBtn) buyBtn.disabled = !canAfford;
+      continue;
     }
+
+    // 3. Lookahead check: if at limit and not already revealed, hide
+    if (lookaheadUsed >= lookaheadLimit && !revealedProducers.has(id)) {
+      if (row) row.style.display = "none";
+      continue;
+    }
+
+    // 4. Consume a lookahead slot (whether or not threshold is met)
+    lookaheadUsed++;
+
+    // 5. Soft gate checks — show as LOCKED if fail
+    let softLocked = false;
+    let lockMessage = "";
+    if (id === "guac_lab" && !guacLabUnlocked) {
+      softLocked = true;
+      lockMessage = `Requires ${TUNING.guac.labUnlockAps} avocados/sec to unlock.`;
+    } else if (id === "guac_refinery" && (state.producers.guac_lab || 0) === 0) {
+      softLocked = true;
+      lockMessage = "Requires at least 1 Guacamole Lab.";
+    } else if (id === "guac_centrifuge" && (state.producers.guac_refinery || 0) < 3) {
+      softLocked = true;
+      lockMessage = "Requires at least 3 Guac Refineries.";
+    }
+
+    if (softLocked) {
+      // Soft-locked items are always revealed (visible once in window)
+      revealedProducers.add(id);
+      if (row) { row.style.display = ""; row.classList.add("locked"); }
+      if (descEl) descEl.textContent = lockMessage;
+      if (buyBtn) buyBtn.disabled = true;
+      if (rateEl) rateEl.textContent = "";
+      if (countEl) countEl.textContent = "";
+      if (costEl) costEl.textContent = Calc.formatNumber(Calc.calcProducerCost(id, 0, TUNING));
+      continue;
+    }
+
+    // 6. Threshold check: first eligible always visible; others need >= costThreshold
+    if (!firstEligibleSeen) {
+      firstEligibleSeen = true;
+      revealedProducers.add(id);
+    } else if (state.avocadoCount >= cost * costThreshold) {
+      revealedProducers.add(id);
+    }
+
+    // 7. If revealed (sticky) → show normally; otherwise hidden (slot consumed)
+    if (!revealedProducers.has(id)) {
+      if (row) row.style.display = "none";
+      continue;
+    }
+
+    if (row) { row.style.display = ""; row.classList.remove("locked"); }
+    if (descEl) descEl.textContent = cfg.desc;
+    if (countEl) countEl.textContent = "";
+    if (costEl) costEl.textContent = Calc.formatNumber(cost);
+    let rateText = `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
+    if (id === "guac_lab" && state.upgrades.guac_unlock) {
+      rateText += ` | Also converts avocados \u2192 guac`;
+    }
+    if (id === "guac_refinery") {
+      rateText = `Each refinery lowers consume exponent by 0.01`;
+    }
+    if (id === "guac_centrifuge") {
+      rateText = `Each centrifuge lowers consume exponent by 0.005`;
+    }
+    if (rateEl) rateEl.textContent = rateText;
+    if (buyBtn) buyBtn.disabled = !canAfford;
   }
 }
 
@@ -750,16 +833,20 @@ function pickAvocado() {
   updateUI();
 }
 
-function distill() {
-  if (!Calc.canDistill(state.totalWisdomSinceLastDistill || 0, state.distillationCount || 0, TUNING)) return;
-  if (!confirm("Distill your model? This resets EVERYTHING including wisdom and wisdom unlocks. You gain a permanent Model Version upgrade.")) return;
+function confirmPrestigeAndDistill() {
+  if (!confirm("Compost AND Distill? This resets EVERYTHING including wisdom and wisdom unlocks. You gain a permanent Model Version upgrade.")) return;
+
+  // First apply the prestige wisdom gain to totalWisdomSinceLastDistill
+  const wisdomGain = overlayWisdomGain;
+  const newTotalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + wisdomGain;
+  const newTotalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
 
   const newModelVersion = (state.modelVersion || 0) + 1;
   const newDistillationCount = (state.distillationCount || 0) + 1;
   const keptBenchmarks = { ...state.benchmarks };
   const keptAllTime = state.totalAvocadosAllTime;
 
-  // Full reset
+  // Full reset (distillation resets everything including wisdom + wisdom unlocks)
   const fresh = createDefaultState();
   state.avocadoCount = 0;
   state.totalAvocadosThisRun = 0;
@@ -771,7 +858,7 @@ function distill() {
   state.wisdomUnlocks = {};
   state.prestigeCount = 0;
   state.benchmarks = keptBenchmarks;
-  state.totalWisdomEarned = (state.totalWisdomEarned || 0); // keep lifetime total
+  state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = 0;
   state.hyperparams = fresh.hyperparams;
   state.modelVersion = newModelVersion;
@@ -786,18 +873,21 @@ function distill() {
   // Reset milestones
   lastMilestoneReached = 0;
   lastGuacMultMilestone = 1;
+  revealedProducers.clear();
+  revealedUpgrades.clear();
   setResearchTab("research");
 
+  logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`Model distilled to v${newModelVersion}.0!`);
   const bonus = TUNING.distillation.bonuses[newModelVersion - 1];
   if (bonus) logLine(bonus.flavor);
 
+  closePrestigeOverlay();
   saveGame();
   renderProducerList();
+  renderGuacProducerList();
   renderUpgradeList();
-  renderWisdomUnlocks();
   renderBenchmarks();
-  renderDistillation();
   updateUI();
 }
 
@@ -808,6 +898,15 @@ function buyProducer(id) {
     if (currentAps < TUNING.guac.labUnlockAps) return;
   }
 
+  // Guac centrifuge gating — need 3+ refineries
+  if (id === "guac_centrifuge" && (state.producers.guac_centrifuge || 0) === 0) {
+    if ((state.producers.guac_refinery || 0) < 3) return;
+  }
+
+  // Prestige gating
+  const cfg = TUNING.producers[id];
+  if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount) return;
+
   const owned = state.producers[id] || 0;
   const hpModsBuy = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
@@ -817,7 +916,6 @@ function buyProducer(id) {
   state.avocadoCount -= cost;
   state.producers[id] = owned + 1;
 
-  const cfg = TUNING.producers[id];
   logLine(`Bought ${cfg.title} (#${state.producers[id]})`);
   saveGame();
   updateUI();
@@ -834,12 +932,118 @@ function buyUpgrade(id) {
   updateUI();
 }
 
-function prestige() {
+// --- Prestige Overlay ---
+let overlayWisdomGain = 0;
+let overlayPurchases = {};
+
+function openPrestigeOverlay() {
   if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING)) return;
 
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  let wisdomGain = Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING);
-  wisdomGain = Math.floor(wisdomGain * distBonus.wisdomEarnMult);
+  overlayWisdomGain = Math.floor(Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING) * distBonus.wisdomEarnMult);
+  overlayPurchases = {};
+
+  const newPrestigeCount = (state.prestigeCount || 0) + 1;
+  const totalWisdom = state.wisdom + overlayWisdomGain;
+
+  // Build summary
+  prestigeSummaryEl.innerHTML = "";
+  const rows = [
+    ["Prestige #", `${newPrestigeCount}`],
+    ["Avocados This Run", Calc.formatNumber(state.totalAvocadosThisRun)],
+    ["Wisdom Gained", `+${overlayWisdomGain}`],
+    ["Total Wisdom After", `${totalWisdom}`],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    prestigeSummaryEl.appendChild(row);
+  }
+
+  // Build wisdom unlocks
+  renderPrestigeWisdomUnlocks(totalWisdom);
+
+  // Build distillation section
+  renderDistillation();
+
+  prestigeOverlay.classList.add("active");
+  prestigeOverlay.setAttribute("aria-hidden", "false");
+}
+
+function renderPrestigeWisdomUnlocks(availableWisdom) {
+  prestigeWisdomUnlocksEl.innerHTML = "";
+
+  const hasAnyUnlocks = Object.keys(TUNING.wisdomUnlocks).length > 0;
+  const blockEl = document.getElementById("prestige-wisdom-unlocks-block");
+  if (!hasAnyUnlocks) {
+    if (blockEl) blockEl.style.display = "none";
+    return;
+  }
+  if (blockEl) blockEl.style.display = "";
+
+  const descEl = document.createElement("div");
+  descEl.className = "muted";
+  descEl.textContent = "Permanent upgrades bought with Wisdom. Persist through prestige.";
+  prestigeWisdomUnlocksEl.appendChild(descEl);
+
+  let remainingWisdom = availableWisdom;
+  // Subtract already-purchased overlayPurchases
+  for (const id of Object.keys(overlayPurchases)) {
+    remainingWisdom -= TUNING.wisdomUnlocks[id].wisdomCost;
+  }
+
+  const wisdomLabel = document.createElement("div");
+  wisdomLabel.className = "row";
+  wisdomLabel.id = "overlay-wisdom-remaining";
+  wisdomLabel.innerHTML = `<div class="label">Remaining Wisdom</div><div class="value">${remainingWisdom}</div>`;
+  prestigeWisdomUnlocksEl.appendChild(wisdomLabel);
+
+  for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
+    const alreadyOwned = !!state.wisdomUnlocks[id];
+    const overlayBought = !!overlayPurchases[id];
+    const isOwned = alreadyOwned || overlayBought;
+
+    const row = document.createElement("div");
+    row.className = `upgrade-row${isOwned ? " owned" : ""}`;
+    row.innerHTML = `
+      <div class="upgrade-info">
+        <div class="upgrade-title">${cfg.title}</div>
+        <div class="upgrade-desc">${cfg.desc}</div>
+      </div>
+    `;
+
+    if (isOwned) {
+      const badge = document.createElement("span");
+      badge.className = "muted";
+      badge.textContent = "Owned";
+      row.appendChild(badge);
+    } else {
+      const btn = document.createElement("button");
+      btn.className = "btn upgrade-buy";
+      btn.type = "button";
+      btn.textContent = `${cfg.wisdomCost} Wisdom`;
+      btn.disabled = remainingWisdom < cfg.wisdomCost;
+      btn.addEventListener("click", () => {
+        overlayPurchases[id] = true;
+        const totalWisdom = state.wisdom + overlayWisdomGain;
+        renderPrestigeWisdomUnlocks(totalWisdom);
+      });
+      row.appendChild(btn);
+    }
+
+    prestigeWisdomUnlocksEl.appendChild(row);
+  }
+}
+
+function closePrestigeOverlay() {
+  prestigeOverlay.classList.remove("active");
+  prestigeOverlay.setAttribute("aria-hidden", "true");
+}
+
+function confirmPrestige() {
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  const wisdomGain = overlayWisdomGain;
   const allTime = state.totalAvocadosAllTime;
   const newWisdom = state.wisdom + wisdomGain;
   const keptWisdomUnlocks = { ...state.wisdomUnlocks };
@@ -848,6 +1052,19 @@ function prestige() {
   const newTotalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
   const newTotalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + wisdomGain;
 
+  // Apply overlay wisdom unlock purchases
+  for (const id of Object.keys(overlayPurchases)) {
+    const cfg = TUNING.wisdomUnlocks[id];
+    keptWisdomUnlocks[id] = true;
+    // Deduct cost from newWisdom (we already computed it in overlay)
+  }
+  let wisdomAfterPurchases = newWisdom;
+  for (const id of Object.keys(overlayPurchases)) {
+    if (!state.wisdomUnlocks[id]) { // only deduct for new purchases
+      wisdomAfterPurchases -= TUNING.wisdomUnlocks[id].wisdomCost;
+    }
+  }
+
   // Reset run state
   state.avocadoCount = 0;
   state.totalAvocadosThisRun = 0;
@@ -855,7 +1072,7 @@ function prestige() {
   state.guacCount = 0;
   state.producers = createDefaultState().producers;
   state.upgrades = {};
-  state.wisdom = newWisdom;
+  state.wisdom = wisdomAfterPurchases;
   state.wisdomUnlocks = keptWisdomUnlocks; // persists through prestige
   state.prestigeCount = newPrestigeCount;
   state.benchmarks = keptBenchmarks; // benchmarks persist forever
@@ -871,6 +1088,8 @@ function prestige() {
   // Reset milestones
   lastMilestoneReached = 0;
   lastGuacMultMilestone = 1;
+  revealedProducers.clear();
+  revealedUpgrades.clear();
 
   // Reset research tab to "Research"
   setResearchTab("research");
@@ -878,8 +1097,18 @@ function prestige() {
   logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`\u2728 You gained ${wisdomGain} Wisdom. (Prestige #${newPrestigeCount})`);
 
+  closePrestigeOverlay();
   saveGame();
+  renderProducerList();
+  renderGuacProducerList();
+  renderUpgradeList();
+  renderBenchmarks();
   updateUI();
+}
+
+function prestige() {
+  if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING)) return;
+  openPrestigeOverlay();
 }
 
 // --- Main Loop ---
@@ -908,7 +1137,12 @@ function startLoop() {
     if (state.upgrades.guac_unlock && (state.producers.guac_lab || 0) > 0) {
       const labs = state.producers.guac_lab;
       const refineries = state.producers.guac_refinery || 0;
-      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt * hpMods.guacConsumeMult;
+      const centrifuges = state.producers.guac_centrifuge || 0;
+      // Centrifuge effect: each lowers consumeExponent by 0.005 (applied via extra refinery-equivalent count)
+      // We pass refineries to calcGuacConsumption which handles refinery reduction;
+      // centrifuge effect is additional, so we adjust the refinery count for calc purposes
+      const effectiveRefineries = refineries + centrifuges * 0.5; // 0.5 * 0.01 = 0.005 per centrifuge
+      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, effectiveRefineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt * hpMods.guacConsumeMult;
       const actualConsumption = Math.min(desiredConsumption, state.avocadoCount);
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
@@ -953,7 +1187,6 @@ function startLoop() {
       if (newBenchmarks.length > 0) {
         renderBenchmarks();
       }
-      renderDistillation();
     }
 
     // Auto-save every ~5s
@@ -1039,6 +1272,10 @@ document.querySelector(".tab-bar").addEventListener("click", (e) => {
 // --- Wire Events ---
 pickAvocadoBtn.addEventListener("click", pickAvocado);
 prestigeBtn.addEventListener("click", prestige);
+prestigeRebornBtn.addEventListener("click", confirmPrestige);
+prestigeOverlay.addEventListener("click", (e) => {
+  if (e.target === prestigeOverlay) closePrestigeOverlay();
+});
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
@@ -1085,7 +1322,6 @@ debugAddWisdomBtn.addEventListener("click", () => {
   state.totalWisdomEarned = (state.totalWisdomEarned || 0) + 10;
   state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + 10;
   saveGame();
-  renderDistillation();
   updateUI();
   logLine("Debug: +10 wisdom");
 });
@@ -1107,10 +1343,9 @@ debugModal.addEventListener("click", (e) => {
 // --- Init ---
 loadGame();
 renderProducerList();
+renderGuacProducerList();
 renderUpgradeList();
-renderWisdomUnlocks();
 renderBenchmarks();
-renderDistillation();
 updateUI();
 startLoop();
 logLine("Avocado Intelligence loaded.");
