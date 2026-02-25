@@ -15,12 +15,28 @@ const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
   producers: {
     sapling:         { baseCost: 10,    costGrowth: 1.15, baseRate: 0.2 },
+    seed_bank:       { baseCost: 35,    costGrowth: 1.15, baseRate: 0.5 },
     orchard_row:     { baseCost: 100,   costGrowth: 1.15, baseRate: 1 },
-    influencer:      { baseCost: 5,     costGrowth: 1.11, baseRate: 0, clickBonus: 0.1 },
+    compost_bin:     { baseCost: 400,   costGrowth: 1.15, baseRate: 3 },
     drone:           { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
+    greenhouse:      { baseCost: 4000,  costGrowth: 1.15, baseRate: 18 },
+    harvest_bot:     { baseCost: 45000, costGrowth: 1.15, baseRate: 80 },
     guac_lab:        { baseCost: 12000, costGrowth: 1.15, baseRate: 47 },
+    guac_refinery:   { baseCost: 50000, costGrowth: 1.15, baseRate: 0 },
+    guac_centrifuge: { baseCost: 200000, costGrowth: 1.15, baseRate: 0 },
+    exchange:        { baseCost: 130000, costGrowth: 1.15, baseRate: 260 },
+    data_grove:      { baseCost: 350000, costGrowth: 1.15, baseRate: 450 },
     attention_head:  { baseCost: 800000, costGrowth: 1.15, baseRate: 900 },
+    pit_miner:       { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400 },
+    gpu_cluster:     { baseCost: 5e6,    costGrowth: 1.15, baseRate: 2800 },
+    neural_pit:      { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800 },
+    synth_orchard:   { baseCost: 3e7,    costGrowth: 1.15, baseRate: 11000 },
     transformer:     { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000 },
+    orchard_cloud:   { baseCost: 3.3e8,  costGrowth: 1.15, baseRate: 44000 },
+    quantum_grove:   { baseCost: 5e8,    costGrowth: 1.15, baseRate: 55000 },
+    agi_nexus:       { baseCost: 5e9,    costGrowth: 1.15, baseRate: 180000 },
+    dyson_orchard:   { baseCost: 8e10,   costGrowth: 1.15, baseRate: 600000 },
+    omega_harvest:   { baseCost: 1e12,   costGrowth: 1.15, baseRate: 2500000 },
     foundation_model:{ baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000 },
   },
   guac: {
@@ -39,17 +55,24 @@ const tuning = {
     drip_irrigation:    { cost: 5000, unlockAt: 5,  producerId: "orchard_row", prodMult: 2 },
     global_boost_1:     { cost: 10000, unlockAt: 0, globalMult: 1.5 },
     global_boost_2:     { cost: 500000, unlockAt: 0, globalMult: 2 },
+    global_boost_3:     { cost: 5e7, unlockAt: 0, globalMult: 2 },
     wisdom_boost:       { cost: 1e6, unlockAt: 0, wisdomMult: 0.05 },
     guac_recycler:      { cost: 50000,  unlockAt: 5,  producerId: "guac_lab", consumeExpDelta: -0.05 },
     bulk_fermentation:  { cost: 200000, unlockAt: 10, producerId: "guac_lab", consumeExpDelta: -0.05 },
     superlinear_synth:  { cost: 100000, guacUnlockAt: 25,  produceExpDelta: +0.05 },
     exponential_ripen:  { cost: 500000, guacUnlockAt: 100, produceExpDelta: +0.10 },
     concentrate_proto:  { cost: 75000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5 },
-    throughput_click_1: { cost: 500,   unlockAt: 1,  producerId: "influencer", apsPctPerClick: 0.03 },
-    throughput_click_2: { cost: 5000,  unlockAt: 5,  producerId: "influencer", apsPctPerClick: 0.06 },
-    throughput_click_3: { cost: 50000, unlockAt: 25, producerId: "influencer", apsPctPerClick: 0.10 },
+    throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03 },
+    throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  apsPctPerClick: 0.06 },
+    throughput_click_3: { cost: 50000, apsUnlockAt: 100, apsPctPerClick: 0.10 },
     attention_focus:    { cost: 2e6,   unlockAt: 5,  producerId: "attention_head", prodMult: 2 },
     transformer_scale:  { cost: 5e8,   unlockAt: 5,  producerId: "transformer", prodMult: 2 },
+    seed_catalog:       { cost: 500,   unlockAt: 10, producerId: "seed_bank", prodMult: 2 },
+    hot_compost:        { cost: 3000,  unlockAt: 5,  producerId: "compost_bin", prodMult: 2 },
+    climate_control:    { cost: 25000, unlockAt: 5,  producerId: "greenhouse", prodMult: 2 },
+    harvest_fleet:      { cost: 250000, unlockAt: 5, producerId: "harvest_bot", prodMult: 2 },
+    data_lake:          { cost: 1.5e6, unlockAt: 5,  producerId: "data_grove", prodMult: 2 },
+    gpu_overclock:      { cost: 2e7,   unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2 },
   },
   benchmarks: {
     hello_world:      { title: "Hello, World", globalMult: 0.02 },
@@ -79,7 +102,7 @@ const tuning = {
     },
   },
   prestige: {
-    unlockThreshold: 1e6,
+    unlockThreshold: 1e7,
     divisor: 1000,
     wisdomMultPerPoint: 0.10,
   },
@@ -197,12 +220,18 @@ describe("calcProducerCost", () => {
     expect(calcProducerCost("orchard_row", 5, tuning)).toBe(201);
   });
 
-  it("works for new attention_head producer", () => {
+  it("works for attention_head producer", () => {
     expect(calcProducerCost("attention_head", 0, tuning)).toBe(800000);
   });
 
-  it("works for new transformer producer", () => {
+  it("works for transformer producer", () => {
     expect(calcProducerCost("transformer", 0, tuning)).toBe(150000000);
+  });
+
+  it("works for new producers", () => {
+    expect(calcProducerCost("seed_bank", 0, tuning)).toBe(35);
+    expect(calcProducerCost("gpu_cluster", 0, tuning)).toBe(5000000);
+    expect(calcProducerCost("omega_harvest", 0, tuning)).toBe(1000000000000);
   });
 });
 
@@ -229,6 +258,15 @@ describe("calcProducerUnitRate", () => {
 
   it("applies transformer_scale to transformer", () => {
     expect(calcProducerUnitRate("transformer", { transformer_scale: true }, tuning)).toBe(56000);
+  });
+
+  it("applies new producer upgrades", () => {
+    expect(calcProducerUnitRate("seed_bank", { seed_catalog: true }, tuning)).toBe(1.0);
+    expect(calcProducerUnitRate("compost_bin", { hot_compost: true }, tuning)).toBe(6);
+    expect(calcProducerUnitRate("greenhouse", { climate_control: true }, tuning)).toBe(36);
+    expect(calcProducerUnitRate("harvest_bot", { harvest_fleet: true }, tuning)).toBe(160);
+    expect(calcProducerUnitRate("data_grove", { data_lake: true }, tuning)).toBe(900);
+    expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true }, tuning)).toBe(5600);
   });
 });
 
@@ -393,7 +431,7 @@ describe("calcTotalAps", () => {
 });
 
 describe("calcClickPower", () => {
-  const noProducers = { sapling: 0, orchard_row: 0, influencer: 0, drone: 0, guac_lab: 0 };
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
 
   it("returns base click yield with no upgrades", () => {
     expect(calcClickPower({}, noProducers, 0, 0, 0, tuning)).toBe(1);
@@ -428,27 +466,6 @@ describe("calcClickPower", () => {
     )).toBeCloseTo(24);
   });
 
-  // --- Influencer flat click bonus ---
-  it("adds flat click bonus from influencers", () => {
-    // base 1 + 4 * 0.1 = 1.4
-    const producers = { ...noProducers, influencer: 4 };
-    expect(calcClickPower({}, producers, 0, 0, 0, tuning)).toBeCloseTo(1.4);
-  });
-
-  it("influencer bonus is multiplied by click upgrades", () => {
-    // (1 + 2*0.1) * 2 (strong_thumb) = 1.2 * 2 = 2.4
-    const producers = { ...noProducers, influencer: 2 };
-    expect(calcClickPower({ strong_thumb: true }, producers, 0, 0, 0, tuning)).toBeCloseTo(2.4);
-  });
-
-  it("influencer bonus stacks with all multipliers", () => {
-    // base 1 + 10*0.1 = 2, * 2 (strong) = 4, * 1.5 (global) = 6
-    const producers = { ...noProducers, influencer: 10 };
-    expect(calcClickPower(
-      { strong_thumb: true, global_boost_1: true }, producers, 0, 0, 0, tuning
-    )).toBeCloseTo(6);
-  });
-
   // --- Throughput Clicking (base APS % bonus, highest tier wins) ---
   it("adds base APS percentage from throughput_click_1", () => {
     // base 1, baseAps 100, 3% = +3, total = 4
@@ -464,32 +481,21 @@ describe("calcClickPower", () => {
   it("throughput bonus is zero when baseAps is zero", () => {
     expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 0, tuning)).toBe(1);
   });
-
-  it("combines influencer bonus and throughput clicking", () => {
-    // base 1 + 4*0.1 = 1.4 (from influencers)
-    // clickMult: * 2 (strong_thumb) = 2.8
-    // baseAps bonus: 100 * 0.03 = +3 → 5.8
-    // global/wisdom/guac = 1 each → 5.8
-    const producers = { ...noProducers, influencer: 4 };
-    expect(calcClickPower(
-      { strong_thumb: true, throughput_click_1: true }, producers, 0, 0, 100, tuning
-    )).toBeCloseTo(5.8);
-  });
 });
 
 describe("calcWisdomEarned", () => {
   it("returns 0 below threshold", () => {
-    expect(calcWisdomEarned(999999, tuning)).toBe(0);
+    expect(calcWisdomEarned(9999999, tuning)).toBe(0);
   });
 
-  it("returns 1 at exactly threshold (1e6)", () => {
-    // floor(sqrt(1e6) / 1000) = floor(1000 / 1000) = 1
-    expect(calcWisdomEarned(1e6, tuning)).toBe(1);
+  it("returns 3 at exactly threshold (1e7)", () => {
+    // floor(sqrt(1e7) / 1000) = floor(3162.27 / 1000) = 3
+    expect(calcWisdomEarned(1e7, tuning)).toBe(3);
   });
 
   it("returns floor of sqrt scaling", () => {
-    // floor(sqrt(4e6) / 1000) = floor(2000 / 1000) = 2
-    expect(calcWisdomEarned(4e6, tuning)).toBe(2);
+    // floor(sqrt(4e7) / 1000) = floor(6324.5 / 1000) = 6
+    expect(calcWisdomEarned(4e7, tuning)).toBe(6);
   });
 
   it("grows with sqrt of total", () => {
@@ -532,15 +538,15 @@ describe("calcWisdomBonus", () => {
 
 describe("canPrestige", () => {
   it("returns false below threshold", () => {
-    expect(canPrestige(999999, tuning)).toBe(false);
+    expect(canPrestige(9999999, tuning)).toBe(false);
   });
 
   it("returns true at exactly threshold", () => {
-    expect(canPrestige(1e6, tuning)).toBe(true);
+    expect(canPrestige(1e7, tuning)).toBe(true);
   });
 
   it("returns true above threshold", () => {
-    expect(canPrestige(5e6, tuning)).toBe(true);
+    expect(canPrestige(5e7, tuning)).toBe(true);
   });
 
   it("returns false at zero", () => {

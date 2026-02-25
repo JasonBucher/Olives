@@ -19,15 +19,7 @@
     <hr class="divider" />
 
     <div class="layout">
-      <!-- Left Column: Producers -->
-      <div class="column">
-        <section class="section">
-          <div class="section-title">Producers</div>
-          <div id="producers-list"></div>
-        </section>
-      </div>
-
-      <!-- Center Column: Farm -->
+      <!-- Left Column: Farm + Guac Processing + Log -->
       <div class="column">
         <section class="section">
           <div class="section-title">Farm</div>
@@ -91,17 +83,9 @@
 
         </section>
 
-        <section class="section" id="wisdom-unlocks-section" style="display: none;">
-          <div class="section-title">Wisdom Unlocks</div>
-          <div class="muted">Permanent upgrades bought with Wisdom. Persist through prestige.</div>
-          <div id="wisdom-unlocks-list" style="margin-top: 8px;"></div>
-        </section>
-
-        <section class="section" id="benchmarks-section">
-          <div class="section-title">Benchmarks</div>
-          <div class="muted">AI milestones. Some grant permanent bonuses.</div>
-          <div id="benchmarks-list" style="margin-top: 8px;"></div>
-          <div class="muted" id="benchmarks-counter" style="margin-top: 6px;">0 / 18</div>
+        <section class="section guac-section" id="guac-section" style="display: none;">
+          <div class="section-title">Guac Processing</div>
+          <div id="guac-producers-list"></div>
         </section>
 
         <section class="section">
@@ -110,17 +94,29 @@
         </section>
       </div>
 
-      <!-- Right Column: Distillation + Prestige + Research -->
+      <!-- Center Column: Producers -->
       <div class="column">
-        <section class="section" id="distillation-section" style="display: none;">
-          <div class="section-title">Model Distillation</div>
-          <div class="muted">Compress all knowledge into a new model version. Resets everything including wisdom.</div>
-          <div id="distill-list" class="stack" style="margin-top: 8px;"></div>
+        <section class="section">
+          <div class="section-title">Producers</div>
+          <div id="producers-list"></div>
+        </section>
+      </div>
+
+      <!-- Right Column: Research + Distillation + Compost + Benchmarks -->
+      <div class="column">
+        <section class="section">
+          <div class="section-title">Research</div>
+          <div class="tab-bar">
+            <button class="tab active" data-tab="research">Research</button>
+            <button class="tab" data-tab="owned">Owned</button>
+          </div>
+          <div id="upgrades-list" data-tab-content="research"></div>
+          <div id="upgrades-owned-list" data-tab-content="owned" style="display: none;"></div>
         </section>
 
         <section class="section">
           <div class="section-title">Compost Heap</div>
-          <div id="prestige-locked" class="muted note">Reach 1M total avocados this run to unlock composting.</div>
+          <div id="prestige-locked" class="muted note">Reach 10M total avocados this run to unlock composting.</div>
           <div id="prestige-unlocked" class="stack" style="display: none;">
             <div class="row">
               <div class="label">This Run</div>
@@ -137,14 +133,11 @@
           </div>
         </section>
 
-        <section class="section">
-          <div class="section-title">Research</div>
-          <div class="tab-bar">
-            <button class="tab active" data-tab="research">Research</button>
-            <button class="tab" data-tab="owned">Owned</button>
-          </div>
-          <div id="upgrades-list" data-tab-content="research"></div>
-          <div id="upgrades-owned-list" data-tab-content="owned" style="display: none;"></div>
+        <section class="section" id="benchmarks-section">
+          <div class="section-title">Benchmarks</div>
+          <div class="muted">AI milestones. Some grant permanent bonuses.</div>
+          <div id="benchmarks-list" style="margin-top: 8px;"></div>
+          <div class="muted" id="benchmarks-counter" style="margin-top: 6px;">0 / 18</div>
         </section>
       </div>
     </div>
@@ -212,6 +205,29 @@
 
         <div class="actions">
           <button id="hp-apply-btn" class="btn btn-primary" type="button">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prestige Overlay -->
+  <div id="prestige-overlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal prestige-modal">
+      <div class="modal-body">
+        <div class="prestige-block">
+          <div class="prestige-block-title">Composting</div>
+          <div id="prestige-summary" class="stack"></div>
+        </div>
+        <div class="prestige-block" id="prestige-wisdom-unlocks-block" style="display: none;">
+          <div class="prestige-block-title">Wisdom Unlocks</div>
+          <div id="prestige-wisdom-unlocks"></div>
+        </div>
+        <div class="prestige-block" id="prestige-distillation-block" style="display: none;">
+          <div class="prestige-block-title">Model Distillation</div>
+          <div id="prestige-distillation"></div>
+        </div>
+        <div class="actions" style="margin-top: 14px;">
+          <button id="prestige-reborn-btn" class="btn btn-primary" type="button">Reborn</button>
         </div>
       </div>
     </div>

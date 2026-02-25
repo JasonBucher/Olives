@@ -420,3 +420,32 @@ h1 {
 .hp-option input[type="radio"] {
   margin-right: 6px;
 }
+
+/* Prestige overlay modal */
+.prestige-modal {
+  width: min(640px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.prestige-block {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+
+.prestige-block:first-child { margin-top: 0; }
+
+.prestige-block-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+/* Guac Processing section accent */
+.guac-section {
+  border-left: 3px solid var(--primary);
+}
