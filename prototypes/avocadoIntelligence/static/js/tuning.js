@@ -88,6 +88,73 @@ export const TUNING = {
     stellar_engineer:  { cost: 1.5e11,  unlockAt: 5,  producerId: "dyson_orchard",   prodMult: 2, title: "Stellar Engineering",         desc: "Dyson Orchards produce 2x" },
     heat_death_opt:    { cost: 2e12,    unlockAt: 5,  producerId: "omega_harvest",   prodMult: 2, title: "Heat Death Optimization",     desc: "Omega Harvests produce 2x" },
     global_boost_3:    { cost: 5e7,     unlockAt: 0,  globalMult: 2, title: "Distributed Training", desc: "All production 2x" },
+
+    // ── Multi-Tier Producer Upgrades ──────────────────────────────
+    // cost = floor(baseCost × tierK × 1.15^threshold)
+    // tierK: T2=5, T3=10, T4=15, T5=20
+
+    // Early producers (T2–T5): sapling, seed_bank, orchard_row, compost_bin, drone, greenhouse
+    sapling_t2:        { cost: 1646,               unlockAt: 25,  producerId: "sapling",      prodMult: 2, title: "Ripeness Algorithms v2",    desc: "Saplings produce 2x" },
+    sapling_t3:        { cost: 108366,              unlockAt: 50,  producerId: "sapling",      prodMult: 2, title: "Root Network Protocol",     desc: "Saplings produce 2x (cumulative 8x)" },
+    sapling_t4:        { cost: 176147018,           unlockAt: 100, producerId: "sapling",      prodMult: 2, title: "Photosynthesis Overclocking", desc: "Saplings produce 2x (cumulative 16x)" },
+    sapling_t5:        { cost: 254510701921,        unlockAt: 150, producerId: "sapling",      prodMult: 2, title: "Arboreal Neural Mesh",      desc: "Saplings produce 2x (cumulative 32x)" },
+    seed_bank_t2:      { cost: 5761,                unlockAt: 25,  producerId: "seed_bank",    prodMult: 2, title: "Genome Indexer",             desc: "Seed Banks produce 2x" },
+    seed_bank_t3:      { cost: 379280,              unlockAt: 50,  producerId: "seed_bank",    prodMult: 2, title: "CRISPR Seed Editor",         desc: "Seed Banks produce 2x (cumulative 8x)" },
+    seed_bank_t4:      { cost: 616514562,           unlockAt: 100, producerId: "seed_bank",    prodMult: 2, title: "Synthetic Germplasm",        desc: "Seed Banks produce 2x (cumulative 16x)" },
+    seed_bank_t5:      { cost: 890787456722,        unlockAt: 150, producerId: "seed_bank",    prodMult: 2, title: "Infinite Seed Theorem",      desc: "Seed Banks produce 2x (cumulative 32x)" },
+    orchard_row_t2:    { cost: 16459,               unlockAt: 25,  producerId: "orchard_row",  prodMult: 2, title: "Precision Pruning",          desc: "Orchard Rows produce 2x" },
+    orchard_row_t3:    { cost: 1083657,             unlockAt: 50,  producerId: "orchard_row",  prodMult: 2, title: "Autonomous Row Management",  desc: "Orchard Rows produce 2x (cumulative 8x)" },
+    orchard_row_t4:    { cost: 1761470176,          unlockAt: 100, producerId: "orchard_row",  prodMult: 2, title: "Fractal Planting Patterns",  desc: "Orchard Rows produce 2x (cumulative 16x)" },
+    orchard_row_t5:    { cost: 2545107019207,       unlockAt: 150, producerId: "orchard_row",  prodMult: 2, title: "Infinite Orchard Hypothesis", desc: "Orchard Rows produce 2x (cumulative 32x)" },
+    compost_bin_t2:    { cost: 65838,               unlockAt: 25,  producerId: "compost_bin",  prodMult: 2, title: "Thermophilic Optimization",  desc: "Compost Bins produce 2x" },
+    compost_bin_t3:    { cost: 4334630,             unlockAt: 50,  producerId: "compost_bin",  prodMult: 2, title: "Microbial Ensemble Learning", desc: "Compost Bins produce 2x (cumulative 8x)" },
+    compost_bin_t4:    { cost: 7045880704,          unlockAt: 100, producerId: "compost_bin",  prodMult: 2, title: "Zero-Waste Inference",       desc: "Compost Bins produce 2x (cumulative 16x)" },
+    compost_bin_t5:    { cost: 10180428076828,      unlockAt: 150, producerId: "compost_bin",  prodMult: 2, title: "Entropy Reversal Engine",    desc: "Compost Bins produce 2x (cumulative 32x)" },
+    drone_t2:          { cost: 181054,              unlockAt: 25,  producerId: "drone",        prodMult: 2, title: "Swarm Intelligence",         desc: "Drones produce 2x" },
+    drone_t3:          { cost: 11920232,            unlockAt: 50,  producerId: "drone",        prodMult: 2, title: "Formation Flying Protocol",  desc: "Drones produce 2x (cumulative 8x)" },
+    drone_t4:          { cost: 19376171937,         unlockAt: 100, producerId: "drone",        prodMult: 2, title: "Drone Hivemind",             desc: "Drones produce 2x (cumulative 16x)" },
+    drone_t5:          { cost: 27996177211277,      unlockAt: 150, producerId: "drone",        prodMult: 2, title: "Autonomous Airspace Control", desc: "Drones produce 2x (cumulative 32x)" },
+    greenhouse_t2:     { cost: 658379,              unlockAt: 25,  producerId: "greenhouse",   prodMult: 2, title: "Spectral Light Tuning",      desc: "Greenhouses produce 2x" },
+    greenhouse_t3:     { cost: 43346298,            unlockAt: 50,  producerId: "greenhouse",   prodMult: 2, title: "Atmospheric Gradient Descent", desc: "Greenhouses produce 2x (cumulative 8x)" },
+    greenhouse_t4:     { cost: 70458807042,         unlockAt: 100, producerId: "greenhouse",   prodMult: 2, title: "Biome Simulation Engine",    desc: "Greenhouses produce 2x (cumulative 16x)" },
+    greenhouse_t5:     { cost: 101804280768279,     unlockAt: 150, producerId: "greenhouse",   prodMult: 2, title: "Pocket Dimension Agriculture", desc: "Greenhouses produce 2x (cumulative 32x)" },
+
+    // Mid producers (T2–T4): harvest_bot, exchange, data_grove, attention_head, pit_miner
+    harvest_bot_t2:    { cost: 7406764,             unlockAt: 25,  producerId: "harvest_bot",    prodMult: 2, title: "Reinforcement Harvesting",  desc: "Harvest Bots produce 2x" },
+    harvest_bot_t3:    { cost: 487645849,           unlockAt: 50,  producerId: "harvest_bot",    prodMult: 2, title: "Predictive Ripeness Model",  desc: "Harvest Bots produce 2x (cumulative 8x)" },
+    harvest_bot_t4:    { cost: 792661579223,        unlockAt: 100, producerId: "harvest_bot",    prodMult: 2, title: "Self-Replicating Harvesters", desc: "Harvest Bots produce 2x (cumulative 16x)" },
+    exchange_t2:       { cost: 21397319,            unlockAt: 25,  producerId: "exchange",       prodMult: 2, title: "High-Frequency Pit Trading", desc: "Exchanges produce 2x" },
+    exchange_t3:       { cost: 1408754674,          unlockAt: 50,  producerId: "exchange",       prodMult: 2, title: "Derivatives Market",         desc: "Exchanges produce 2x (cumulative 8x)" },
+    exchange_t4:       { cost: 2289911228866,       unlockAt: 100, producerId: "exchange",       prodMult: 2, title: "Quantum Arbitrage",          desc: "Exchanges produce 2x (cumulative 16x)" },
+    data_grove_t2:     { cost: 57608167,            unlockAt: 25,  producerId: "data_grove",     prodMult: 2, title: "Feature Engineering",        desc: "Data Groves produce 2x" },
+    data_grove_t3:     { cost: 3792801046,          unlockAt: 50,  producerId: "data_grove",     prodMult: 2, title: "Data Lakehouse",             desc: "Data Groves produce 2x (cumulative 8x)" },
+    data_grove_t4:     { cost: 6165145616176,       unlockAt: 100, producerId: "data_grove",     prodMult: 2, title: "Synthetic Data Generator",   desc: "Data Groves produce 2x (cumulative 16x)" },
+    attention_head_t2: { cost: 131675810,           unlockAt: 25,  producerId: "attention_head", prodMult: 2, title: "Cross-Attention Fusion",     desc: "Attention Heads produce 2x" },
+    attention_head_t3: { cost: 8669259533,          unlockAt: 50,  producerId: "attention_head", prodMult: 2, title: "Flash Attention",            desc: "Attention Heads produce 2x (cumulative 8x)" },
+    attention_head_t4: { cost: 14091761408403,      unlockAt: 100, producerId: "attention_head", prodMult: 2, title: "Infinite Context Window",    desc: "Attention Heads produce 2x (cumulative 16x)" },
+    pit_miner_t2:      { cost: 230432668,           unlockAt: 25,  producerId: "pit_miner",      prodMult: 2, title: "Deep Pit Extraction",        desc: "Pit Miners produce 2x" },
+    pit_miner_t3:      { cost: 15171204182,         unlockAt: 50,  producerId: "pit_miner",      prodMult: 2, title: "Pit Fusion Reactor",         desc: "Pit Miners produce 2x (cumulative 8x)" },
+    pit_miner_t4:      { cost: 24660582464706,      unlockAt: 100, producerId: "pit_miner",      prodMult: 2, title: "Subatomic Pit Mining",       desc: "Pit Miners produce 2x (cumulative 16x)" },
+
+    // Late producers (T2–T3): gpu_cluster, neural_pit, synth_orchard, transformer, orchard_cloud, quantum_grove
+    gpu_cluster_t2:    { cost: 822973815,           unlockAt: 25,  producerId: "gpu_cluster",    prodMult: 2, title: "Tensor Core Unlocking",      desc: "GPU Clusters produce 2x" },
+    gpu_cluster_t3:    { cost: 54182872079,         unlockAt: 50,  producerId: "gpu_cluster",    prodMult: 2, title: "Wafer-Scale Compute",        desc: "GPU Clusters produce 2x (cumulative 8x)" },
+    neural_pit_t2:     { cost: 3291895262,          unlockAt: 25,  producerId: "neural_pit",     prodMult: 2, title: "Residual Connections",       desc: "Neural Pit Networks produce 2x" },
+    neural_pit_t3:     { cost: 216731488317,        unlockAt: 50,  producerId: "neural_pit",     prodMult: 2, title: "Mixture of Pits",            desc: "Neural Pit Networks produce 2x (cumulative 8x)" },
+    synth_orchard_t2:  { cost: 4937842893,          unlockAt: 25,  producerId: "synth_orchard",  prodMult: 2, title: "Epigenetic Memory",          desc: "Synthetic Orchards produce 2x" },
+    synth_orchard_t3:  { cost: 325097232475,        unlockAt: 50,  producerId: "synth_orchard",  prodMult: 2, title: "De Novo Genome Synthesis",   desc: "Synthetic Orchards produce 2x (cumulative 8x)" },
+    transformer_t2:    { cost: 24689214465,         unlockAt: 25,  producerId: "transformer",    prodMult: 2, title: "Sparse Attention",           desc: "Transformer Cores produce 2x" },
+    transformer_t3:    { cost: 1625486162376,       unlockAt: 50,  producerId: "transformer",    prodMult: 2, title: "Chain-of-Thought Pruning",   desc: "Transformer Cores produce 2x (cumulative 8x)" },
+    orchard_cloud_t2:  { cost: 54316271823,         unlockAt: 25,  producerId: "orchard_cloud",  prodMult: 2, title: "Edge Deployment",            desc: "Orchard Clouds produce 2x" },
+    orchard_cloud_t3:  { cost: 3576069557227,       unlockAt: 50,  producerId: "orchard_cloud",  prodMult: 2, title: "Multi-Region Replication",   desc: "Orchard Clouds produce 2x (cumulative 8x)" },
+    quantum_grove_t2:  { cost: 82297381549,         unlockAt: 25,  producerId: "quantum_grove",  prodMult: 2, title: "Quantum Error Correction",   desc: "Quantum Groves produce 2x" },
+    quantum_grove_t3:  { cost: 5418287207920,       unlockAt: 50,  producerId: "quantum_grove",  prodMult: 2, title: "Topological Qubit Orchard",  desc: "Quantum Groves produce 2x (cumulative 8x)" },
+
+    // Endgame producers (T2 only): agi_nexus, dyson_orchard, omega_harvest, foundation_model
+    agi_nexus_t2:        { cost: 822973815495,      unlockAt: 25,  producerId: "agi_nexus",        prodMult: 2, title: "Instrumental Convergence",  desc: "AGI Nexuses produce 2x" },
+    dyson_orchard_t2:    { cost: 13167581047916,    unlockAt: 25,  producerId: "dyson_orchard",    prodMult: 2, title: "Dyson Swarm Optimization",  desc: "Dyson Orchards produce 2x" },
+    omega_harvest_t2:    { cost: 164594763098948,   unlockAt: 25,  producerId: "omega_harvest",    prodMult: 2, title: "Vacuum Energy Extraction",  desc: "Omega Harvests produce 2x" },
+    foundation_model_t2: { cost: 8229738154947,     unlockAt: 25,  producerId: "foundation_model", prodMult: 2, title: "Constitutional Alignment",  desc: "Foundation Models produce 2x" },
   },
 
   wisdomUnlocks: {

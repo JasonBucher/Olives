@@ -73,6 +73,17 @@ const tuning = {
     harvest_fleet:      { cost: 250000, unlockAt: 5, producerId: "harvest_bot", prodMult: 2 },
     data_lake:          { cost: 1.5e6, unlockAt: 5,  producerId: "data_grove", prodMult: 2 },
     gpu_overclock:      { cost: 2e7,   unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2 },
+    drone_swarm:        { cost: 50000, unlockAt: 5,  producerId: "drone",       prodMult: 2 },
+    // Multi-tier upgrades for stacking tests
+    sapling_t2:         { cost: 1646,        unlockAt: 25,  producerId: "sapling",      prodMult: 2 },
+    sapling_t3:         { cost: 108366,      unlockAt: 50,  producerId: "sapling",      prodMult: 2 },
+    sapling_t4:         { cost: 176147018,   unlockAt: 100, producerId: "sapling",      prodMult: 2 },
+    sapling_t5:         { cost: 254510701921, unlockAt: 150, producerId: "sapling",     prodMult: 2 },
+    drone_t2:           { cost: 181054,      unlockAt: 25,  producerId: "drone",        prodMult: 2 },
+    drone_t3:           { cost: 11920232,    unlockAt: 50,  producerId: "drone",        prodMult: 2 },
+    gpu_cluster_t2:     { cost: 822973815,   unlockAt: 25,  producerId: "gpu_cluster",  prodMult: 2 },
+    gpu_cluster_t3:     { cost: 54182872079, unlockAt: 50,  producerId: "gpu_cluster",  prodMult: 2 },
+    agi_nexus_t2:       { cost: 822973815495, unlockAt: 25, producerId: "agi_nexus",    prodMult: 2 },
   },
   benchmarks: {
     hello_world:      { title: "Hello, World", globalMult: 0.02 },
@@ -911,5 +922,56 @@ describe("calcDistillationBonus", () => {
     const b = calcDistillationBonus(10, tuning);
     expect(b.allProdMult).toBeCloseTo(2.0);
     expect(b.unlocksFoundationModel).toBe(true);
+  });
+});
+
+// ---------- Multi-tier upgrade stacking tests ----------
+
+describe("calcProducerUnitRate — multi-tier stacking", () => {
+  it("2-tier stacking gives 4x (T1 + T2)", () => {
+    // sapling base 0.2, T1 (efficient_saplings) 2x, T2 (sapling_t2) 2x = 4x = 0.8
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true }, tuning)).toBeCloseTo(0.8);
+  });
+
+  it("3-tier stacking gives 8x (T1 + T2 + T3)", () => {
+    // sapling base 0.2, 3 × 2x = 8x = 1.6
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(1.6);
+  });
+
+  it("4-tier stacking gives 16x (T1 + T2 + T3 + T4)", () => {
+    // sapling base 0.2, 4 × 2x = 16x = 3.2
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true, sapling_t4: true }, tuning)).toBeCloseTo(3.2);
+  });
+
+  it("5-tier stacking gives 32x (T1 through T5)", () => {
+    // sapling base 0.2, 5 × 2x = 32x = 6.4
+    expect(calcProducerUnitRate("sapling", {
+      efficient_saplings: true, sapling_t2: true, sapling_t3: true, sapling_t4: true, sapling_t5: true,
+    }, tuning)).toBeCloseTo(6.4);
+  });
+
+  it("later tiers without T1 still stack correctly", () => {
+    // sapling base 0.2, only T2 + T3 = 4x = 0.8
+    expect(calcProducerUnitRate("sapling", { sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(0.8);
+  });
+
+  it("stacking works for mid-tier producer (drone)", () => {
+    // drone base 8, T1 (drone_swarm) 2x, T2 2x, T3 2x = 8x = 64
+    expect(calcProducerUnitRate("drone", { drone_swarm: true, drone_t2: true, drone_t3: true }, tuning)).toBeCloseTo(64);
+  });
+
+  it("stacking works for late-tier producer (gpu_cluster)", () => {
+    // gpu_cluster base 2800, T1 (gpu_overclock) 2x, T2 2x = 4x = 11200
+    expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true, gpu_cluster_t2: true }, tuning)).toBeCloseTo(11200);
+  });
+
+  it("stacking works for endgame producer (agi_nexus)", () => {
+    // agi_nexus base 180000, T1 (recursive_improve) not in test tuning, T2 2x = 2x = 360000
+    expect(calcProducerUnitRate("agi_nexus", { agi_nexus_t2: true }, tuning)).toBeCloseTo(360000);
+  });
+
+  it("tier upgrades do not affect other producers", () => {
+    // sapling tiers should not affect drone
+    expect(calcProducerUnitRate("drone", { sapling_t2: true, sapling_t3: true }, tuning)).toBe(8);
   });
 });
