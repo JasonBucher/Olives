@@ -40,12 +40,14 @@ const tuning = {
     foundation_model:{ baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000 },
   },
   guac: {
-    baseConsumption: 50,
+    baseConsumption: 200,
     consumeExponent: 0.85,
-    consumeExponentFloor: 0.5,
+    consumeExponentFloor: 0.70,
     baseProduction: 1,
     produceExponent: 1.0,
-    multiplierPerSqrt: 0.10,
+    multiplierCoeff: 0.06,
+    guacMultCap: 8.0,
+    guacMaintenanceRate: 0.5,
     labUnlockAps: 50,
   },
   upgrades: {
@@ -124,7 +126,7 @@ const tuning = {
       { apsMult: 1.5, wisdomEarnMult: 1.2, desc: "test" },
       { baseClickBonus: 1, guacProdMult: 1.3, desc: "test" },
       { costMult: 0.90, startingWisdom: 2, desc: "test" },
-      { multiplierPerSqrtBonus: 0.02, consumeFloorBonus: -0.05, desc: "test" },
+      { multiplierCoeffBonus: 0.01, consumeFloorBonus: -0.05, desc: "test" },
       { allProdMult: 2.0, unlocksFoundationModel: true, desc: "test" },
     ],
   },
@@ -287,19 +289,37 @@ describe("calcGuacMultiplier", () => {
     expect(calcGuacMultiplier(0, tuning)).toBe(1);
   });
 
-  it("applies sqrt scaling", () => {
-    // 1 + sqrt(100) * 0.10 = 1 + 10 * 0.10 = 2.0
-    expect(calcGuacMultiplier(100, tuning)).toBe(2);
+  it("applies asymptotic log2 scaling", () => {
+    // L = log2(101) * 0.06 ≈ 6.658 * 0.06 ≈ 0.3995
+    // mult = 1 + 7 * (0.3995 / 1.3995) ≈ 1 + 7 * 0.2854 ≈ 2.998
+    expect(calcGuacMultiplier(100, tuning)).toBeCloseTo(3.0, 0);
   });
 
-  it("grows with diminishing returns", () => {
-    // 1 + sqrt(400) * 0.10 = 1 + 20 * 0.10 = 3.0
-    expect(calcGuacMultiplier(400, tuning)).toBe(3);
+  it("approaches cap but never reaches it", () => {
+    // At 1M guac: L = log2(1000001) * 0.06 ≈ 19.93 * 0.06 ≈ 1.196
+    // mult = 1 + 7 * (1.196 / 2.196) ≈ 1 + 7 * 0.5446 ≈ 4.81
+    const mult = calcGuacMultiplier(1000000, tuning);
+    expect(mult).toBeGreaterThan(4.5);
+    expect(mult).toBeLessThan(8.0); // never reaches cap
   });
 
   it("handles small guac amounts", () => {
-    // 1 + sqrt(1) * 0.10 = 1.10
-    expect(calcGuacMultiplier(1, tuning)).toBeCloseTo(1.1);
+    // L = log2(2) * 0.06 = 0.06
+    // mult = 1 + 7 * (0.06 / 1.06) ≈ 1 + 7 * 0.0566 ≈ 1.396
+    expect(calcGuacMultiplier(1, tuning)).toBeCloseTo(1.4, 0);
+  });
+
+  it("gives early boost at 10 guac", () => {
+    // L = log2(11) * 0.06 ≈ 3.459 * 0.06 ≈ 0.2076
+    // mult = 1 + 7 * (0.2076 / 1.2076) ≈ 1 + 7 * 0.1719 ≈ 2.203
+    expect(calcGuacMultiplier(10, tuning)).toBeCloseTo(2.2, 0);
+  });
+
+  it("shows diminishing returns at high guac", () => {
+    const at10k = calcGuacMultiplier(10000, tuning);
+    const at100k = calcGuacMultiplier(100000, tuning);
+    // Difference should be small
+    expect(at100k - at10k).toBeLessThan(0.5);
   });
 });
 
@@ -308,25 +328,25 @@ describe("calcGuacConsumption", () => {
     expect(calcGuacConsumption(0, tuning)).toBe(0);
   });
 
-  it("returns base consumption with 1 lab", () => {
-    // 50 * 1^0.85 = 50
-    expect(calcGuacConsumption(1, tuning)).toBe(50);
+  it("returns base consumption with 1 lab (no guac)", () => {
+    // 200 * 1^0.85 = 200, maintenance = 0
+    expect(calcGuacConsumption(1, tuning)).toBe(200);
   });
 
   it("scales sublinearly with more labs", () => {
-    // 50 * 10^0.85 ≈ 354
+    // 200 * 10^0.85 ≈ 1416
     const c10 = calcGuacConsumption(10, tuning);
-    expect(c10).toBeCloseTo(354, 0);
-    // Should be less than linear (500)
-    expect(c10).toBeLessThan(500);
+    expect(c10).toBeCloseTo(1416, 0);
+    // Should be less than linear (2000)
+    expect(c10).toBeLessThan(2000);
   });
 
   it("scales further sublinearly at 100 labs", () => {
-    // 50 * 100^0.85 ≈ 2506
+    // 200 * 100^0.85 ≈ 10024
     const c100 = calcGuacConsumption(100, tuning);
-    expect(c100).toBeCloseTo(2506, 0);
-    // Should be less than linear (5000)
-    expect(c100).toBeLessThan(5000);
+    expect(c100).toBeCloseTo(10024, 0);
+    // Should be less than linear (20000)
+    expect(c100).toBeLessThan(20000);
   });
 });
 
@@ -334,12 +354,37 @@ describe("calcGuacConsumption — exponent floor", () => {
   it("clamps exponent at floor when pushed below", () => {
     const lowExpTuning = {
       ...tuning,
-      guac: { ...tuning.guac, consumeExponent: 0.2 },  // below floor of 0.5
+      guac: { ...tuning.guac, consumeExponent: 0.2 },  // below floor of 0.70
     };
-    // Should use floor (0.5), not 0.2
-    // 50 * 10^0.5 ≈ 158.1
+    // Should use floor (0.70), not 0.2
+    // 200 * 10^0.70 ≈ 1002
     const result = calcGuacConsumption(10, lowExpTuning);
-    expect(result).toBeCloseTo(50 * Math.pow(10, 0.5), 0);
+    expect(result).toBeCloseTo(200 * Math.pow(10, 0.70), 0);
+  });
+});
+
+describe("calcGuacConsumption — maintenance cost", () => {
+  it("adds maintenance proportional to guac count", () => {
+    // Base: 200 * 1^0.85 = 200, maintenance: 1000 * 0.5 = 500, total = 700
+    expect(calcGuacConsumption(1, tuning, undefined, undefined, undefined, undefined, 1000)).toBe(700);
+  });
+
+  it("maintenance scales linearly with guac", () => {
+    // Base: 200 * 1^0.85 = 200, maintenance: 50000 * 0.5 = 25000, total = 25200
+    expect(calcGuacConsumption(1, tuning, undefined, undefined, undefined, undefined, 50000)).toBe(25200);
+  });
+
+  it("maintenance adds to effective-exponent consumption", () => {
+    // 5 refineries: exp = 0.80, base: 200 * 10^0.80, maintenance: 100 * 0.5 = 50
+    const expected = 200 * Math.pow(10, 0.80) + 100 * 0.5;
+    const result = calcGuacConsumption(10, tuning, 5, {}, {}, 0, 100);
+    expect(result).toBeCloseTo(expected, 0);
+  });
+
+  it("maintenance is zero when guacCount is zero", () => {
+    const withoutGuac = calcGuacConsumption(10, tuning, 0, {}, {}, 0, 0);
+    const withoutParam = calcGuacConsumption(10, tuning, 0, {}, {}, 0);
+    expect(withoutGuac).toBeCloseTo(withoutParam, 5);
   });
 });
 
@@ -425,14 +470,16 @@ describe("calcTotalAps", () => {
 
   it("applies guac multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, guac mult = 1 + sqrt(100) * 0.10 = 2.0, total = 4
-    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(4);
+    // base = 2, guac mult ≈ 3.0 at 100 guac, total ≈ 6
+    const guacMult = calcGuacMultiplier(100, tuning);
+    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(2 * guacMult);
   });
 
   it("stacks guac and wisdom multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, wisdom = 2.0, guac = 2.0, total = 2 * 2 * 2 = 8
-    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(8);
+    // base = 2, wisdom = 2.0, guac ≈ 3.0 at 100 guac, total ≈ 2 * 2 * 3 = 12
+    const guacMult = calcGuacMultiplier(100, tuning);
+    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(2 * 2.0 * guacMult);
   });
 
   it("applies benchmark global multiplier", () => {
@@ -467,15 +514,17 @@ describe("calcClickPower", () => {
   });
 
   it("applies guac multiplier to clicks", () => {
-    // base 1, guac = 1 + sqrt(100) * 0.10 = 2.0
-    expect(calcClickPower({}, noProducers, 0, 100, 0, tuning)).toBeCloseTo(2);
+    // base 1, guac mult ≈ 3.0 at 100 guac
+    const guacMult = calcGuacMultiplier(100, tuning);
+    expect(calcClickPower({}, noProducers, 0, 100, 0, tuning)).toBeCloseTo(guacMult);
   });
 
   it("stacks all multipliers", () => {
-    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 2 (10 wisdom) = 12, * 2 (100 guac) = 24
+    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 2 (10 wisdom) = 12, * guac ≈ 3.0
+    const guacMult = calcGuacMultiplier(100, tuning);
     expect(calcClickPower(
       { strong_thumb: true, iron_thumb: true, global_boost_1: true }, noProducers, 10, 100, 0, tuning
-    )).toBeCloseTo(24);
+    )).toBeCloseTo(12 * guacMult);
   });
 
   // --- Throughput Clicking (base APS % bonus, highest tier wins) ---
@@ -592,12 +641,12 @@ describe("calcEffectiveConsumeExponent", () => {
   });
 
   it("clamps at floor", () => {
-    // 35 refineries: 0.85 - 0.35 = 0.50 (at floor)
-    expect(calcEffectiveConsumeExponent(35, {}, {}, 0, tuning)).toBe(0.50);
+    // 15 refineries: 0.85 - 0.15 = 0.70 (at floor)
+    expect(calcEffectiveConsumeExponent(15, {}, {}, 0, tuning)).toBe(0.70);
   });
 
   it("does not go below floor even with many refineries", () => {
-    expect(calcEffectiveConsumeExponent(100, {}, {}, 0, tuning)).toBe(0.50);
+    expect(calcEffectiveConsumeExponent(100, {}, {}, 0, tuning)).toBe(0.70);
   });
 
   it("applies Guac Memory II wisdom unlock", () => {
@@ -610,14 +659,14 @@ describe("calcEffectiveConsumeExponent", () => {
     expect(calcEffectiveConsumeExponent(5, { guac_recycler: true }, { guac_memory_2: true }, 3, tuning)).toBeCloseTo(0.72);
   });
 
-  it("Infinite Guac Theory lowers floor to 0.35", () => {
-    // With infinite_guac, floor is 0.35 instead of 0.50
-    expect(calcEffectiveConsumeExponent(100, {}, { infinite_guac: true }, 0, tuning)).toBe(0.35);
+  it("Infinite Guac Theory lowers floor to 0.55", () => {
+    // With infinite_guac, floor is 0.55 instead of 0.70
+    expect(calcEffectiveConsumeExponent(100, {}, { infinite_guac: true }, 0, tuning)).toBe(0.55);
   });
 
   it("Infinite Guac Theory allows going below old floor", () => {
-    // 0.85 - 40*0.01 = 0.45, below old floor 0.50 but above new floor 0.35
-    expect(calcEffectiveConsumeExponent(40, {}, { infinite_guac: true }, 0, tuning)).toBeCloseTo(0.45);
+    // 0.85 - 20*0.01 = 0.65, below old floor 0.70 but above new floor 0.55
+    expect(calcEffectiveConsumeExponent(20, {}, { infinite_guac: true }, 0, tuning)).toBeCloseTo(0.65);
   });
 });
 
@@ -666,15 +715,15 @@ describe("calcEffectiveBaseProduction", () => {
 describe("calcGuacConsumption — effective tuning", () => {
   it("uses effective exponent when extra args provided", () => {
     // 5 refineries: exp = 0.80
-    // 50 * 10^0.80
-    const expected = 50 * Math.pow(10, 0.80);
+    // 200 * 10^0.80
+    const expected = 200 * Math.pow(10, 0.80);
     const result = calcGuacConsumption(10, tuning, 5, {}, {}, 0);
     expect(result).toBeCloseTo(expected, 0);
   });
 
   it("still works with old 2-arg signature", () => {
-    // 50 * 10^0.85
-    const expected = 50 * Math.pow(10, 0.85);
+    // 200 * 10^0.85
+    const expected = 200 * Math.pow(10, 0.85);
     expect(calcGuacConsumption(10, tuning)).toBeCloseTo(expected, 0);
   });
 });
@@ -877,6 +926,7 @@ describe("calcDistillationBonus", () => {
     expect(b.guacProdMult).toBe(1);
     expect(b.costMult).toBe(1);
     expect(b.startingWisdom).toBe(0);
+    expect(b.multiplierCoeffBonus).toBe(0);
     expect(b.allProdMult).toBe(1);
     expect(b.wisdomEarnMult).toBe(1);
     expect(b.unlocksFoundationModel).toBe(false);
@@ -903,7 +953,7 @@ describe("calcDistillationBonus", () => {
 
   it("cumulates through v4.0", () => {
     const b = calcDistillationBonus(4, tuning);
-    expect(b.multiplierPerSqrtBonus).toBeCloseTo(0.02);
+    expect(b.multiplierCoeffBonus).toBeCloseTo(0.01);
     expect(b.consumeFloorBonus).toBeCloseTo(-0.05);
   });
 

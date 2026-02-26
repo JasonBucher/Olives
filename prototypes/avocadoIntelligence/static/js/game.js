@@ -756,7 +756,7 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
       if (costEl) costEl.textContent = Calc.formatNumber(cost);
       let rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
       if (id === "guac_lab" && state.upgrades.guac_unlock) {
-        const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount);
+        const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
         const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
         rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
       }
@@ -1189,7 +1189,7 @@ function startLoop() {
       // We pass refineries to calcGuacConsumption which handles refinery reduction;
       // centrifuge effect is additional, so we adjust the refinery count for calc purposes
       const effectiveRefineries = refineries + centrifuges * 0.5; // 0.5 * 0.01 = 0.005 per centrifuge
-      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, effectiveRefineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount) * dt * hpMods.guacConsumeMult;
+      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, effectiveRefineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount) * dt * hpMods.guacConsumeMult;
       const actualConsumption = Math.min(desiredConsumption, state.avocadoCount);
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;

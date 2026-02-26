@@ -81,7 +81,7 @@ export function calcEffectiveConsumeExponent(refineryCount, upgrades, wisdomUnlo
   // Floor
   let floor = tuning.guac.consumeExponentFloor;
   if (wisdomUnlocks.infinite_guac) {
-    floor = 0.35;
+    floor = 0.55;
   }
   return Math.max(exp, floor);
 }
@@ -113,8 +113,8 @@ export function calcEffectiveBaseProduction(upgrades, tuning) {
   return base;
 }
 
-/** Calculate total guac lab avocado consumption per second (sublinear). */
-export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, wisdomUnlocks, prestigeCount) {
+/** Calculate total guac lab avocado consumption per second (sublinear + maintenance). */
+export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, wisdomUnlocks, prestigeCount, guacCount) {
   if (labCount <= 0) return 0;
   // Support both old signature (labCount, tuning) and new signature with extra args
   let exp;
@@ -123,7 +123,11 @@ export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, w
   } else {
     exp = Math.max(tuning.guac.consumeExponent, tuning.guac.consumeExponentFloor);
   }
-  return tuning.guac.baseConsumption * Math.pow(labCount, exp);
+  let consumption = tuning.guac.baseConsumption * Math.pow(labCount, exp);
+  // Maintenance: accumulated guac has an ongoing cost
+  const maintenanceRate = tuning.guac.guacMaintenanceRate || 0;
+  consumption += (guacCount || 0) * maintenanceRate;
+  return consumption;
 }
 
 /** Calculate guac produced per second at full feed. */
@@ -146,9 +150,12 @@ export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, pr
   return result;
 }
 
-/** Calculate the guac global multiplier. */
+/** Calculate the guac global multiplier (asymptotic soft cap). */
 export function calcGuacMultiplier(guacCount, tuning, benchmarks) {
-  let mult = 1 + Math.sqrt(guacCount) * tuning.guac.multiplierPerSqrt;
+  const coeff = tuning.guac.multiplierCoeff;
+  const cap = tuning.guac.guacMultCap;
+  const logTerm = Math.log2(1 + guacCount) * coeff;
+  let mult = 1 + (cap - 1) * (logTerm / (1 + logTerm));
   if (benchmarks) {
     const bb = calcBenchmarkBonus(benchmarks, tuning);
     mult = 1 + (mult - 1) * bb.guacMult;
@@ -348,13 +355,13 @@ export function canDistill(totalWisdomSinceLastDistill, distillationCount, tunin
 /**
  * Calculate cumulative distillation bonuses for a given model version.
  * Returns { apsMult, clickBaseBonus, guacProdMult, costMult, startingWisdom,
- *           multiplierPerSqrtBonus, consumeFloorBonus, allProdMult, wisdomEarnMult,
+ *           multiplierCoeffBonus, consumeFloorBonus, allProdMult, wisdomEarnMult,
  *           unlocksFoundationModel }.
  */
 export function calcDistillationBonus(modelVersion, tuning) {
   const result = {
     apsMult: 1, clickBaseBonus: 0, guacProdMult: 1, costMult: 1,
-    startingWisdom: 0, multiplierPerSqrtBonus: 0, consumeFloorBonus: 0,
+    startingWisdom: 0, multiplierCoeffBonus: 0, consumeFloorBonus: 0,
     allProdMult: 1, wisdomEarnMult: 1, unlocksFoundationModel: false,
   };
   if (!tuning.distillation || modelVersion <= 0) return result;
@@ -366,7 +373,7 @@ export function calcDistillationBonus(modelVersion, tuning) {
     if (b.guacProdMult) result.guacProdMult *= b.guacProdMult;
     if (b.costMult) result.costMult *= b.costMult;
     if (b.startingWisdom) result.startingWisdom += b.startingWisdom;
-    if (b.multiplierPerSqrtBonus) result.multiplierPerSqrtBonus += b.multiplierPerSqrtBonus;
+    if (b.multiplierCoeffBonus) result.multiplierCoeffBonus += b.multiplierCoeffBonus;
     if (b.consumeFloorBonus) result.consumeFloorBonus += b.consumeFloorBonus;
     if (b.allProdMult) result.allProdMult *= b.allProdMult;
     if (b.wisdomEarnMult) result.wisdomEarnMult *= b.wisdomEarnMult;

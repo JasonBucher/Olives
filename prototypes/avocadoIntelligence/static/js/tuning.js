@@ -36,12 +36,14 @@ export const TUNING = {
   },
 
   guac: {
-    baseConsumption: 50,        // base avocado consumption rate per lab
+    baseConsumption: 200,       // base avocado consumption rate per lab
     consumeExponent: 0.85,      // sublinear scaling: consume = base * n^exp
-    consumeExponentFloor: 0.5,  // minimum consume exponent (prevents n^0 exploit)
+    consumeExponentFloor: 0.70, // minimum consume exponent (prevents n^0 exploit)
     baseProduction: 1,          // guac produced per lab at base
     produceExponent: 1.0,       // guac output scaling: produce = base * n^exp
-    multiplierPerSqrt: 0.10,    // guac multiplier = 1 + sqrt(guac) * this
+    multiplierCoeff: 0.06,      // controls ramp speed of asymptotic guac multiplier
+    guacMultCap: 8.0,           // asymptotic cap for guac multiplier (never quite reached)
+    guacMaintenanceRate: 0.5,   // avo/sec consumed per unit of guac held (maintenance cost)
     labUnlockAps: 50,           // avocados/sec needed to buy guac labs
   },
 
@@ -161,7 +163,7 @@ export const TUNING = {
   wisdomUnlocks: {
     guac_memory_1:     { wisdomCost: 3,  title: "Guac Memory I",         desc: "produceExponent +0.02 per prestige completed" },
     guac_memory_2:     { wisdomCost: 10, title: "Guac Memory II",        desc: "consumeExponent -0.01 per prestige completed" },
-    infinite_guac:     { wisdomCost: 25, title: "Infinite Guac Theory",  desc: "consumeExponent floor lowered from 0.50 to 0.35" },
+    infinite_guac:     { wisdomCost: 25, title: "Infinite Guac Theory",  desc: "consumeExponent floor lowered from 0.70 to 0.55" },
   },
 
   benchmarks: {
@@ -224,7 +226,7 @@ export const TUNING = {
       { apsMult: 1.5, wisdomEarnMult: 1.2, desc: "Base APS x1.5, wisdom earn rate x1.2", flavor: "Knowledge compressed. Inference faster." },
       { baseClickBonus: 1, guacProdMult: 1.3, desc: "+1 base click power, guac production x1.3", flavor: "Attention weights optimized." },
       { costMult: 0.90, startingWisdom: 2, desc: "Producer costs x0.90, +2 starting wisdom on prestige", flavor: "Quantized. Smaller, same performance." },
-      { multiplierPerSqrtBonus: 0.02, consumeFloorBonus: -0.05, desc: "Guac mult 0.10\u21920.12, consume floor -0.05", flavor: "Architecture breakthrough." },
+      { multiplierCoeffBonus: 0.01, consumeFloorBonus: -0.05, desc: "Guac mult coeff +0.01, consume floor -0.05", flavor: "Architecture breakthrough." },
       { allProdMult: 2.0, unlocksFoundationModel: true, desc: "All production x2.0, unlock Foundation Model", flavor: "You have built AGI." },
     ],
   },
