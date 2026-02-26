@@ -406,6 +406,18 @@ function renderGuacBuyQuantitySelector() {
   sectionTitle.appendChild(bar);
 }
 
+const GUAC_PRODUCER_IDS = new Set(["guac_lab", "guac_refinery", "guac_centrifuge"]);
+
+function getUpgradeCategory(cfg) {
+  if (cfg.clickMult || cfg.apsPctPerClick) return "click";
+  if (cfg.synergyPct) return "synergy";
+  if (cfg.unlocksGuac || cfg.consumeExpDelta || cfg.produceExpDelta || cfg.baseProdMult) return "guac";
+  if (cfg.producerId && GUAC_PRODUCER_IDS.has(cfg.producerId)) return "guac";
+  if (cfg.globalMult || cfg.wisdomMult) return "global";
+  if (cfg.producerId) return "production";
+  return "global";
+}
+
 function renderUpgradeList() {
   upgradesListEl.innerHTML = "";
   for (const inv of INVESTMENTS) {
@@ -413,6 +425,7 @@ function renderUpgradeList() {
     const row = document.createElement("div");
     row.className = "upgrade-row";
     row.dataset.id = inv.id;
+    row.dataset.category = getUpgradeCategory(cfg);
     row.innerHTML = `
       <div class="upgrade-info">
         <div class="upgrade-title">${cfg.title}</div>

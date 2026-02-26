@@ -385,9 +385,17 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
+  padding: 8px 0 8px 10px;
   border-bottom: 1px solid var(--divider);
+  border-left: 3px solid transparent;
 }
+
+/* Upgrade category colors */
+.upgrade-row[data-category="click"]      { border-left-color: #e8a438; }
+.upgrade-row[data-category="production"] { border-left-color: #4a8cc7; }
+.upgrade-row[data-category="synergy"]    { border-left-color: #9b6abf; }
+.upgrade-row[data-category="guac"]       { border-left-color: #4a7c3f; }
+.upgrade-row[data-category="global"]     { border-left-color: #d4af37; }
 .upgrade-row:last-child { border-bottom: 0; }
 
 .upgrade-row.owned {

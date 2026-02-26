@@ -23,6 +23,8 @@ function makeUpgrade(id) {
     group: cfg.synergyPct ? "synergy" : cfg.producerId ? "production" : cfg.clickMult ? "click" : "global",
     cost: () => cfg.cost,
     isUnlocked: (state, ctx) => {
+      // Prestige gate: must have completed enough prestiges
+      if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount) return false;
       // Wisdom unlock gate: must own the specified wisdom unlock
       if (cfg.requiresWisdomUnlock && !state.wisdomUnlocks[cfg.requiresWisdomUnlock]) return false;
       // Prerequisite upgrade must be owned first
