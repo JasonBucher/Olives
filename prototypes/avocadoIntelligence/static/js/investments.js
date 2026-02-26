@@ -132,6 +132,7 @@ export const INVESTMENTS = [
   // Late (T2–T3)
   makeUpgrade("gpu_cluster_t2"),
   makeUpgrade("gpu_cluster_t3"),
+  makeUpgrade("gpu_cluster_t4"),
   makeUpgrade("neural_pit_t2"),
   makeUpgrade("neural_pit_t3"),
   makeUpgrade("synth_orchard_t2"),

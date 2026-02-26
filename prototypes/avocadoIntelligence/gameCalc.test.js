@@ -51,8 +51,8 @@ const tuning = {
   upgrades: {
     strong_thumb:       { cost: 100,  unlockAt: 0, clickMult: 2 },
     iron_thumb:         { cost: 500,  unlockAt: 0, clickMult: 2 },
-    efficient_saplings: { cost: 1000, unlockAt: 10, producerId: "sapling", prodMult: 2 },
-    drip_irrigation:    { cost: 5000, unlockAt: 5,  producerId: "orchard_row", prodMult: 2 },
+    efficient_saplings: { cost: 40,   unlockAt: 5,  producerId: "sapling", prodMult: 2 },
+    drip_irrigation:    { cost: 402,  unlockAt: 5,  producerId: "orchard_row", prodMult: 2 },
     global_boost_1:     { cost: 10000, unlockAt: 0, globalMult: 1.5 },
     global_boost_2:     { cost: 500000, unlockAt: 0, globalMult: 2 },
     global_boost_3:     { cost: 5e7, unlockAt: 0, globalMult: 2 },
@@ -65,15 +65,15 @@ const tuning = {
     throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03 },
     throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  apsPctPerClick: 0.06 },
     throughput_click_3: { cost: 50000, apsUnlockAt: 100, apsPctPerClick: 0.10 },
-    attention_focus:    { cost: 2e6,   unlockAt: 5,  producerId: "attention_head", prodMult: 2 },
-    transformer_scale:  { cost: 5e8,   unlockAt: 5,  producerId: "transformer", prodMult: 2 },
-    seed_catalog:       { cost: 500,   unlockAt: 10, producerId: "seed_bank", prodMult: 2 },
-    hot_compost:        { cost: 3000,  unlockAt: 5,  producerId: "compost_bin", prodMult: 2 },
-    climate_control:    { cost: 25000, unlockAt: 5,  producerId: "greenhouse", prodMult: 2 },
-    harvest_fleet:      { cost: 250000, unlockAt: 5, producerId: "harvest_bot", prodMult: 2 },
-    data_lake:          { cost: 1.5e6, unlockAt: 5,  producerId: "data_grove", prodMult: 2 },
-    gpu_overclock:      { cost: 2e7,   unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2 },
-    drone_swarm:        { cost: 50000, unlockAt: 5,  producerId: "drone",       prodMult: 2 },
+    attention_focus:    { cost: 3218171,   unlockAt: 5,  producerId: "attention_head", prodMult: 2 },
+    transformer_scale:  { cost: 603407156, unlockAt: 5,  producerId: "transformer", prodMult: 2 },
+    seed_catalog:       { cost: 140,       unlockAt: 5,  producerId: "seed_bank", prodMult: 2 },
+    hot_compost:        { cost: 1609,      unlockAt: 5,  producerId: "compost_bin", prodMult: 2 },
+    climate_control:    { cost: 16090,     unlockAt: 5,  producerId: "greenhouse", prodMult: 2 },
+    harvest_fleet:      { cost: 181022,    unlockAt: 5,  producerId: "harvest_bot", prodMult: 2 },
+    data_lake:          { cost: 1407950,   unlockAt: 5,  producerId: "data_grove", prodMult: 2 },
+    gpu_overclock:      { cost: 20113571,  unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2 },
+    drone_swarm:        { cost: 4424,  unlockAt: 5,  producerId: "drone",       prodMult: 2 },
     // Multi-tier upgrades for stacking tests
     sapling_t2:         { cost: 1646,        unlockAt: 25,  producerId: "sapling",      prodMult: 2 },
     sapling_t3:         { cost: 108366,      unlockAt: 50,  producerId: "sapling",      prodMult: 2 },
@@ -81,8 +81,9 @@ const tuning = {
     sapling_t5:         { cost: 254510701921, unlockAt: 150, producerId: "sapling",     prodMult: 2 },
     drone_t2:           { cost: 181054,      unlockAt: 25,  producerId: "drone",        prodMult: 2 },
     drone_t3:           { cost: 11920232,    unlockAt: 50,  producerId: "drone",        prodMult: 2 },
-    gpu_cluster_t2:     { cost: 822973815,   unlockAt: 25,  producerId: "gpu_cluster",  prodMult: 2 },
-    gpu_cluster_t3:     { cost: 54182872079, unlockAt: 50,  producerId: "gpu_cluster",  prodMult: 2 },
+    gpu_cluster_t2:     { cost: 822973815,       unlockAt: 25,  producerId: "gpu_cluster",  prodMult: 2 },
+    gpu_cluster_t3:     { cost: 54182872079,     unlockAt: 50,  producerId: "gpu_cluster",  prodMult: 2 },
+    gpu_cluster_t4:     { cost: 88073508802520,  unlockAt: 100, producerId: "gpu_cluster",  prodMult: 2 },
     agi_nexus_t2:       { cost: 822973815495, unlockAt: 25, producerId: "agi_nexus",    prodMult: 2 },
   },
   benchmarks: {
@@ -960,9 +961,11 @@ describe("calcProducerUnitRate — multi-tier stacking", () => {
     expect(calcProducerUnitRate("drone", { drone_swarm: true, drone_t2: true, drone_t3: true }, tuning)).toBeCloseTo(64);
   });
 
-  it("stacking works for late-tier producer (gpu_cluster)", () => {
-    // gpu_cluster base 2800, T1 (gpu_overclock) 2x, T2 2x = 4x = 11200
-    expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true, gpu_cluster_t2: true }, tuning)).toBeCloseTo(11200);
+  it("stacking works for late-tier producer (gpu_cluster) with T4", () => {
+    // gpu_cluster base 2800, T1 2x, T2 2x, T3 2x, T4 2x = 16x = 44800
+    expect(calcProducerUnitRate("gpu_cluster", {
+      gpu_overclock: true, gpu_cluster_t2: true, gpu_cluster_t3: true, gpu_cluster_t4: true,
+    }, tuning)).toBeCloseTo(44800);
   });
 
   it("stacking works for endgame producer (agi_nexus)", () => {
