@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   clamp, formatRate, getDisplayCount, rollWeighted, canPrestige,
   formatNumber, calcProducerCost, calcProducerUnitRate,
+  calcBulkProducerCost, calcMaxAffordable,
   calcBaseAps, calcTotalAps, calcClickPower, calcWisdomEarned, calcWisdomBonus,
   calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
   calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
@@ -246,6 +247,76 @@ describe("calcProducerCost", () => {
     expect(calcProducerCost("seed_bank", 0, tuning)).toBe(35);
     expect(calcProducerCost("gpu_cluster", 0, tuning)).toBe(5000000);
     expect(calcProducerCost("omega_harvest", 0, tuning)).toBe(1000000000000);
+  });
+});
+
+describe("calcBulkProducerCost", () => {
+  it("qty=1 equals calcProducerCost result", () => {
+    expect(calcBulkProducerCost("sapling", 0, 1, tuning)).toBe(calcProducerCost("sapling", 0, tuning));
+  });
+
+  it("qty=3 equals sum of 3 individual calcProducerCost calls", () => {
+    const expected = calcProducerCost("sapling", 0, tuning)
+                   + calcProducerCost("sapling", 1, tuning)
+                   + calcProducerCost("sapling", 2, tuning);
+    expect(calcBulkProducerCost("sapling", 0, 3, tuning)).toBe(expected);
+  });
+
+  it("respects starting ownedCount", () => {
+    const expected = calcProducerCost("sapling", 5, tuning)
+                   + calcProducerCost("sapling", 6, tuning);
+    expect(calcBulkProducerCost("sapling", 5, 2, tuning)).toBe(expected);
+  });
+
+  it("applies costMult per-unit", () => {
+    const costMult = 0.9;
+    const expected = Math.floor(calcProducerCost("sapling", 0, tuning) * costMult)
+                   + Math.floor(calcProducerCost("sapling", 1, tuning) * costMult);
+    expect(calcBulkProducerCost("sapling", 0, 2, tuning, costMult)).toBe(expected);
+  });
+
+  it("returns 0 for qty=0", () => {
+    expect(calcBulkProducerCost("sapling", 0, 0, tuning)).toBe(0);
+  });
+});
+
+describe("calcMaxAffordable", () => {
+  it("returns 0 when budget < first unit cost", () => {
+    expect(calcMaxAffordable("sapling", 0, 5, tuning)).toBe(0);
+  });
+
+  it("returns 1 when budget equals exactly one unit", () => {
+    const cost = calcProducerCost("sapling", 0, tuning);
+    expect(calcMaxAffordable("sapling", 0, cost, tuning)).toBe(1);
+  });
+
+  it("returns correct count for larger budgets", () => {
+    // sapling costs: 10, 11, 12, 14, 16, 18 ... (floor of 10 * 1.15^n)
+    // Cumulative: 10, 21, 33, 47, 63, 81
+    const budget = 50;
+    const count = calcMaxAffordable("sapling", 0, budget, tuning);
+    expect(count).toBe(4); // 10+11+12+14 = 47 <= 50, next would be 16 -> 63 > 50
+    expect(calcBulkProducerCost("sapling", 0, count, tuning)).toBeLessThanOrEqual(budget);
+    expect(calcBulkProducerCost("sapling", 0, count + 1, tuning)).toBeGreaterThan(budget);
+  });
+
+  it("accounts for starting ownedCount", () => {
+    // At owned=10, sapling costs 40 each
+    const cost10 = calcProducerCost("sapling", 10, tuning);
+    expect(calcMaxAffordable("sapling", 10, cost10 - 1, tuning)).toBe(0);
+    expect(calcMaxAffordable("sapling", 10, cost10, tuning)).toBe(1);
+  });
+
+  it("applies costMult", () => {
+    const costMult = 0.5;
+    // With 0.5x costs, can afford more units
+    const normalCount = calcMaxAffordable("sapling", 0, 50, tuning);
+    const discountedCount = calcMaxAffordable("sapling", 0, 50, tuning, costMult);
+    expect(discountedCount).toBeGreaterThan(normalCount);
+  });
+
+  it("returns 0 for zero budget", () => {
+    expect(calcMaxAffordable("sapling", 0, 0, tuning)).toBe(0);
   });
 });
 

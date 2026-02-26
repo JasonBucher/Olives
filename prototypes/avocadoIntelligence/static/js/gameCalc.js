@@ -52,6 +52,29 @@ export function calcProducerCost(id, ownedCount, tuning) {
   return Math.floor(p.baseCost * Math.pow(p.costGrowth, ownedCount));
 }
 
+/** Calculate the total cost of buying `quantity` producers starting from `ownedCount`. */
+export function calcBulkProducerCost(id, ownedCount, quantity, tuning, costMult = 1) {
+  if (quantity <= 0) return 0;
+  let total = 0;
+  for (let i = 0; i < quantity; i++) {
+    total += Math.floor(calcProducerCost(id, ownedCount + i, tuning) * costMult);
+  }
+  return total;
+}
+
+/** Calculate the maximum number of producers affordable within `budget`. */
+export function calcMaxAffordable(id, ownedCount, budget, tuning, costMult = 1) {
+  let count = 0;
+  let remaining = budget;
+  while (true) {
+    const cost = Math.floor(calcProducerCost(id, ownedCount + count, tuning) * costMult);
+    if (cost > remaining) break;
+    remaining -= cost;
+    count++;
+  }
+  return count;
+}
+
 /** Calculate a single producer's per-unit output rate, applying per-producer upgrade multipliers. */
 export function calcProducerUnitRate(id, upgrades, tuning) {
   let rate = tuning.producers[id].baseRate;

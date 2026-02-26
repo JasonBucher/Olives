@@ -97,6 +97,9 @@ let state = createDefaultState();
 const revealedProducers = new Set();
 const revealedUpgrades = new Set();
 
+// --- Buy quantity selector (session-only, not persisted) ---
+let buyQuantity = 1; // 1, 10, 100, or "max"
+
 // --- APS milestone tracking ---
 const APS_MILESTONES = [1, 10, 100, 1000, 10000, 100000];
 const APS_MILESTONE_MESSAGES = {
@@ -136,6 +139,7 @@ const CLICK_MESSAGES = [
 let lastUnderfedLogTime = 0;
 
 // --- DOM ---
+const gameTitleEl = document.getElementById("game-title");
 const avocadoCountEl = document.getElementById("avocado-count");
 const apsCountEl = document.getElementById("aps-count");
 const clickPowerEl = document.getElementById("click-power");
@@ -336,6 +340,32 @@ function renderGuacProducerList() {
   renderProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER);
 }
 
+function renderBuyQuantitySelector() {
+  const sectionTitle = producersListEl.closest(".section")?.querySelector(".section-title");
+  if (!sectionTitle) return;
+  sectionTitle.style.display = "flex";
+  sectionTitle.style.justifyContent = "space-between";
+  sectionTitle.style.alignItems = "center";
+
+  const bar = document.createElement("div");
+  bar.className = "buy-qty-bar";
+  const options = [1, 10, 100, "max"];
+  for (const opt of options) {
+    const btn = document.createElement("button");
+    btn.className = "buy-qty-tab" + (opt === 1 ? " active" : "");
+    btn.type = "button";
+    btn.textContent = opt === "max" ? "MAX" : String(opt);
+    btn.addEventListener("click", () => {
+      bar.querySelectorAll(".buy-qty-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      buyQuantity = opt;
+      updateUI();
+    });
+    bar.appendChild(btn);
+  }
+  sectionTitle.appendChild(bar);
+}
+
 function renderUpgradeList() {
   upgradesListEl.innerHTML = "";
   for (const inv of INVESTMENTS) {
@@ -503,6 +533,11 @@ function updateUI() {
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
 
+  // Dynamic game title based on model version
+  const gameTitle = (state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado";
+  if (gameTitleEl) gameTitleEl.textContent = gameTitle;
+  document.title = gameTitle;
+
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
   apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   clickPowerEl.textContent = Calc.formatNumber(clickPower);
@@ -549,12 +584,27 @@ function updateUI() {
     totalMultEl.textContent = `x${(guacMult * wisdomMult).toFixed(2)}`;
   }
 
-  // Model version row — show when distilled
-  const modelRowEl = document.getElementById("model-version-row");
-  if (modelRowEl) {
-    modelRowEl.style.display = (state.modelVersion || 0) > 0 ? "" : "none";
-    const mvEl = document.getElementById("model-version-val");
-    if (mvEl) mvEl.textContent = `v${state.modelVersion || 0}.0`;
+  // Model version bar
+  const modelBarEl = document.getElementById("model-bar");
+  if (modelBarEl) {
+    const mv = state.modelVersion || 0;
+    modelBarEl.style.display = mv > 0 ? "" : "none";
+    if (mv > 0) {
+      document.getElementById("model-bar-label").textContent = `◆ Model v${mv}.0`;
+      const tooltipEl = document.getElementById("model-bar-tooltip");
+      const lines = [];
+      if (distBonus.apsMult !== 1) lines.push(`APS ×${distBonus.apsMult.toFixed(1)}`);
+      if (distBonus.allProdMult !== 1) lines.push(`All production ×${distBonus.allProdMult.toFixed(1)}`);
+      if (distBonus.clickBaseBonus > 0) lines.push(`+${distBonus.clickBaseBonus} base click power`);
+      if (distBonus.guacProdMult !== 1) lines.push(`Guac production ×${distBonus.guacProdMult.toFixed(1)}`);
+      if (distBonus.costMult !== 1) lines.push(`Producer costs ×${distBonus.costMult.toFixed(2)}`);
+      if (distBonus.startingWisdom > 0) lines.push(`+${distBonus.startingWisdom} starting wisdom on prestige`);
+      if (distBonus.multiplierCoeffBonus > 0) lines.push(`Guac mult coeff +${distBonus.multiplierCoeffBonus.toFixed(2)}`);
+      if (distBonus.consumeFloorBonus !== 0) lines.push(`Consume floor ${distBonus.consumeFloorBonus.toFixed(2)}`);
+      if (distBonus.wisdomEarnMult !== 1) lines.push(`Wisdom earn rate ×${distBonus.wisdomEarnMult.toFixed(1)}`);
+      if (distBonus.unlocksFoundationModel) lines.push(`Foundation Model unlocked`);
+      tooltipEl.textContent = lines.join("  ·  ");
+    }
   }
 
   // Hyperparams row — show when tuned (any non-default)
@@ -707,15 +757,28 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
   const refineries = state.producers.guac_refinery || 0;
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
+  const combinedCostMult = distBonus.costMult * hpMods.costMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
   for (const id of order) {
     const owned = state.producers[id] || 0;
-    let cost = Calc.calcProducerCost(id, owned, TUNING);
-    cost = Math.floor(cost * distBonus.costMult * hpMods.costMult);
+    const singleCost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * combinedCostMult);
     const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
-    const canAfford = state.avocadoCount >= cost;
+
+    // Compute display cost and effective quantity based on buyQuantity
+    let effectiveQty;
+    let displayCost;
+    if (buyQuantity === "max") {
+      effectiveQty = Calc.calcMaxAffordable(id, owned, state.avocadoCount, TUNING, combinedCostMult);
+      displayCost = effectiveQty > 0
+        ? Calc.calcBulkProducerCost(id, owned, effectiveQty, TUNING, combinedCostMult)
+        : singleCost;
+    } else {
+      effectiveQty = buyQuantity;
+      displayCost = Calc.calcBulkProducerCost(id, owned, buyQuantity, TUNING, combinedCostMult);
+    }
+    const canAfford = state.avocadoCount >= displayCost && effectiveQty > 0;
 
     const row = listEl.querySelector(`[data-id="${id}"]`);
     const countEl = listEl.querySelector(`[data-count="${id}"]`);
@@ -725,6 +788,11 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
     const descEl = listEl.querySelector(`[data-desc="${id}"]`);
 
     const cfg = TUNING.producers[id];
+
+    // Format buy button label
+    const costLabel = effectiveQty > 1
+      ? `${Calc.formatNumber(displayCost)} (\u00d7${effectiveQty})`
+      : Calc.formatNumber(displayCost);
 
     // 1. Hard gate: prestige-gated producers hidden until enough prestiges
     if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount && owned === 0) {
@@ -743,7 +811,7 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
       if (row) { row.style.display = ""; row.classList.remove("locked"); }
       if (descEl) descEl.textContent = cfg.desc;
       if (countEl) countEl.textContent = `(${owned} owned)`;
-      if (costEl) costEl.textContent = Calc.formatNumber(cost);
+      if (costEl) costEl.textContent = costLabel;
       let rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
       if (id === "guac_lab" && state.upgrades.guac_unlock) {
         const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
@@ -798,10 +866,11 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
     }
 
     // 6. Threshold check: first eligible always visible; others need >= costThreshold
+    // Use singleCost for reveal gating, not bulk cost
     if (!firstEligibleSeen) {
       firstEligibleSeen = true;
       revealedProducers.add(id);
-    } else if (state.avocadoCount >= cost * costThreshold) {
+    } else if (state.avocadoCount >= singleCost * costThreshold) {
       revealedProducers.add(id);
     }
 
@@ -814,7 +883,7 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
     if (row) { row.style.display = ""; row.classList.remove("locked"); }
     if (descEl) descEl.textContent = cfg.desc;
     if (countEl) countEl.textContent = "";
-    if (costEl) costEl.textContent = Calc.formatNumber(cost);
+    if (costEl) costEl.textContent = costLabel;
     let rateText = `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
     if (id === "guac_lab" && state.upgrades.guac_unlock) {
       rateText += ` | Also converts avocados \u2192 guac`;
@@ -941,17 +1010,43 @@ function buyProducer(id) {
   const cfg = TUNING.producers[id];
   if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount) return;
 
-  const owned = state.producers[id] || 0;
   const hpModsBuy = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  const cost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * distBonusBuy.costMult * hpModsBuy.costMult);
-  if (state.avocadoCount < cost) return;
+  const combinedCostMult = distBonusBuy.costMult * hpModsBuy.costMult;
 
-  state.avocadoCount -= cost;
-  state.producers[id] = owned + 1;
+  // Determine how many to buy
+  const startOwned = state.producers[id] || 0;
+  let qty;
+  if (buyQuantity === "max") {
+    qty = Calc.calcMaxAffordable(id, startOwned, state.avocadoCount, TUNING, combinedCostMult);
+  } else {
+    qty = buyQuantity;
+  }
+  if (qty <= 0) return;
 
-  SessionLog.record("purchase", { kind: "producer", id, title: cfg.title, count: state.producers[id], cost });
-  logLine(`Bought ${cfg.title} (#${state.producers[id]})`);
+  // Buy loop — one at a time for correct scaling
+  let bought = 0;
+  let totalCost = 0;
+  for (let i = 0; i < qty; i++) {
+    const owned = state.producers[id] || 0;
+    const cost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * combinedCostMult);
+    if (state.avocadoCount < cost) break;
+    state.avocadoCount -= cost;
+    state.producers[id] = owned + 1;
+    totalCost += cost;
+    bought++;
+  }
+
+  if (bought === 0) return;
+
+  const endCount = state.producers[id];
+  if (bought === 1) {
+    SessionLog.record("purchase", { kind: "producer", id, title: cfg.title, count: endCount, cost: totalCost });
+    logLine(`Bought ${cfg.title} (#${endCount})`);
+  } else {
+    SessionLog.record("purchase", { kind: "producer", id, title: cfg.title, count: endCount, bought, cost: totalCost });
+    logLine(`Bought ${bought} ${cfg.title} (#${startOwned + 1}-${endCount})`);
+  }
   saveGame();
   updateUI();
 }
@@ -1406,10 +1501,11 @@ const analyzerView = initAnalyzerView({
 
 loadGame();
 renderProducerList();
+renderBuyQuantitySelector();
 renderGuacProducerList();
 renderUpgradeList();
 renderBenchmarks();
 updateUI();
 captureStateSnapshot("init");
 startLoop();
-logLine("Avocado Intelligence loaded.");
+logLine(((state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado") + " loaded.");

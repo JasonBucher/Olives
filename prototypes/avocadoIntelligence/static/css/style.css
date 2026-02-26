@@ -252,6 +252,29 @@ h1 {
   padding: 6px 10px;
 }
 
+/* Buy quantity selector */
+.buy-qty-bar {
+  display: flex;
+  gap: 2px;
+}
+
+.buy-qty-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-family: var(--mono);
+}
+
+.buy-qty-tab:hover { background: rgba(255,255,255,0.06); }
+.buy-qty-tab.active { background: var(--btn); color: var(--text); }
+
 /* Tab bar */
 .tab-bar {
   display: flex;
@@ -339,6 +362,49 @@ h1 {
 .benchmark-lock {
   color: var(--muted);
   margin-right: 4px;
+}
+
+/* Model version status bar */
+.model-bar {
+  position: relative;
+  margin: 8px 0 4px;
+  padding: 6px 14px;
+  background: linear-gradient(180deg, #3a3f3c 0%, #252a27 50%, #1e2320 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  color: #c8ceca;
+  letter-spacing: 0.04em;
+  cursor: default;
+}
+
+.model-bar-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #252a27;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.6;
+  z-index: 10;
+
+  /* Hidden by default, appears after 0.3s hover */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+}
+
+.model-bar:hover .model-bar-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.3s;
 }
 
 @media (max-width: 900px) {

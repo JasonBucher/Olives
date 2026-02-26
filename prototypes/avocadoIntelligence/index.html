@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Avocado Intelligence</title>
+  <title>Avocado</title>
   <link rel="stylesheet" href="static/css/style.css" />
 </head>
 <body>
   <div id="game-root" class="container">
     <header class="topbar">
       <div class="title">
-        <h1>Avocado Intelligence</h1>
+        <h1 id="game-title">Avocado</h1>
         <div class="subtitle">Click. Grow. Prestige.</div>
       </div>
       <div class="topbar-actions">
@@ -20,6 +20,11 @@
     </header>
 
     <hr class="divider" />
+
+    <div id="model-bar" class="model-bar" style="display: none;">
+      <span id="model-bar-label">◆ Model v0.0</span>
+      <div class="model-bar-tooltip" id="model-bar-tooltip"></div>
+    </div>
 
     <div class="layout">
       <!-- Left Column: Farm + Guac Processing + Log -->
@@ -66,11 +71,6 @@
             <div class="row" id="total-mult-row" style="display: none;">
               <div class="label">Total Multiplier</div>
               <div class="value"><span id="total-mult">x1.00</span></div>
-            </div>
-
-            <div class="row" id="model-version-row" style="display: none;">
-              <div class="label">Model Version</div>
-              <div class="value"><span id="model-version-val">v0.0</span></div>
             </div>
 
             <div class="row" id="hyperparams-row" style="display: none;">
