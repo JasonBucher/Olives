@@ -120,6 +120,7 @@ h1 {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .footer {
@@ -149,6 +150,31 @@ h1 {
 }
 .btn:disabled:hover { background: var(--btn); }
 
+.pick-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pick-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.btn-pick {
+  width: 64px;
+  height: 64px;
+  font-size: 48px;
+  line-height: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
 .btn-primary { background: var(--primary); }
 .btn-primary:hover { background: var(--primaryHover); }
 .btn-primary:active { background: #3a6230; transform: scale(0.95); }
@@ -161,11 +187,22 @@ h1 {
   font-size: 22px;
   z-index: 1000;
   animation: emoji-float 0.8s ease-out forwards;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.click-value {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
 }
 
 @keyframes emoji-float {
   0%   { opacity: 1; transform: translate(0, 0) scale(1); }
-  100% { opacity: 0; transform: translate(var(--dx), -80px) scale(0.6); }
+  100% { opacity: 0; transform: translate(var(--dx), -40px) scale(0.6); }
 }
 
 .btn-danger { background: var(--danger); }

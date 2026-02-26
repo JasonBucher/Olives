@@ -142,7 +142,6 @@ let lastUnderfedLogTime = 0;
 const gameTitleEl = document.getElementById("game-title");
 const avocadoCountEl = document.getElementById("avocado-count");
 const apsCountEl = document.getElementById("aps-count");
-const clickPowerEl = document.getElementById("click-power");
 const guacRowEl = document.getElementById("guac-row");
 const guacCountEl = document.getElementById("guac-count");
 const guacMultRowEl = document.getElementById("guac-mult-row");
@@ -540,7 +539,7 @@ function updateUI() {
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
   apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  clickPowerEl.textContent = Calc.formatNumber(clickPower);
+
 
   // Guac row — show when guac protocol owned
   const hasGuac = !!state.upgrades.guac_unlock;
@@ -900,14 +899,14 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
 }
 
 // --- Actions ---
-function spawnClickEmoji() {
+function spawnClickEmoji(value) {
   const rect = pickAvocadoBtn.getBoundingClientRect();
   const el = document.createElement("div");
   el.className = "click-emoji";
-  el.textContent = "\u{1f951}";
+  el.innerHTML = `\u{1f951} <span class="click-value">+${Calc.formatNumber(value)}</span>`;
   // Random angle within ±15° from straight up
   const angle = (Math.random() - 0.5) * 60 * (Math.PI / 180);
-  const dx = Math.sin(angle) * 80;
+  const dx = Math.sin(angle) * 40;
   el.style.left = `${rect.left + rect.width / 2 - 11}px`;
   el.style.top = `${rect.top - 10}px`;
   el.style.setProperty("--dx", `${dx}px`);
@@ -924,7 +923,7 @@ function pickAvocado() {
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
   recordClick();
-  spawnClickEmoji();
+  spawnClickEmoji(power);
 
   // Flavor text (1-in-10 chance)
   if (Math.random() < 0.1) {

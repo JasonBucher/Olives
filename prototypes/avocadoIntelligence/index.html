@@ -43,10 +43,6 @@
               <div class="value"><span id="aps-count">0</span></div>
             </div>
 
-            <div class="row">
-              <div class="label">Per Click</div>
-              <div class="value"><span id="click-power">1</span></div>
-            </div>
 
             <div class="row" id="guac-row" style="display: none;">
               <div class="label">Guacamole</div>
@@ -79,7 +75,10 @@
             </div>
 
             <div class="actions">
-              <button id="pick-avocado-btn" class="btn btn-primary" type="button">Pick Avocado</button>
+              <div class="pick-wrapper">
+                <button id="pick-avocado-btn" class="btn btn-primary btn-pick" type="button">🥑</button>
+                <div class="pick-label">Pick Avocado</div>
+              </div>
               <button id="tune-btn" class="btn" type="button" style="display: none;">Tune Hyperparams</button>
             </div>
           </div>
