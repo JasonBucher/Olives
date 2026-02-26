@@ -20,7 +20,7 @@ function makeUpgrade(id) {
   return {
     id,
     title: cfg.title,
-    group: cfg.producerId ? "production" : cfg.clickMult ? "click" : "global",
+    group: cfg.synergyPct ? "synergy" : cfg.producerId ? "production" : cfg.clickMult ? "click" : "global",
     cost: () => cfg.cost,
     isUnlocked: (state, ctx) => {
       // Wisdom unlock gate: must own the specified wisdom unlock
@@ -31,7 +31,14 @@ function makeUpgrade(id) {
       if (cfg.guacUnlockAt && (state.guacCount || 0) < cfg.guacUnlockAt) return false;
       // APS-gated upgrades: must have enough APS
       if (cfg.apsUnlockAt && (ctx?.currentAps || 0) < cfg.apsUnlockAt) return false;
-      if (cfg.unlockAt <= 0 && !cfg.apsUnlockAt) return true;
+      if (cfg.unlockAt <= 0 && !cfg.apsUnlockAt && !cfg.sourceReq) return true;
+      // Synergy gate: need N source producers AND N target producers
+      if (cfg.sourceReq && cfg.synergySource) {
+        if ((state.producers[cfg.synergySource] || 0) < cfg.sourceReq) return false;
+      }
+      if (cfg.targetReq && cfg.synergyTarget) {
+        if ((state.producers[cfg.synergyTarget] || 0) < cfg.targetReq) return false;
+      }
       // Producer-linked: must own at least 1, then check unlockAt threshold
       if (cfg.producerId) {
         if ((state.producers[cfg.producerId] || 0) < 1) return false;
@@ -150,4 +157,18 @@ export const INVESTMENTS = [
   makeUpgrade("dyson_orchard_t2"),
   makeUpgrade("omega_harvest_t2"),
   makeUpgrade("foundation_model_t2"),
+  // Cross-producer synergy upgrades (13)
+  makeUpgrade("syn_orchard_sapling"),
+  makeUpgrade("syn_compost_seed"),
+  makeUpgrade("syn_drone_orchard"),
+  makeUpgrade("syn_greenhouse_sapling"),
+  makeUpgrade("syn_harvest_compost"),
+  makeUpgrade("syn_exchange_drone"),
+  makeUpgrade("syn_data_greenhouse"),
+  makeUpgrade("syn_attn_harvest"),
+  makeUpgrade("syn_pit_exchange"),
+  makeUpgrade("syn_gpu_data"),
+  makeUpgrade("syn_neural_attn"),
+  makeUpgrade("syn_synth_sapling"),
+  makeUpgrade("syn_transformer_pit"),
 ].sort((a, b) => a.cost() - b.cost());

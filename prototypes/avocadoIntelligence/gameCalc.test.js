@@ -9,36 +9,37 @@ import {
   calcEffectiveBaseProduction,
   calcBenchmarkBonus, calcHyperparamModifiers,
   calcDistillationCost, canDistill, calcDistillationBonus,
+  calcSynergyMultiplier,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
 const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
   producers: {
-    sapling:         { baseCost: 10,    costGrowth: 1.15, baseRate: 0.2 },
-    seed_bank:       { baseCost: 35,    costGrowth: 1.15, baseRate: 0.5 },
-    orchard_row:     { baseCost: 100,   costGrowth: 1.15, baseRate: 1 },
-    compost_bin:     { baseCost: 400,   costGrowth: 1.15, baseRate: 3 },
-    drone:           { baseCost: 1100,  costGrowth: 1.15, baseRate: 8 },
-    greenhouse:      { baseCost: 4000,  costGrowth: 1.15, baseRate: 18 },
-    harvest_bot:     { baseCost: 45000, costGrowth: 1.15, baseRate: 80 },
-    guac_lab:        { baseCost: 50000, costGrowth: 1.15, baseRate: 47 },
-    guac_refinery:   { baseCost: 150000, costGrowth: 1.15, baseRate: 0 },
-    guac_centrifuge: { baseCost: 500000, costGrowth: 1.15, baseRate: 0 },
-    exchange:        { baseCost: 130000, costGrowth: 1.15, baseRate: 260 },
-    data_grove:      { baseCost: 350000, costGrowth: 1.15, baseRate: 450 },
-    attention_head:  { baseCost: 800000, costGrowth: 1.15, baseRate: 900 },
-    pit_miner:       { baseCost: 1.4e6,  costGrowth: 1.15, baseRate: 1400 },
-    gpu_cluster:     { baseCost: 5e6,    costGrowth: 1.15, baseRate: 2800 },
-    neural_pit:      { baseCost: 2e7,    costGrowth: 1.15, baseRate: 7800 },
-    synth_orchard:   { baseCost: 3e7,    costGrowth: 1.15, baseRate: 11000 },
-    transformer:     { baseCost: 1.5e8,  costGrowth: 1.15, baseRate: 28000 },
-    orchard_cloud:   { baseCost: 3.3e8,  costGrowth: 1.15, baseRate: 44000 },
-    quantum_grove:   { baseCost: 5e8,    costGrowth: 1.15, baseRate: 55000 },
-    agi_nexus:       { baseCost: 5e9,    costGrowth: 1.15, baseRate: 180000 },
-    dyson_orchard:   { baseCost: 8e10,   costGrowth: 1.15, baseRate: 600000 },
-    omega_harvest:   { baseCost: 1e12,   costGrowth: 1.15, baseRate: 2500000 },
-    foundation_model:{ baseCost: 5e10,   costGrowth: 1.15, baseRate: 200000 },
+    sapling:         { baseCost: 15,      costGrowth: 1.15, baseRate: 0.1 },
+    seed_bank:       { baseCost: 100,     costGrowth: 1.15, baseRate: 0.8 },
+    orchard_row:     { baseCost: 1100,    costGrowth: 1.15, baseRate: 8 },
+    compost_bin:     { baseCost: 12000,   costGrowth: 1.15, baseRate: 47 },
+    drone:           { baseCost: 130000,  costGrowth: 1.15, baseRate: 260 },
+    greenhouse:      { baseCost: 1.4e6,   costGrowth: 1.15, baseRate: 1400 },
+    harvest_bot:     { baseCost: 20e6,    costGrowth: 1.15, baseRate: 7800 },
+    guac_lab:        { baseCost: 50000,   costGrowth: 1.15, baseRate: 47 },
+    guac_refinery:   { baseCost: 150000,  costGrowth: 1.15, baseRate: 0 },
+    guac_centrifuge: { baseCost: 500000,  costGrowth: 1.15, baseRate: 0 },
+    exchange:        { baseCost: 280e6,   costGrowth: 1.15, baseRate: 44000 },
+    data_grove:      { baseCost: 3.9e9,   costGrowth: 1.15, baseRate: 260000 },
+    attention_head:  { baseCost: 55e9,    costGrowth: 1.15, baseRate: 1.6e6 },
+    pit_miner:       { baseCost: 830e9,   costGrowth: 1.15, baseRate: 10e6 },
+    gpu_cluster:     { baseCost: 12e12,   costGrowth: 1.15, baseRate: 65e6 },
+    neural_pit:      { baseCost: 180e12,  costGrowth: 1.15, baseRate: 430e6 },
+    synth_orchard:   { baseCost: 2.9e15,  costGrowth: 1.15, baseRate: 2.9e9 },
+    transformer:     { baseCost: 46e15,   costGrowth: 1.15, baseRate: 21e9 },
+    orchard_cloud:   { baseCost: 780e15,  costGrowth: 1.15, baseRate: 150e9 },
+    quantum_grove:   { baseCost: 14e18,   costGrowth: 1.15, baseRate: 1.1e12 },
+    agi_nexus:       { baseCost: 290e18,  costGrowth: 1.15, baseRate: 8.3e12 },
+    dyson_orchard:   { baseCost: 7.3e21,  costGrowth: 1.15, baseRate: 64e12 },
+    omega_harvest:   { baseCost: 210e21,  costGrowth: 1.15, baseRate: 510e12 },
+    foundation_model:{ baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12 },
   },
   guac: {
     baseConsumption: 200,
@@ -88,6 +89,12 @@ const tuning = {
     gpu_cluster_t3:     { cost: 54182872079,     unlockAt: 50,  producerId: "gpu_cluster",  prodMult: 2 },
     gpu_cluster_t4:     { cost: 88073508802520,  unlockAt: 100, producerId: "gpu_cluster",  prodMult: 2 },
     agi_nexus_t2:       { cost: 822973815495, unlockAt: 25, producerId: "agi_nexus",    prodMult: 2 },
+    // Synergy upgrades for testing
+    syn_orchard_sapling:    { cost: 5000,   synergySource: "orchard_row",    synergyTarget: "sapling",  synergyPct: 0.05, sourceReq: 5,  targetReq: 10 },
+    syn_greenhouse_sapling: { cost: 5e6,    synergySource: "greenhouse",     synergyTarget: "sapling",  synergyPct: 0.04, sourceReq: 1,  targetReq: 10 },
+    syn_synth_sapling:      { cost: 10e15,  synergySource: "synth_orchard",  synergyTarget: "sapling",  synergyPct: 0.02, sourceReq: 1,  targetReq: 15 },
+    syn_drone_orchard:      { cost: 500000, synergySource: "drone",          synergyTarget: "orchard_row", synergyPct: 0.04, sourceReq: 3, targetReq: 5 },
+    syn_gpu_data:           { cost: 40e12,  synergySource: "gpu_cluster",    synergyTarget: "data_grove",  synergyPct: 0.02, sourceReq: 1, targetReq: 3 },
   },
   benchmarks: {
     hello_world:      { title: "Hello, World", globalMult: 0.02 },
@@ -212,41 +219,72 @@ describe("formatNumber", () => {
     expect(formatNumber(1500.3)).toBe("1,500.3");
   });
 
-  it("adds commas to millions", () => {
-    expect(formatNumber(2500000)).toBe("2,500,000");
+  it("abbreviates millions with M suffix", () => {
+    expect(formatNumber(1.5e6)).toBe("1.50 M");
+    expect(formatNumber(45e6)).toBe("45.0 M");
+    expect(formatNumber(500e6)).toBe("500 M");
+  });
+
+  it("abbreviates billions with B suffix", () => {
+    expect(formatNumber(3.9e9)).toBe("3.90 B");
+    expect(formatNumber(55e9)).toBe("55.0 B");
+  });
+
+  it("abbreviates trillions with T suffix", () => {
+    expect(formatNumber(12e12)).toBe("12.0 T");
+  });
+
+  it("abbreviates quadrillions with Qa suffix", () => {
+    expect(formatNumber(2.9e15)).toBe("2.90 Qa");
+  });
+
+  it("abbreviates quintillions with Qi suffix", () => {
+    expect(formatNumber(14e18)).toBe("14.0 Qi");
+  });
+
+  it("abbreviates sextillions with Sx suffix", () => {
+    expect(formatNumber(7.3e21)).toBe("7.30 Sx");
+  });
+
+  it("uses integer format for >= 100 scaled", () => {
+    expect(formatNumber(500e6)).toBe("500 M");
+    expect(formatNumber(830e9)).toBe("830 B");
   });
 });
 
 describe("calcProducerCost", () => {
   it("returns baseCost when owning 0", () => {
-    expect(calcProducerCost("sapling", 0, tuning)).toBe(10);
+    expect(calcProducerCost("sapling", 0, tuning)).toBe(15);
   });
 
   it("scales cost by costGrowth^owned", () => {
-    expect(calcProducerCost("sapling", 1, tuning)).toBe(11);
+    // floor(15 * 1.15) = 17
+    expect(calcProducerCost("sapling", 1, tuning)).toBe(17);
   });
 
   it("grows exponentially", () => {
-    expect(calcProducerCost("sapling", 10, tuning)).toBe(40);
+    // floor(15 * 1.15^10) = 60
+    expect(calcProducerCost("sapling", 10, tuning)).toBe(60);
   });
 
   it("works for higher-tier producers", () => {
-    expect(calcProducerCost("orchard_row", 0, tuning)).toBe(100);
-    expect(calcProducerCost("orchard_row", 5, tuning)).toBe(201);
+    expect(calcProducerCost("orchard_row", 0, tuning)).toBe(1100);
+    // floor(1100 * 1.15^5) = 2212
+    expect(calcProducerCost("orchard_row", 5, tuning)).toBe(2212);
   });
 
   it("works for attention_head producer", () => {
-    expect(calcProducerCost("attention_head", 0, tuning)).toBe(800000);
+    expect(calcProducerCost("attention_head", 0, tuning)).toBe(55000000000);
   });
 
   it("works for transformer producer", () => {
-    expect(calcProducerCost("transformer", 0, tuning)).toBe(150000000);
+    expect(calcProducerCost("transformer", 0, tuning)).toBe(46000000000000000);
   });
 
   it("works for new producers", () => {
-    expect(calcProducerCost("seed_bank", 0, tuning)).toBe(35);
-    expect(calcProducerCost("gpu_cluster", 0, tuning)).toBe(5000000);
-    expect(calcProducerCost("omega_harvest", 0, tuning)).toBe(1000000000000);
+    expect(calcProducerCost("seed_bank", 0, tuning)).toBe(100);
+    expect(calcProducerCost("gpu_cluster", 0, tuning)).toBe(12000000000000);
+    expect(calcProducerCost("omega_harvest", 0, tuning)).toBe(210000000000000000000000);
   });
 });
 
@@ -282,7 +320,7 @@ describe("calcBulkProducerCost", () => {
 
 describe("calcMaxAffordable", () => {
   it("returns 0 when budget < first unit cost", () => {
-    expect(calcMaxAffordable("sapling", 0, 5, tuning)).toBe(0);
+    expect(calcMaxAffordable("sapling", 0, 10, tuning)).toBe(0);
   });
 
   it("returns 1 when budget equals exactly one unit", () => {
@@ -291,17 +329,16 @@ describe("calcMaxAffordable", () => {
   });
 
   it("returns correct count for larger budgets", () => {
-    // sapling costs: 10, 11, 12, 14, 16, 18 ... (floor of 10 * 1.15^n)
-    // Cumulative: 10, 21, 33, 47, 63, 81
-    const budget = 50;
+    // sapling costs: 15, 17, 19, 22, 25, 28 ... (floor of 15 * 1.15^n)
+    // Cumulative: 15, 32, 51, 73, 98
+    const budget = 75;
     const count = calcMaxAffordable("sapling", 0, budget, tuning);
-    expect(count).toBe(4); // 10+11+12+14 = 47 <= 50, next would be 16 -> 63 > 50
+    expect(count).toBe(4); // 15+17+19+22 = 73 <= 75, next would be 25 -> 98 > 75
     expect(calcBulkProducerCost("sapling", 0, count, tuning)).toBeLessThanOrEqual(budget);
     expect(calcBulkProducerCost("sapling", 0, count + 1, tuning)).toBeGreaterThan(budget);
   });
 
   it("accounts for starting ownedCount", () => {
-    // At owned=10, sapling costs 40 each
     const cost10 = calcProducerCost("sapling", 10, tuning);
     expect(calcMaxAffordable("sapling", 10, cost10 - 1, tuning)).toBe(0);
     expect(calcMaxAffordable("sapling", 10, cost10, tuning)).toBe(1);
@@ -310,8 +347,8 @@ describe("calcMaxAffordable", () => {
   it("applies costMult", () => {
     const costMult = 0.5;
     // With 0.5x costs, can afford more units
-    const normalCount = calcMaxAffordable("sapling", 0, 50, tuning);
-    const discountedCount = calcMaxAffordable("sapling", 0, 50, tuning, costMult);
+    const normalCount = calcMaxAffordable("sapling", 0, 75, tuning);
+    const discountedCount = calcMaxAffordable("sapling", 0, 75, tuning, costMult);
     expect(discountedCount).toBeGreaterThan(normalCount);
   });
 
@@ -322,36 +359,36 @@ describe("calcMaxAffordable", () => {
 
 describe("calcProducerUnitRate", () => {
   it("returns base rate with no upgrades", () => {
-    expect(calcProducerUnitRate("sapling", {}, tuning)).toBe(0.2);
+    expect(calcProducerUnitRate("sapling", {}, tuning)).toBe(0.1);
   });
 
   it("doubles rate with matching producer upgrade", () => {
-    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning)).toBe(0.4);
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning)).toBe(0.2);
   });
 
   it("ignores upgrades for other producers", () => {
-    expect(calcProducerUnitRate("sapling", { drip_irrigation: true }, tuning)).toBe(0.2);
+    expect(calcProducerUnitRate("sapling", { drip_irrigation: true }, tuning)).toBe(0.1);
   });
 
   it("applies upgrade to correct producer", () => {
-    expect(calcProducerUnitRate("orchard_row", { drip_irrigation: true }, tuning)).toBe(2);
+    expect(calcProducerUnitRate("orchard_row", { drip_irrigation: true }, tuning)).toBe(16);
   });
 
   it("applies attention_focus to attention_head", () => {
-    expect(calcProducerUnitRate("attention_head", { attention_focus: true }, tuning)).toBe(1800);
+    expect(calcProducerUnitRate("attention_head", { attention_focus: true }, tuning)).toBe(3.2e6);
   });
 
   it("applies transformer_scale to transformer", () => {
-    expect(calcProducerUnitRate("transformer", { transformer_scale: true }, tuning)).toBe(56000);
+    expect(calcProducerUnitRate("transformer", { transformer_scale: true }, tuning)).toBe(42e9);
   });
 
   it("applies new producer upgrades", () => {
-    expect(calcProducerUnitRate("seed_bank", { seed_catalog: true }, tuning)).toBe(1.0);
-    expect(calcProducerUnitRate("compost_bin", { hot_compost: true }, tuning)).toBe(6);
-    expect(calcProducerUnitRate("greenhouse", { climate_control: true }, tuning)).toBe(36);
-    expect(calcProducerUnitRate("harvest_bot", { harvest_fleet: true }, tuning)).toBe(160);
-    expect(calcProducerUnitRate("data_grove", { data_lake: true }, tuning)).toBe(900);
-    expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true }, tuning)).toBe(5600);
+    expect(calcProducerUnitRate("seed_bank", { seed_catalog: true }, tuning)).toBe(1.6);
+    expect(calcProducerUnitRate("compost_bin", { hot_compost: true }, tuning)).toBe(94);
+    expect(calcProducerUnitRate("greenhouse", { climate_control: true }, tuning)).toBe(2800);
+    expect(calcProducerUnitRate("harvest_bot", { harvest_fleet: true }, tuning)).toBe(15600);
+    expect(calcProducerUnitRate("data_grove", { data_lake: true }, tuning)).toBe(520000);
+    expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true }, tuning)).toBe(130e6);
   });
 });
 
@@ -492,20 +529,20 @@ describe("calcBaseAps", () => {
 
   it("sums production from multiple producer types", () => {
     const producers = { sapling: 5, orchard_row: 2, drone: 0, guac_lab: 0 };
-    // 5 * 0.2 + 2 * 1 = 3
-    expect(calcBaseAps(producers, {}, tuning)).toBe(3);
+    // 5 * 0.1 + 2 * 8 = 16.5
+    expect(calcBaseAps(producers, {}, tuning)).toBe(16.5);
   });
 
   it("applies per-producer upgrades", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.4 = 4
-    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBe(4);
+    // 10 * 0.2 = 2
+    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBe(2);
   });
 
   it("does not apply global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 = 2 (global_boost_1 should NOT affect this)
-    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBe(2);
+    // 10 * 0.1 = 1 (global_boost_1 should NOT affect this)
+    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBe(1);
   });
 });
 
@@ -517,46 +554,46 @@ describe("calcTotalAps", () => {
 
   it("sums production from multiple producer types", () => {
     const producers = { sapling: 5, orchard_row: 2, drone: 0, guac_lab: 0 };
-    // 5 * 0.2 + 2 * 1 = 3
-    expect(calcTotalAps(producers, {}, 0, 0, tuning)).toBe(3);
+    // 5 * 0.1 + 2 * 8 = 16.5
+    expect(calcTotalAps(producers, {}, 0, 0, tuning)).toBe(16.5);
   });
 
   it("applies global multiplier upgrade", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 = 2, * 1.5 = 3
-    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBe(3);
+    // 10 * 0.1 = 1, * 1.5 = 1.5
+    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBe(1.5);
   });
 
   it("stacks global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 = 2, * 1.5 * 2 = 6
-    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBe(6);
+    // 10 * 0.1 = 1, * 1.5 * 2 = 3
+    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBe(3);
   });
 
   it("applies wisdom bonus", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, wisdom = 1 + 10 * 0.10 = 2.0, total = 4
-    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(4);
+    // base = 1, wisdom = 1 + 10 * 0.10 = 2.0, total = 2
+    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(2);
   });
 
   it("applies guac multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, guac mult ≈ 3.0 at 100 guac, total ≈ 6
+    // base = 1, guac mult at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(2 * guacMult);
+    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(1 * guacMult);
   });
 
   it("stacks guac and wisdom multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, wisdom = 2.0, guac ≈ 3.0 at 100 guac, total ≈ 2 * 2 * 3 = 12
+    // base = 1, wisdom = 2.0, guac at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(2 * 2.0 * guacMult);
+    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(1 * 2.0 * guacMult);
   });
 
   it("applies benchmark global multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 2, benchmark global = 1 + 0.02 = 1.02, total = 2 * 1.02 = 2.04
-    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(2.04);
+    // base = 1, benchmark global = 1 + 0.02 = 1.02, total = 1 * 1.02 = 1.02
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.02);
   });
 });
 
@@ -580,32 +617,27 @@ describe("calcClickPower", () => {
   });
 
   it("applies wisdom bonus to clicks", () => {
-    // base 1, wisdom = 1 + 5 * 0.10 = 1.50
     expect(calcClickPower({}, noProducers, 5, 0, 0, tuning)).toBeCloseTo(1.5);
   });
 
   it("applies guac multiplier to clicks", () => {
-    // base 1, guac mult ≈ 3.0 at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
     expect(calcClickPower({}, noProducers, 0, 100, 0, tuning)).toBeCloseTo(guacMult);
   });
 
   it("stacks all multipliers", () => {
-    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 2 (10 wisdom) = 12, * guac ≈ 3.0
+    // 1 * 2 (strong) * 2 (iron) = 4, * 1.5 (global) = 6, * 2 (10 wisdom) = 12, * guac
     const guacMult = calcGuacMultiplier(100, tuning);
     expect(calcClickPower(
       { strong_thumb: true, iron_thumb: true, global_boost_1: true }, noProducers, 10, 100, 0, tuning
     )).toBeCloseTo(12 * guacMult);
   });
 
-  // --- Throughput Clicking (base APS % bonus, highest tier wins) ---
   it("adds base APS percentage from throughput_click_1", () => {
-    // base 1, baseAps 100, 3% = +3, total = 4
     expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 100, tuning)).toBe(4);
   });
 
   it("highest throughput tier wins (not additive)", () => {
-    // base 1, baseAps 100, max(3%, 6%, 10%) = 10% = +10, total = 11
     const upgrades = { throughput_click_1: true, throughput_click_2: true, throughput_click_3: true };
     expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(11);
   });
@@ -1051,51 +1083,112 @@ describe("calcDistillationBonus", () => {
 
 describe("calcProducerUnitRate — multi-tier stacking", () => {
   it("2-tier stacking gives 4x (T1 + T2)", () => {
-    // sapling base 0.2, T1 (efficient_saplings) 2x, T2 (sapling_t2) 2x = 4x = 0.8
-    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true }, tuning)).toBeCloseTo(0.8);
+    // sapling base 0.1, T1 (efficient_saplings) 2x, T2 (sapling_t2) 2x = 4x = 0.4
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true }, tuning)).toBeCloseTo(0.4);
   });
 
   it("3-tier stacking gives 8x (T1 + T2 + T3)", () => {
-    // sapling base 0.2, 3 × 2x = 8x = 1.6
-    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(1.6);
+    // sapling base 0.1, 3 × 2x = 8x = 0.8
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(0.8);
   });
 
   it("4-tier stacking gives 16x (T1 + T2 + T3 + T4)", () => {
-    // sapling base 0.2, 4 × 2x = 16x = 3.2
-    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true, sapling_t4: true }, tuning)).toBeCloseTo(3.2);
+    // sapling base 0.1, 4 × 2x = 16x = 1.6
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true, sapling_t2: true, sapling_t3: true, sapling_t4: true }, tuning)).toBeCloseTo(1.6);
   });
 
   it("5-tier stacking gives 32x (T1 through T5)", () => {
-    // sapling base 0.2, 5 × 2x = 32x = 6.4
+    // sapling base 0.1, 5 × 2x = 32x = 3.2
     expect(calcProducerUnitRate("sapling", {
       efficient_saplings: true, sapling_t2: true, sapling_t3: true, sapling_t4: true, sapling_t5: true,
-    }, tuning)).toBeCloseTo(6.4);
+    }, tuning)).toBeCloseTo(3.2);
   });
 
   it("later tiers without T1 still stack correctly", () => {
-    // sapling base 0.2, only T2 + T3 = 4x = 0.8
-    expect(calcProducerUnitRate("sapling", { sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(0.8);
+    // sapling base 0.1, only T2 + T3 = 4x = 0.4
+    expect(calcProducerUnitRate("sapling", { sapling_t2: true, sapling_t3: true }, tuning)).toBeCloseTo(0.4);
   });
 
   it("stacking works for mid-tier producer (drone)", () => {
-    // drone base 8, T1 (drone_swarm) 2x, T2 2x, T3 2x = 8x = 64
-    expect(calcProducerUnitRate("drone", { drone_swarm: true, drone_t2: true, drone_t3: true }, tuning)).toBeCloseTo(64);
+    // drone base 260, T1 (drone_swarm) 2x, T2 2x, T3 2x = 8x = 2080
+    expect(calcProducerUnitRate("drone", { drone_swarm: true, drone_t2: true, drone_t3: true }, tuning)).toBeCloseTo(2080);
   });
 
   it("stacking works for late-tier producer (gpu_cluster) with T4", () => {
-    // gpu_cluster base 2800, T1 2x, T2 2x, T3 2x, T4 2x = 16x = 44800
+    // gpu_cluster base 65e6, T1 2x, T2 2x, T3 2x, T4 2x = 16x = 1.04e9
     expect(calcProducerUnitRate("gpu_cluster", {
       gpu_overclock: true, gpu_cluster_t2: true, gpu_cluster_t3: true, gpu_cluster_t4: true,
-    }, tuning)).toBeCloseTo(44800);
+    }, tuning)).toBeCloseTo(1.04e9);
   });
 
   it("stacking works for endgame producer (agi_nexus)", () => {
-    // agi_nexus base 180000, T1 (recursive_improve) not in test tuning, T2 2x = 2x = 360000
-    expect(calcProducerUnitRate("agi_nexus", { agi_nexus_t2: true }, tuning)).toBeCloseTo(360000);
+    // agi_nexus base 8.3e12, T2 2x = 16.6e12
+    expect(calcProducerUnitRate("agi_nexus", { agi_nexus_t2: true }, tuning)).toBeCloseTo(16.6e12);
   });
 
   it("tier upgrades do not affect other producers", () => {
     // sapling tiers should not affect drone
-    expect(calcProducerUnitRate("drone", { sapling_t2: true, sapling_t3: true }, tuning)).toBe(8);
+    expect(calcProducerUnitRate("drone", { sapling_t2: true, sapling_t3: true }, tuning)).toBe(260);
   });
 });
+
+// ---------- Cross-producer synergy tests ----------
+
+describe("calcSynergyMultiplier", () => {
+  it("returns 1 when no synergy upgrades exist for target", () => {
+    const producers = { sapling: 10, orchard_row: 5 };
+    expect(calcSynergyMultiplier("drone", producers, {}, tuning)).toBe(1);
+  });
+
+  it("returns 1 when synergy upgrade exists but not owned", () => {
+    const producers = { sapling: 10, orchard_row: 5 };
+    expect(calcSynergyMultiplier("sapling", producers, {}, tuning)).toBe(1);
+  });
+
+  it("returns correct multiplier with one synergy", () => {
+    // 5% per orchard_row, 10 orchard_rows = 1 + 0.05*10 = 1.50
+    const producers = { sapling: 10, orchard_row: 10 };
+    expect(calcSynergyMultiplier("sapling", producers, { syn_orchard_sapling: true }, tuning)).toBeCloseTo(1.50);
+  });
+
+  it("returns 1 when source count is 0", () => {
+    const producers = { sapling: 10, orchard_row: 0 };
+    expect(calcSynergyMultiplier("sapling", producers, { syn_orchard_sapling: true }, tuning)).toBe(1);
+  });
+
+  it("combines multiple synergies targeting the same producer additively", () => {
+    // sapling has 3 synergy sources: orchard_row (5%), greenhouse (4%), synth_orchard (2%)
+    // 15 orchard_rows, 10 greenhouses, 5 synth_orchards:
+    // bonus = 0.05*15 + 0.04*10 + 0.02*5 = 0.75 + 0.40 + 0.10 = 1.25
+    // multiplier = 1 + 1.25 = 2.25
+    const producers = { sapling: 15, orchard_row: 15, greenhouse: 10, synth_orchard: 5 };
+    const upgrades = { syn_orchard_sapling: true, syn_greenhouse_sapling: true, syn_synth_sapling: true };
+    expect(calcSynergyMultiplier("sapling", producers, upgrades, tuning)).toBeCloseTo(2.25);
+  });
+
+  it("only applies owned synergy upgrades", () => {
+    // Only orchard synergy owned, not greenhouse or synth
+    const producers = { sapling: 10, orchard_row: 10, greenhouse: 5, synth_orchard: 3 };
+    const upgrades = { syn_orchard_sapling: true };
+    // bonus = 0.05*10 = 0.50, multiplier = 1.50
+    expect(calcSynergyMultiplier("sapling", producers, upgrades, tuning)).toBeCloseTo(1.50);
+  });
+});
+
+describe("calcBaseAps — synergy integration", () => {
+  it("returns boosted APS when synergy upgrade is owned and source has units", () => {
+    const producers = { sapling: 10, orchard_row: 5 };
+    const upgrades = { syn_orchard_sapling: true };
+    // sapling: 10 * 0.1 * (1 + 0.05*5) = 10 * 0.1 * 1.25 = 1.25
+    // orchard_row: 5 * 8 = 40
+    // total = 41.25
+    expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(41.25);
+  });
+
+  it("returns unboosted APS when synergy upgrade not owned", () => {
+    const producers = { sapling: 10, orchard_row: 5 };
+    // sapling: 10 * 0.1 = 1, orchard_row: 5 * 8 = 40, total = 41
+    expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(41);
+  });
+});
+

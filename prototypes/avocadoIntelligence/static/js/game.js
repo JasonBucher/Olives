@@ -601,7 +601,7 @@ function updateUI() {
   document.title = gameTitle;
 
   avocadoCountEl.textContent = Calc.formatNumber(state.avocadoCount);
-  apsCountEl.textContent = aps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  apsCountEl.textContent = Calc.formatNumber(aps);
 
 
   // Guac row — show when guac protocol owned
@@ -874,7 +874,12 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
       if (descEl) descEl.textContent = cfg.desc;
       if (countEl) countEl.textContent = `(${owned} owned)`;
       if (costEl) costEl.textContent = costLabel;
-      let rateText = `Producing ${Calc.formatRate(unitRate * owned)} avocados/sec (${Calc.formatRate(unitRate)} each)`;
+      const synergyMult = Calc.calcSynergyMultiplier(id, state.producers, state.upgrades, TUNING);
+      const effectiveUnitRate = unitRate * synergyMult;
+      let rateText = `Producing ${Calc.formatRate(effectiveUnitRate * owned)} avocados/sec (${Calc.formatRate(effectiveUnitRate)} each)`;
+      if (synergyMult > 1) {
+        rateText += ` [synergy x${synergyMult.toFixed(2)}]`;
+      }
       if (id === "guac_lab" && state.upgrades.guac_unlock) {
         const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
         const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);

@@ -27,8 +27,9 @@ export function rollWeighted(outcomes) {
   return outcomes[outcomes.length - 1];
 }
 
-/** Format a rate value for display — trims unnecessary trailing zeros. */
+/** Format a rate value for display — abbreviates large values, trims trailing zeros for small. */
 export function formatRate(value) {
+  if (value >= 1e6) return formatNumber(value);
   if (Number.isInteger(value)) return String(value);
   // Show up to 1 decimal, strip trailing zero
   return parseFloat(value.toFixed(1)).toString();
@@ -39,8 +40,26 @@ export function getDisplayCount(value) {
   return Math.floor(value);
 }
 
-/** Format numbers with commas. Shows one decimal when non-zero, drops trailing .0. */
+/** Abbreviation suffixes for large numbers. */
+const SUFFIXES = [
+  { threshold: 1e21, divisor: 1e21, suffix: "Sx" },
+  { threshold: 1e18, divisor: 1e18, suffix: "Qi" },
+  { threshold: 1e15, divisor: 1e15, suffix: "Qa" },
+  { threshold: 1e12, divisor: 1e12, suffix: "T" },
+  { threshold: 1e9,  divisor: 1e9,  suffix: "B" },
+  { threshold: 1e6,  divisor: 1e6,  suffix: "M" },
+];
+
+/** Format a number with abbreviation for >= 1M, commas for smaller values. */
 export function formatNumber(value) {
+  for (const { threshold, divisor, suffix } of SUFFIXES) {
+    if (value >= threshold) {
+      const scaled = value / divisor;
+      if (scaled >= 100) return `${Math.floor(scaled)} ${suffix}`;
+      if (scaled >= 10) return `${scaled.toFixed(1)} ${suffix}`;
+      return `${scaled.toFixed(2)} ${suffix}`;
+    }
+  }
   const rounded = Math.round(value * 10) / 10;
   if (rounded % 1 === 0) return Math.floor(rounded).toLocaleString();
   return rounded.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -186,12 +205,28 @@ export function calcGuacMultiplier(guacCount, tuning, benchmarks) {
   return mult;
 }
 
+/** Calculate synergy multiplier for a target producer from owned synergy upgrades.
+ *  Multiple synergies targeting the same producer are additive with each other,
+ *  then applied as one multiplier: 1 + sum(pct * sourceCount). */
+export function calcSynergyMultiplier(targetId, producers, upgrades, tuning) {
+  let bonus = 0;
+  for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
+    if (upgrade.synergyTarget === targetId && upgrade.synergyPct && upgrades[upgradeId]) {
+      const sourceCount = producers[upgrade.synergySource] || 0;
+      bonus += upgrade.synergyPct * sourceCount;
+    }
+  }
+  return 1 + bonus;
+}
+
 /** Calculate base APS (producer rates only, no global/wisdom/guac multipliers). */
 export function calcBaseAps(producers, upgrades, tuning) {
   let total = 0;
   for (const [id, count] of Object.entries(producers)) {
     if (count <= 0) continue;
-    total += calcProducerUnitRate(id, upgrades, tuning) * count;
+    const unitRate = calcProducerUnitRate(id, upgrades, tuning);
+    const synergyMult = calcSynergyMultiplier(id, producers, upgrades, tuning);
+    total += unitRate * count * synergyMult;
   }
   return total;
 }

@@ -489,6 +489,10 @@ function fmtNum(v) {
 }
 
 function fmtCompact(v) {
+  if (v >= 1e21) return (v / 1e21).toFixed(1) + "Sx";
+  if (v >= 1e18) return (v / 1e18).toFixed(1) + "Qi";
+  if (v >= 1e15) return (v / 1e15).toFixed(1) + "Qa";
+  if (v >= 1e12) return (v / 1e12).toFixed(1) + "T";
   if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
