@@ -34,8 +34,40 @@ This prevents localStorage bloat and avoids loading stale transient data on relo
 ### ES Modules
 All JS files use `import`/`export`. The HTML loads `game.js` with `<script type="module">`. This keeps each system in its own file and enables tree-shaking by test runners.
 
-### Vitest Testing (`gameCalc.test.js`)
-Tests import directly from `./static/js/gameCalc.js` and run with `vitest`. 11 starter tests cover the calc utilities. The pattern: every pure function in `gameCalc.js` gets a corresponding test. No DOM mocking needed.
+### Session Telemetry (`static/js/sessionLog.js`)
+Lightweight event logger that persists to localStorage using `STORAGE_PREFIX`.
+Creates a session ID per browser tab, records events as NDJSON, debounced
+writes, 20K line cap. Usage:
+- `createSessionLog(STORAGE_PREFIX)` — create instance
+- `.initSession()` — record session start
+- `.record(type, payload)` — record an event
+- `.getText()` — get NDJSON for analysis
+- `.clear()` — wipe log (does not affect game state)
+
+### Run Analyzer (`static/js/views/analyzerView.js`)
+Full-screen analysis view with SVG time-series chart, event timeline, and
+JSON/CSV export. Customize by passing your game's metrics:
+```js
+initAnalyzerView({
+  sessionLog: SessionLog,
+  series: [
+    { key: "oliveCount", label: "Olives", color: "#84cc16", default: true },
+  ],
+  summaryFields: [
+    { key: "oliveCount", label: "Olives" },
+  ],
+  downloadPrefix: "template",
+  ...
+});
+```
+
+When copying to a new prototype:
+1. Update `captureStateSnapshot()` in `game.js` to include your game's metrics
+2. Update the `series` and `summaryFields` arrays in the `initAnalyzerView()` call
+3. Everything else works automatically
+
+### Vitest Testing (`gameCalc.test.js`, `analyzer.test.js`)
+Tests import directly from source files and run with `vitest`. 11 starter tests cover the calc utilities, plus ~23 analyzer tests covering the pure analysis functions. The pattern: every pure function gets a corresponding test. No DOM mocking needed.
 
 ```
 npm test           # single run
@@ -47,6 +79,8 @@ npm run test:watch # watch mode
 - **Safe reset** — `isResetting` flag prevents the main loop interval from re-saving state after a reset
 - **Debug modal** — +100 resources buttons and a reset button, wired up and ready
 - **Event log** — Timestamped, capped at 60 lines, newest on top
+- **Session telemetry** — NDJSON event log with debounced writes and 20K line cap
+- **Run analyzer** — SVG time-series chart, event timeline, JSON/CSV export
 
 ## File map
 | File | Role |
@@ -54,8 +88,11 @@ npm run test:watch # watch mode
 | `static/js/tuning.js` | Balance constants |
 | `static/js/gameCalc.js` | Pure math/formatting functions |
 | `static/js/investments.js` | Upgrade registry |
-| `static/js/game.js` | Main loop, state, DOM, save/load |
-| `static/css/style.css` | Dark theme, 3-column grid layout |
+| `static/js/game.js` | Main loop, state, DOM, save/load, telemetry |
+| `static/js/sessionLog.js` | Session telemetry logger (factory) |
+| `static/js/views/analyzerView.js` | Run analyzer view (configurable series) |
+| `static/css/style.css` | Dark theme, 3-column grid layout, analyzer styles |
 | `gameCalc.test.js` | Unit tests for calc functions |
-| `index.html` | 3-column UI shell |
+| `analyzer.test.js` | Unit tests for analyzer pure functions |
+| `index.html` | 3-column UI shell + analyzer screen |
 | `INTENT.md` | Design philosophy |

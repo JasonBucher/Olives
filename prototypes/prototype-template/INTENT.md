@@ -30,6 +30,10 @@ The default layout is three columns, each a conceptual contract:
   - Market / Church / Bank / etc.
   - Systems you interact with but don’t own
 
+## Session Telemetry
+
+Session telemetry and a run analyzer are built in. Every prototype can capture state snapshots and visualize progression out of the box. The telemetry is configurable — each prototype defines which metrics to chart and summarize.
+
 ## Anti-bloat rule
 
 If you find yourself adding:

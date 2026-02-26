@@ -4,9 +4,13 @@
 import { TUNING } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
+import { createSessionLog } from "./sessionLog.js";
+import { initAnalyzerView } from "./views/analyzerView.js";
 
 const STORAGE_PREFIX = "TEMPLATE_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
+
+const SessionLog = createSessionLog(STORAGE_PREFIX);
 
 // --- Persisted State ---
 // Only keys listed here are saved to / loaded from localStorage.
@@ -154,6 +158,39 @@ function computeOps() {
   return clickRate; // olives per second from clicks
 }
 
+// --- Telemetry ---
+// --- CUSTOMIZE: add your game's metrics here ---
+function captureStateSnapshot(reason = "tick") {
+  SessionLog.record("state_snapshot", {
+    oliveCount: state.oliveCount,
+    ops: computeOps(),
+    reason,
+  });
+}
+
+// --- View switching (game vs analyzer) ---
+const gameRootEl = document.getElementById("game-root");
+const analyzerScreenEl = document.getElementById("analyzer-screen");
+const analyzerBtn = document.getElementById("analyzer-btn");
+let activeView = "game";
+
+function renderActiveView() {
+  const isAnalyzer = activeView === "analyzer";
+  gameRootEl?.classList.toggle("is-hidden", isAnalyzer);
+  analyzerScreenEl?.classList.toggle("is-hidden", !isAnalyzer);
+}
+
+function openAnalyzer() {
+  activeView = "analyzer";
+  renderActiveView();
+  analyzerView?.notifyVisible();
+}
+
+function closeAnalyzer() {
+  activeView = "game";
+  renderActiveView();
+}
+
 // --- UI ---
 function updateUI() {
   oliveCountEl.textContent = String(Calc.getDisplayCount(state.oliveCount));
@@ -171,19 +208,22 @@ function pickOlive() {
 // --- Main Loop ---
 function startLoop() {
   let last = Date.now();
+  let tickCount = 0;
   mainLoopInterval = setInterval(() => {
     const now = Date.now();
     const dt = (now - last) / 1000;
     last = now;
 
-    // Future: passive production, timers, shipments, etc.
-    // Keep template minimal for now.
+    tickCount++;
+
+    // Capture telemetry every 5th tick (~1/s)
+    if (tickCount % 5 === 0) captureStateSnapshot("tick");
 
     // UI refresh (OPS updates even if idle)
     updateUI();
 
-    // Save occasionally if desired. Keeping it light:
-    // saveGame();
+    // Auto-save every ~5s
+    if (tickCount % 25 === 0) saveGame();
   }, TUNING.production.tickMs);
 }
 
@@ -199,6 +239,8 @@ function closeDebug() {
 
 // --- Wire Events ---
 pickOliveBtn.addEventListener("click", pickOlive);
+
+if (analyzerBtn) analyzerBtn.addEventListener("click", openAnalyzer);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
@@ -228,8 +270,27 @@ debugModal.addEventListener("click", (e) => {
   if (e.target === debugModal) closeDebug();
 });
 
+// --- Analyzer ---
+// --- CUSTOMIZE: update series and summaryFields for your prototype ---
+const analyzerView = initAnalyzerView({
+  sessionLog: SessionLog,
+  onBack: closeAnalyzer,
+  captureSnapshot: (reason) => captureStateSnapshot(reason),
+  series: [
+    { key: "oliveCount", label: "Olives", color: "#84cc16", default: true },
+    { key: "ops",        label: "OPS",    color: "#3b82f6", default: true },
+  ],
+  summaryFields: [
+    { key: "oliveCount", label: "Olives" },
+    { key: "ops",        label: "OPS" },
+  ],
+  downloadPrefix: "template",
+});
+
 // --- Init ---
 loadGame();
 updateUI();
+SessionLog.initSession();
+captureStateSnapshot("init");
 startLoop();
 logLine("Loaded prototype template.");
