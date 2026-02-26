@@ -23,7 +23,6 @@ const PERSISTED_STATE_KEYS = [
   "prestigeCount",
   "benchmarks",
   "totalWisdomEarned",
-  "hyperparams",
   "modelVersion",
   "distillationCount",
   "totalWisdomSinceLastDistill",
@@ -48,13 +47,6 @@ function createDefaultState() {
     prestigeCount: 0,
     benchmarks: {},
     totalWisdomEarned: 0,
-    hyperparams: {
-      learningRate: "conservative",
-      batchSize: "small",
-      regularization: "none",
-      lastTuneTime: 0,
-      warmupStartTime: 0,
-    },
     modelVersion: 0,
     distillationCount: 0,
     totalWisdomSinceLastDistill: 0,
@@ -222,10 +214,9 @@ function closeAnalyzer() {
 
 // --- Telemetry helpers ---
 function captureStateSnapshot(reason = "tick") {
-  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
   let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
-  aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
+  aps *= distBonus.apsMult * distBonus.allProdMult;
 
   SessionLog.record("state_snapshot", {
     avocadoCount: state.avocadoCount,
@@ -275,7 +266,6 @@ function loadGame() {
       upgrades: { ...(persisted.upgrades || {}) },
       wisdomUnlocks: { ...(persisted.wisdomUnlocks || {}) },
       benchmarks: { ...(persisted.benchmarks || {}) },
-      hyperparams: { ...defaults.hyperparams, ...(persisted.hyperparams || {}) },
       meta: { ...defaults.meta, ...(persisted.meta || {}) },
     };
   } catch (e) {
@@ -601,13 +591,11 @@ function renderBenchmarks() {
 let tickCount = 0;
 
 function updateUI() {
-  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
   let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
-  aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
+  aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
   let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
-  clickPower *= hpMods.clickMult * hpMods.globalMult;
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -686,36 +674,6 @@ function updateUI() {
     }
   }
 
-  // Hyperparams row — show when tuned (any non-default)
-  const hpRowEl = document.getElementById("hyperparams-row");
-  if (hpRowEl) {
-    const isDefault = state.hyperparams.learningRate === "conservative"
-      && state.hyperparams.batchSize === "small"
-      && state.hyperparams.regularization === "none";
-    hpRowEl.style.display = (state.prestigeCount >= 1 && !isDefault) ? "" : "none";
-    if (!isDefault) {
-      const hpValEl = document.getElementById("hyperparams-val");
-      if (hpValEl) hpValEl.textContent = `${state.hyperparams.learningRate} / ${state.hyperparams.batchSize} / ${state.hyperparams.regularization}`;
-    }
-  }
-
-  // Tune button visibility
-  const tuneBtn = document.getElementById("tune-btn");
-  if (tuneBtn) {
-    tuneBtn.style.display = state.prestigeCount >= 1 ? "" : "none";
-    const now = Date.now();
-    const elapsed = now - (state.hyperparams.lastTuneTime || 0);
-    const cooldownMs = TUNING.hyperparams.cooldownMs;
-    if (elapsed < cooldownMs) {
-      const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
-      tuneBtn.disabled = true;
-      tuneBtn.textContent = `Tune Hyperparams (${remaining}s)`;
-    } else {
-      tuneBtn.disabled = false;
-      tuneBtn.textContent = "Tune Hyperparams";
-    }
-  }
-
   // Guac section visibility — show when guac is unlocked
   if (guacSectionEl) {
     guacSectionEl.style.display = hasGuac ? "" : "none";
@@ -729,10 +687,10 @@ function updateUI() {
   const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
 
   // --- Standard producer rows ---
-  updateProducerRows(producersListEl, PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.producerLookahead, buyQuantity);
+  updateProducerRows(producersListEl, PRODUCER_ORDER, distBonus, currentAps, guacLabUnlocked, TUNING.reveal.producerLookahead, buyQuantity);
 
   // --- Guac producer rows ---
-  updateProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.guacProducerLookahead, guacBuyQuantity);
+  updateProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER, distBonus, currentAps, guacLabUnlocked, TUNING.reveal.guacProducerLookahead, guacBuyQuantity);
 
   // Upgrade rows: move between Research / Owned tabs (with lookahead + threshold)
   const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
@@ -832,11 +790,11 @@ function updateUI() {
   }
 }
 
-function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLabUnlocked, lookaheadLimit, qty) {
+function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocked, lookaheadLimit, qty) {
   const refineries = state.producers.guac_refinery || 0;
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
-  const combinedCostMult = distBonus.costMult * hpMods.costMult;
+  const combinedCostMult = distBonus.costMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
@@ -1020,10 +978,8 @@ function pickAvocado() {
   lastClickTime = Date.now();
   if (idlePromptShowing) dismissIdlePrompt();
 
-  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
   let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
-  power *= hpMods.clickMult * hpMods.globalMult;
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -1069,7 +1025,6 @@ function confirmPrestigeAndDistill() {
   state.benchmarks = keptBenchmarks;
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = 0;
-  state.hyperparams = fresh.hyperparams;
   state.modelVersion = newModelVersion;
   state.distillationCount = newDistillationCount;
 
@@ -1125,9 +1080,8 @@ function buyProducer(id) {
   const cfg = TUNING.producers[id];
   if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount) return;
 
-  const hpModsBuy = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  const combinedCostMult = distBonusBuy.costMult * hpModsBuy.costMult;
+  const combinedCostMult = distBonusBuy.costMult;
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
@@ -1325,7 +1279,6 @@ function confirmPrestige() {
   state.benchmarks = keptBenchmarks; // benchmarks persist forever
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = newTotalWisdomSinceLastDistill;
-  state.hyperparams = createDefaultState().hyperparams;
   // Distillation state persists through prestige
   // Apply starting wisdom bonus from distillation
   if (distBonus.startingWisdom > 0) {
@@ -1374,10 +1327,9 @@ function startLoop() {
     last = now;
 
     // Production
-    const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, now, TUNING);
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
     let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
-    aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
+    aps *= distBonus.apsMult * distBonus.allProdMult;
     if (aps > 0) {
       const produced = aps * dt;
       state.avocadoCount += produced;
@@ -1394,7 +1346,7 @@ function startLoop() {
       // We pass refineries to calcGuacConsumption which handles refinery reduction;
       // centrifuge effect is additional, so we adjust the refinery count for calc purposes
       const effectiveRefineries = refineries + centrifuges * 0.5; // 0.5 * 0.01 = 0.005 per centrifuge
-      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, effectiveRefineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount) * dt * hpMods.guacConsumeMult;
+      const desiredConsumption = Calc.calcGuacConsumption(labs, TUNING, effectiveRefineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount) * dt;
       const actualConsumption = Math.min(desiredConsumption, state.avocadoCount);
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
@@ -1608,29 +1560,6 @@ function renderBonusesModal() {
     if (distBonus.unlocksFoundationModel) addRow(sec, "Foundation Model", "Unlocked");
   }
 
-  // 6. Hyperparameters
-  const hp = state.hyperparams;
-  const isDefault = hp.learningRate === "conservative" && hp.batchSize === "small" && hp.regularization === "none";
-  if (state.prestigeCount >= 1 && !isDefault) {
-    const sec = addSection("Hyperparameters");
-    const hpMods = Calc.calcHyperparamModifiers(hp, Date.now(), TUNING);
-    const lrCfg = TUNING.hyperparams.learningRate[hp.learningRate];
-    const bsCfg = TUNING.hyperparams.batchSize[hp.batchSize];
-    const regCfg = TUNING.hyperparams.regularization[hp.regularization];
-    addRow(sec, "Learning Rate", `${lrCfg.label} — ${lrCfg.desc}`);
-    addRow(sec, "Batch Size", `${bsCfg.label} — ${bsCfg.desc}`);
-    addRow(sec, "Regularization", `${regCfg.label} — ${regCfg.desc}`);
-    const effects = [];
-    if (hpMods.apsMult !== 1) effects.push(`APS x${hpMods.apsMult.toFixed(2)}`);
-    if (hpMods.clickMult !== 1) effects.push(`Click x${hpMods.clickMult.toFixed(2)}`);
-    if (hpMods.guacConsumeMult !== 1) effects.push(`Guac consume x${hpMods.guacConsumeMult.toFixed(2)}`);
-    if (hpMods.globalMult !== 1) effects.push(`Global x${hpMods.globalMult.toFixed(2)}`);
-    if (hpMods.costMult !== 1) effects.push(`Cost x${hpMods.costMult.toFixed(2)}`);
-    if (hpMods.wisdomMult !== 1) effects.push(`Wisdom x${hpMods.wisdomMult.toFixed(2)}`);
-    if (hpMods.freezeGuacMult) effects.push("Guac mult frozen");
-    if (effects.length > 0) addRow(sec, "Net Effects", effects.join(", "));
-  }
-
   // If nothing was added, show a message
   if (bonusesModalBody.children.length === 0) {
     const empty = document.createElement("div");
@@ -1644,55 +1573,6 @@ if (bonusesBtn) bonusesBtn.addEventListener("click", openBonusesModal);
 if (bonusesCloseBtn) bonusesCloseBtn.addEventListener("click", closeBonusesModal);
 if (bonusesModal) bonusesModal.addEventListener("click", (e) => {
   if (e.target === bonusesModal) closeBonusesModal();
-});
-
-// --- Hyperparameter Modal ---
-const hpModal = document.getElementById("hp-modal");
-const hpCloseBtn = document.getElementById("hp-close-btn");
-const hpApplyBtn = document.getElementById("hp-apply-btn");
-const tuneBtn = document.getElementById("tune-btn");
-
-function openHpModal() {
-  // Set radio buttons to current state
-  const lrRadio = hpModal.querySelector(`input[name="hp-lr"][value="${state.hyperparams.learningRate}"]`);
-  const bsRadio = hpModal.querySelector(`input[name="hp-bs"][value="${state.hyperparams.batchSize}"]`);
-  const regRadio = hpModal.querySelector(`input[name="hp-reg"][value="${state.hyperparams.regularization}"]`);
-  if (lrRadio) lrRadio.checked = true;
-  if (bsRadio) bsRadio.checked = true;
-  if (regRadio) regRadio.checked = true;
-  hpModal.classList.add("active");
-  hpModal.setAttribute("aria-hidden", "false");
-}
-
-function closeHpModal() {
-  hpModal.classList.remove("active");
-  hpModal.setAttribute("aria-hidden", "true");
-}
-
-function applyHyperparams() {
-  const lr = hpModal.querySelector('input[name="hp-lr"]:checked').value;
-  const bs = hpModal.querySelector('input[name="hp-bs"]:checked').value;
-  const reg = hpModal.querySelector('input[name="hp-reg"]:checked').value;
-
-  state.hyperparams.learningRate = lr;
-  state.hyperparams.batchSize = bs;
-  state.hyperparams.regularization = reg;
-  state.hyperparams.lastTuneTime = Date.now();
-  if (lr === "warmup") {
-    state.hyperparams.warmupStartTime = Date.now();
-  }
-
-  logLine(`Hyperparams tuned: ${lr} / ${bs} / ${reg}`);
-  closeHpModal();
-  saveGame();
-  updateUI();
-}
-
-if (tuneBtn) tuneBtn.addEventListener("click", openHpModal);
-if (hpCloseBtn) hpCloseBtn.addEventListener("click", closeHpModal);
-if (hpApplyBtn) hpApplyBtn.addEventListener("click", applyHyperparams);
-if (hpModal) hpModal.addEventListener("click", (e) => {
-  if (e.target === hpModal) closeHpModal();
 });
 
 // --- Tab switching ---

@@ -7,7 +7,7 @@ import {
   calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
   calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
   calcEffectiveBaseProduction,
-  calcBenchmarkBonus, calcHyperparamModifiers,
+  calcBenchmarkBonus,
   calcDistillationCost, canDistill, calcDistillationBonus,
   calcSynergyMultiplier,
 } from "./static/js/gameCalc.js";
@@ -103,25 +103,6 @@ const tuning = {
     loss_convergence: { title: "Loss Convergence", guacMult: 0.03 },
     convergence:      { title: "Convergence",  wisdomMult: 0.05 },
     no_bonus:         { title: "No Bonus" },
-  },
-  hyperparams: {
-    cooldownMs: 180000,
-    warmupDurationMs: 60000,
-    learningRate: {
-      conservative: { label: "Conservative", apsMult: 1, guacConsumeMult: 1 },
-      aggressive:   { label: "Aggressive", apsMult: 1.3, guacConsumeMult: 1.2 },
-      warmup:       { label: "Warmup", apsMult: 0.85, apsMultAfterWarmup: 1.2 },
-    },
-    batchSize: {
-      small: { label: "Small", apsMult: 1, clickMult: 1 },
-      large: { label: "Large", apsMult: 1.5, clickMult: 0.7 },
-      micro: { label: "Micro", apsMult: 0.8, clickMult: 1.8 },
-    },
-    regularization: {
-      none:         { label: "None" },
-      dropout:      { label: "Dropout", freezeGuacMult: true, wisdomMult: 1.15 },
-      weight_decay: { label: "Weight Decay", costMult: 0.9, globalMult: 0.95 },
-    },
   },
   prestige: {
     unlockThreshold: 1e7,
@@ -893,84 +874,6 @@ describe("calcBenchmarkBonus", () => {
     expect(b.globalMult).toBeCloseTo(1.02);
     expect(b.clickMult).toBeCloseTo(1.05);
     expect(b.wisdomMult).toBeCloseTo(1.05);
-  });
-});
-
-// ---------- Hyperparameter modifier tests ----------
-
-describe("calcHyperparamModifiers", () => {
-  const defaultHp = { learningRate: "conservative", batchSize: "small", regularization: "none", lastTuneTime: 0, warmupStartTime: 0 };
-
-  it("returns all-neutral with defaults", () => {
-    const m = calcHyperparamModifiers(defaultHp, Date.now(), tuning);
-    expect(m.apsMult).toBe(1);
-    expect(m.clickMult).toBe(1);
-    expect(m.guacConsumeMult).toBe(1);
-    expect(m.wisdomMult).toBe(1);
-    expect(m.costMult).toBe(1);
-    expect(m.globalMult).toBe(1);
-    expect(m.freezeGuacMult).toBe(false);
-  });
-
-  it("returns all-neutral with null hyperparams", () => {
-    const m = calcHyperparamModifiers(null, Date.now(), tuning);
-    expect(m.apsMult).toBe(1);
-  });
-
-  it("aggressive learning rate boosts APS and guac consume", () => {
-    const hp = { ...defaultHp, learningRate: "aggressive" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    expect(m.apsMult).toBeCloseTo(1.3);
-    expect(m.guacConsumeMult).toBeCloseTo(1.2);
-  });
-
-  it("warmup learning rate reduces APS during warmup", () => {
-    const now = Date.now();
-    const hp = { ...defaultHp, learningRate: "warmup", warmupStartTime: now };
-    const m = calcHyperparamModifiers(hp, now + 1000, tuning); // 1s in
-    expect(m.apsMult).toBeCloseTo(0.85);
-  });
-
-  it("warmup learning rate boosts APS after warmup", () => {
-    const now = Date.now();
-    const hp = { ...defaultHp, learningRate: "warmup", warmupStartTime: now - 120000 }; // started 2 min ago
-    const m = calcHyperparamModifiers(hp, now, tuning);
-    expect(m.apsMult).toBeCloseTo(1.2);
-  });
-
-  it("large batch size boosts APS and reduces clicks", () => {
-    const hp = { ...defaultHp, batchSize: "large" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    expect(m.apsMult).toBeCloseTo(1.5);
-    expect(m.clickMult).toBeCloseTo(0.7);
-  });
-
-  it("micro batch size reduces APS and boosts clicks", () => {
-    const hp = { ...defaultHp, batchSize: "micro" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    expect(m.apsMult).toBeCloseTo(0.8);
-    expect(m.clickMult).toBeCloseTo(1.8);
-  });
-
-  it("dropout freezes guac mult and boosts wisdom", () => {
-    const hp = { ...defaultHp, regularization: "dropout" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    expect(m.freezeGuacMult).toBe(true);
-    expect(m.wisdomMult).toBeCloseTo(1.15);
-  });
-
-  it("weight_decay reduces costs and global mult", () => {
-    const hp = { ...defaultHp, regularization: "weight_decay" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    expect(m.costMult).toBeCloseTo(0.9);
-    expect(m.globalMult).toBeCloseTo(0.95);
-  });
-
-  it("stacks learning rate and batch size", () => {
-    const hp = { ...defaultHp, learningRate: "aggressive", batchSize: "large" };
-    const m = calcHyperparamModifiers(hp, Date.now(), tuning);
-    // 1.3 * 1.5 = 1.95
-    expect(m.apsMult).toBeCloseTo(1.95);
   });
 });
 

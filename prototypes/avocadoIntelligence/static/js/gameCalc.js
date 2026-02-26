@@ -332,49 +332,6 @@ export function canPrestige(totalAvocadosThisRun, tuning) {
 }
 
 /**
- * Calculate hyperparameter modifiers.
- * Returns { apsMult, clickMult, guacConsumeMult, wisdomMult, costMult, globalMult, freezeGuacMult }.
- */
-export function calcHyperparamModifiers(hyperparams, now, tuning) {
-  const result = { apsMult: 1, clickMult: 1, guacConsumeMult: 1, wisdomMult: 1, costMult: 1, globalMult: 1, freezeGuacMult: false };
-  if (!hyperparams || !tuning.hyperparams) return result;
-
-  // Learning Rate
-  const lr = tuning.hyperparams.learningRate[hyperparams.learningRate];
-  if (lr) {
-    if (hyperparams.learningRate === "warmup") {
-      const elapsed = now - (hyperparams.warmupStartTime || 0);
-      if (elapsed < tuning.hyperparams.warmupDurationMs) {
-        result.apsMult *= lr.apsMult; // -15% during warmup
-      } else {
-        result.apsMult *= lr.apsMultAfterWarmup; // +20% after warmup
-      }
-    } else {
-      result.apsMult *= lr.apsMult || 1;
-    }
-    result.guacConsumeMult *= lr.guacConsumeMult || 1;
-  }
-
-  // Batch Size
-  const bs = tuning.hyperparams.batchSize[hyperparams.batchSize];
-  if (bs) {
-    result.apsMult *= bs.apsMult || 1;
-    result.clickMult *= bs.clickMult || 1;
-  }
-
-  // Regularization
-  const reg = tuning.hyperparams.regularization[hyperparams.regularization];
-  if (reg) {
-    if (reg.freezeGuacMult) result.freezeGuacMult = true;
-    result.wisdomMult *= reg.wisdomMult || 1;
-    result.costMult *= reg.costMult || 1;
-    result.globalMult *= reg.globalMult || 1;
-  }
-
-  return result;
-}
-
-/**
  * Calculate benchmark bonus multipliers from earned benchmarks.
  * Returns { globalMult, clickMult, guacProdMult, guacMult, wisdomMult }.
  */

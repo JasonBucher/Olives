@@ -228,26 +228,6 @@ export const TUNING = {
     full_stack:         { title: "Full Stack",                    desc: "Own 1 of every standard producer.",     globalMult: 0.05, phase: "Endgame" },
   },
 
-  hyperparams: {
-    cooldownMs: 180000, // 3 minutes
-    warmupDurationMs: 60000, // 60 seconds
-    learningRate: {
-      conservative: { label: "Conservative", desc: "No change.", apsMult: 1, guacConsumeMult: 1 },
-      aggressive:   { label: "Aggressive",   desc: "Fast convergence, high compute cost.", apsMult: 1.3, guacConsumeMult: 1.2 },
-      warmup:       { label: "Warmup",       desc: "Slow start, strong finish.", apsMult: 0.85, apsMultAfterWarmup: 1.2 },
-    },
-    batchSize: {
-      small: { label: "Small",  desc: "No change.", apsMult: 1, clickMult: 1 },
-      large: { label: "Large",  desc: "Parallelism over interactivity.", apsMult: 1.5, clickMult: 0.7 },
-      micro: { label: "Micro",  desc: "SGD with momentum. Click harder.", apsMult: 0.8, clickMult: 1.8 },
-    },
-    regularization: {
-      none:         { label: "None",         desc: "No change." },
-      dropout:      { label: "Dropout",      desc: "Prevents overfitting to current run.", freezeGuacMult: true, wisdomMult: 1.15 },
-      weight_decay: { label: "Weight Decay", desc: "Smaller model, same performance.", costMult: 0.9, globalMult: 0.95 },
-    },
-  },
-
   prestige: {
     unlockThreshold: 1e7,         // total avocados this run to unlock prestige
     divisor: 750,                 // wisdom = floor(sqrt(total) / divisor)

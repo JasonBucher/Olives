@@ -571,31 +571,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-/* Hyperparameter modal */
-.hp-section {
-  margin-top: 14px;
-}
-
-.hp-label {
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 6px;
-}
-
-.hp-option {
-  display: block;
-  font-size: 12px;
-  padding: 4px 0;
-  cursor: pointer;
-  color: var(--text);
-}
-
-.hp-option input[type="radio"] {
-  margin-right: 6px;
-}
-
 /* Prestige overlay modal */
 .prestige-modal {
   width: min(640px, 95vw);
