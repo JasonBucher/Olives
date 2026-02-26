@@ -459,7 +459,7 @@ function renderDistillation() {
 
   const descEl = document.createElement("div");
   descEl.className = "muted";
-  descEl.textContent = "Compress all knowledge into a new model version. Resets everything including wisdom.";
+  descEl.textContent = "Compress all knowledge into a new model version. Resets wisdom, producers, upgrades, and prestige count. Wisdom unlocks persist.";
   prestigeDistillationEl.appendChild(descEl);
 
   // Current model
@@ -492,7 +492,7 @@ function renderDistillation() {
       const warnEl = document.createElement("div");
       warnEl.className = "muted";
       warnEl.style.marginTop = "4px";
-      warnEl.textContent = "Warning: This will compost AND distill, resetting everything including wisdom and wisdom unlocks.";
+      warnEl.textContent = "Warning: This will compost AND distill, resetting wisdom, producers, upgrades, and prestige count. Wisdom unlocks are kept.";
       prestigeDistillationEl.appendChild(warnEl);
     }
   } else {
@@ -517,6 +517,8 @@ function renderDistillation() {
 }
 
 // --- Benchmarks Rendering ---
+const BENCHMARK_PHASES = ["Early", "Mid", "Prestige", "Endgame"];
+
 function renderBenchmarks() {
   if (!benchmarksListEl) return;
   benchmarksListEl.innerHTML = "";
@@ -524,28 +526,52 @@ function renderBenchmarks() {
   let earned = 0;
   let hintCount = 0;
 
+  // Count earned
   for (const id of BENCHMARK_ORDER) {
-    const cfg = TUNING.benchmarks[id];
-    const isEarned = !!state.benchmarks[id];
-    if (isEarned) earned++;
+    if (state.benchmarks[id]) earned++;
+  }
 
-    if (isEarned) {
-      const row = document.createElement("div");
-      row.className = "benchmark-row earned";
-      let bonusText = "";
-      if (cfg.globalMult) bonusText = ` (+${Math.round(cfg.globalMult * 100)}% global)`;
-      if (cfg.clickMult) bonusText = ` (+${Math.round(cfg.clickMult * 100)}% click)`;
-      if (cfg.guacProdMult) bonusText = ` (+${Math.round(cfg.guacProdMult * 100)}% guac prod)`;
-      if (cfg.guacMult) bonusText = ` (+${Math.round(cfg.guacMult * 100)}% guac mult)`;
-      if (cfg.wisdomMult) bonusText = ` (+${Math.round(cfg.wisdomMult * 100)}% wisdom)`;
-      row.innerHTML = `<span class="benchmark-check">\u2713</span> <strong>${cfg.title}</strong>${bonusText}`;
-      benchmarksListEl.appendChild(row);
-    } else if (hintCount < 3) {
-      hintCount++;
-      const row = document.createElement("div");
-      row.className = "benchmark-row hint";
-      row.innerHTML = `<span class="benchmark-lock">?</span> ${cfg.desc}`;
-      benchmarksListEl.appendChild(row);
+  // Group benchmarks by phase
+  for (const phase of BENCHMARK_PHASES) {
+    const phaseIds = BENCHMARK_ORDER.filter(id => TUNING.benchmarks[id].phase === phase);
+    if (phaseIds.length === 0) continue;
+
+    const phaseEarned = phaseIds.filter(id => state.benchmarks[id]).length;
+    const phaseTotal = phaseIds.length;
+    const allEarned = phaseEarned === phaseTotal;
+
+    // Phase header
+    const header = document.createElement("div");
+    header.className = "benchmark-phase-header";
+    header.innerHTML = `<span>${phase}</span> <span class="muted">${phaseEarned}/${phaseTotal}</span>`;
+    if (allEarned) header.classList.add("complete");
+    benchmarksListEl.appendChild(header);
+
+    // Phase content — earned benchmarks collapsed if all earned, else show earned + hints
+    for (const id of phaseIds) {
+      const cfg = TUNING.benchmarks[id];
+      const isEarned = !!state.benchmarks[id];
+
+      if (isEarned) {
+        // If all earned in this phase, skip individual display
+        if (allEarned) continue;
+        const row = document.createElement("div");
+        row.className = "benchmark-row earned";
+        let bonusText = "";
+        if (cfg.globalMult) bonusText = ` (+${Math.round(cfg.globalMult * 100)}% global)`;
+        if (cfg.clickMult) bonusText = ` (+${Math.round(cfg.clickMult * 100)}% click)`;
+        if (cfg.guacProdMult) bonusText = ` (+${Math.round(cfg.guacProdMult * 100)}% guac prod)`;
+        if (cfg.guacMult) bonusText = ` (+${Math.round(cfg.guacMult * 100)}% guac mult)`;
+        if (cfg.wisdomMult) bonusText = ` (+${Math.round(cfg.wisdomMult * 100)}% wisdom)`;
+        row.innerHTML = `<span class="benchmark-check">\u2713</span> <strong>${cfg.title}</strong>${bonusText}`;
+        benchmarksListEl.appendChild(row);
+      } else if (hintCount < 3) {
+        hintCount++;
+        const row = document.createElement("div");
+        row.className = "benchmark-row hint";
+        row.innerHTML = `<span class="benchmark-lock">?</span> ${cfg.desc}`;
+        benchmarksListEl.appendChild(row);
+      }
     }
   }
 
@@ -977,7 +1003,7 @@ function pickAvocado() {
 }
 
 function confirmPrestigeAndDistill() {
-  if (!confirm("Compost AND Distill? This resets EVERYTHING including wisdom and wisdom unlocks. You gain a permanent Model Version upgrade.")) return;
+  if (!confirm("Compost AND Distill? This resets wisdom, producers, upgrades, and prestige count. Wisdom unlocks and benchmarks are kept. You gain a permanent Model Version upgrade.")) return;
 
   // First apply the prestige wisdom gain to totalWisdomSinceLastDistill
   const wisdomGain = overlayWisdomGain;
@@ -989,7 +1015,10 @@ function confirmPrestigeAndDistill() {
   const keptBenchmarks = { ...state.benchmarks };
   const keptAllTime = state.totalAvocadosAllTime;
 
-  // Full reset (distillation resets everything including wisdom + wisdom unlocks)
+  // Full reset — wisdom unlocks persist through distillation (wisdom itself resets to 0,
+  // and prestigeCount resets so scaling unlocks lose their effect until re-earned)
+  const keptWisdomUnlocks = { ...state.wisdomUnlocks };
+
   const fresh = createDefaultState();
   state.avocadoCount = 0;
   state.totalAvocadosThisRun = 0;
@@ -998,7 +1027,7 @@ function confirmPrestigeAndDistill() {
   state.producers = fresh.producers;
   state.upgrades = {};
   state.wisdom = 0;
-  state.wisdomUnlocks = {};
+  state.wisdomUnlocks = keptWisdomUnlocks;
   state.prestigeCount = 0;
   state.benchmarks = keptBenchmarks;
   state.totalWisdomEarned = newTotalWisdomEarned;

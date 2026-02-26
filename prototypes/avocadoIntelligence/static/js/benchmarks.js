@@ -27,8 +27,9 @@ export const BENCHMARK_CHECKERS = {
   convergence:        (state) => (state.prestigeCount || 0) >= 1,
   fine_tuning:        (state) => (state.prestigeCount || 0) >= 3,
   transfer_learning:  (state) => {
-    const unlocks = TUNING.wisdomUnlocks;
-    for (const id of Object.keys(unlocks)) {
+    // Only check the original 3 scaling wisdom unlocks, not the guac gate unlocks
+    const originalUnlocks = ["guac_memory_1", "guac_memory_2", "infinite_guac"];
+    for (const id of originalUnlocks) {
       if (!state.wisdomUnlocks[id]) return false;
     }
     return true;
@@ -36,6 +37,29 @@ export const BENCHMARK_CHECKERS = {
   agi_achieved:       (state) => (state.totalWisdomEarned || 0) >= 50,
   superintelligence:  (state, aps) => aps >= 100000,
   paperclip_moment:   (state) => (state.totalAvocadosAllTime || 0) >= 1e9,
+  // Mid-game gap fillers
+  deep_network:       (state) => {
+    const upTo = ["sapling", "seed_bank", "orchard_row", "compost_bin", "drone",
+      "greenhouse", "harvest_bot", "exchange", "data_grove", "attention_head", "pit_miner"];
+    return upTo.every(id => (state.producers[id] || 0) >= 1);
+  },
+  guac_reservoir:     (state) => (state.guacCount || 0) >= 1000,
+  scaling_laws:       (state, aps) => aps >= 5000,
+  // Prestige depth
+  overfit_prevention: (state) => (state.prestigeCount || 0) >= 5,
+  // Distillation era
+  first_distillation: (state) => (state.modelVersion || 0) >= 1,
+  architecture_search:(state) => (state.modelVersion || 0) >= 3,
+  guac_ocean:         (state) => (state.guacCount || 0) >= 10000,
+  // Ultra-endgame
+  million_aps:        (state, aps) => aps >= 1000000,
+  full_stack:         (state) => {
+    const allStandard = ["sapling", "seed_bank", "orchard_row", "compost_bin", "drone",
+      "greenhouse", "harvest_bot", "exchange", "data_grove", "attention_head", "pit_miner",
+      "gpu_cluster", "neural_pit", "synth_orchard", "transformer", "orchard_cloud",
+      "quantum_grove", "agi_nexus", "dyson_orchard", "omega_harvest", "foundation_model"];
+    return allStandard.every(id => (state.producers[id] || 0) >= 1);
+  },
 };
 
 /** Check all benchmarks, return array of newly-earned IDs. */

@@ -401,6 +401,26 @@ h1 {
   margin-right: 4px;
 }
 
+.benchmark-phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 6px 0 2px;
+  margin-top: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.benchmark-phase-header:first-child { margin-top: 0; }
+
+.benchmark-phase-header.complete {
+  color: #4a7c3f;
+}
+
 /* Model version status bar */
 .model-bar {
   position: relative;

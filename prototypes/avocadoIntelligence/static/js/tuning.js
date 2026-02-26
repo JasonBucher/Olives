@@ -177,24 +177,37 @@ export const TUNING = {
   },
 
   benchmarks: {
-    first_inference:    { title: "First Inference",               desc: "Click once." },
-    hello_world:        { title: "Hello, World",                  desc: "Reach 1 APS.",                          globalMult: 0.02 },
-    batch_processing:   { title: "Batch Processing",              desc: "Own 10 Avocado Saplings." },
-    overfitting:        { title: "Overfitting",                   desc: "Buy all click upgrades.",               clickMult: 0.05 },
-    feature_extraction: { title: "Feature Extraction",            desc: "Reach 100 APS.",                        globalMult: 0.03 },
-    first_epoch:        { title: "First Epoch",                   desc: "Own 5+ of any 3 different producers." },
-    guac_online:        { title: "Guac Protocol Online",          desc: "Produce first guac.",                   guacProdMult: 0.05 },
-    data_pipeline:      { title: "Data Pipeline",                 desc: "Own 5 Irrigation Drones and 5 Orchard Rows." },
-    gradient_descent:   { title: "Gradient Descent",              desc: "Reach 1,000 APS.",                      globalMult: 0.05 },
-    attention_is_all:   { title: "Attention Is All You Need",     desc: "Own 1 Attention Head." },
-    loss_convergence:   { title: "Loss Convergence",              desc: "Accumulate 100 guac.",                  guacMult: 0.03 },
-    singularity:        { title: "The Singularity",               desc: "Reach 10,000 APS." },
-    convergence:        { title: "Convergence",                   desc: "Prestige for the first time.",          wisdomMult: 0.05 },
-    fine_tuning:        { title: "Fine-Tuning",                   desc: "Complete 3 prestiges.",                 globalMult: 0.03 },
-    transfer_learning:  { title: "Transfer Learning",             desc: "Buy all 3 wisdom unlocks." },
-    agi_achieved:       { title: "AGI Achieved",                  desc: "Accumulate 50 lifetime wisdom.",        globalMult: 0.05 },
-    superintelligence:  { title: "Superintelligence",             desc: "Reach 100,000 APS.",                    globalMult: 0.10 },
-    paperclip_moment:   { title: "The Paperclip Moment",          desc: "1 billion all-time avocados." },
+    // Early
+    first_inference:    { title: "First Inference",               desc: "Click once.",                           clickMult: 0.02, phase: "Early" },
+    hello_world:        { title: "Hello, World",                  desc: "Reach 1 APS.",                          globalMult: 0.02, phase: "Early" },
+    batch_processing:   { title: "Batch Processing",              desc: "Own 10 Avocado Saplings.",              globalMult: 0.01, phase: "Early" },
+    overfitting:        { title: "Overfitting",                   desc: "Buy all click upgrades.",               clickMult: 0.05, phase: "Early" },
+    feature_extraction: { title: "Feature Extraction",            desc: "Reach 100 APS.",                        globalMult: 0.03, phase: "Early" },
+    first_epoch:        { title: "First Epoch",                   desc: "Own 5+ of any 3 different producers.",  globalMult: 0.02, phase: "Early" },
+    // Mid
+    guac_online:        { title: "Guac Protocol Online",          desc: "Produce first guac.",                   guacProdMult: 0.05, phase: "Mid" },
+    data_pipeline:      { title: "Data Pipeline",                 desc: "Own 5 Irrigation Drones and 5 Orchard Rows.", globalMult: 0.02, phase: "Mid" },
+    gradient_descent:   { title: "Gradient Descent",              desc: "Reach 1,000 APS.",                      globalMult: 0.05, phase: "Mid" },
+    deep_network:       { title: "Deep Network",                  desc: "Own 1 of every standard producer up to Pit Miner.", globalMult: 0.03, phase: "Mid" },
+    scaling_laws:       { title: "Scaling Laws",                  desc: "Reach 5,000 APS.",                      globalMult: 0.03, phase: "Mid" },
+    attention_is_all:   { title: "Attention Is All You Need",     desc: "Own 1 Attention Head.",                 globalMult: 0.03, phase: "Mid" },
+    loss_convergence:   { title: "Loss Convergence",              desc: "Accumulate 100 guac.",                  guacMult: 0.03, phase: "Mid" },
+    singularity:        { title: "The Singularity",               desc: "Reach 10,000 APS.",                     globalMult: 0.05, phase: "Mid" },
+    guac_reservoir:     { title: "Guac Reservoir",                desc: "Accumulate 1,000 guac.",                guacMult: 0.05, phase: "Mid" },
+    // Prestige
+    convergence:        { title: "Convergence",                   desc: "Prestige for the first time.",          wisdomMult: 0.05, phase: "Prestige" },
+    fine_tuning:        { title: "Fine-Tuning",                   desc: "Complete 3 prestiges.",                 globalMult: 0.03, phase: "Prestige" },
+    overfit_prevention: { title: "Overfit Prevention",            desc: "Complete 5 prestiges.",                 wisdomMult: 0.05, phase: "Prestige" },
+    transfer_learning:  { title: "Transfer Learning",             desc: "Buy all 3 scaling wisdom unlocks.",     globalMult: 0.03, phase: "Prestige" },
+    agi_achieved:       { title: "AGI Achieved",                  desc: "Accumulate 50 lifetime wisdom.",        globalMult: 0.05, phase: "Prestige" },
+    superintelligence:  { title: "Superintelligence",             desc: "Reach 100,000 APS.",                    globalMult: 0.10, phase: "Prestige" },
+    paperclip_moment:   { title: "The Paperclip Moment",          desc: "1 billion all-time avocados.",          globalMult: 0.05, phase: "Prestige" },
+    // Endgame
+    first_distillation: { title: "First Distillation",            desc: "Distill to Model v1.0.",                globalMult: 0.05, phase: "Endgame" },
+    architecture_search:{ title: "Architecture Search",           desc: "Reach Model v3.0.",                     globalMult: 0.05, phase: "Endgame" },
+    guac_ocean:         { title: "Guac Ocean",                    desc: "Accumulate 10,000 guac.",               guacMult: 0.05, phase: "Endgame" },
+    million_aps:        { title: "Compute Saturated",             desc: "Reach 1,000,000 APS.",                  globalMult: 0.10, phase: "Endgame" },
+    full_stack:         { title: "Full Stack",                    desc: "Own 1 of every standard producer.",     globalMult: 0.05, phase: "Endgame" },
   },
 
   hyperparams: {
@@ -219,7 +232,7 @@ export const TUNING = {
 
   prestige: {
     unlockThreshold: 1e7,         // total avocados this run to unlock prestige
-    divisor: 1000,                // wisdom = floor(sqrt(total) / divisor)
+    divisor: 750,                 // wisdom = floor(sqrt(total) / divisor)
     wisdomMultPerPoint: 0.10,     // +10% per wisdom point
   },
 
