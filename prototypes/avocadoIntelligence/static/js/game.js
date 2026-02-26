@@ -99,6 +99,7 @@ const revealedUpgrades = new Set();
 
 // --- Buy quantity selector (session-only, not persisted) ---
 let buyQuantity = 1; // 1, 10, 100, or "max"
+let guacBuyQuantity = 1; // independent selector for guac producers
 
 // --- APS milestone tracking ---
 const APS_MILESTONES = [1, 10, 100, 1000, 10000, 100000];
@@ -342,6 +343,10 @@ function renderGuacProducerList() {
 function renderBuyQuantitySelector() {
   const sectionTitle = producersListEl.closest(".section")?.querySelector(".section-title");
   if (!sectionTitle) return;
+  // Remove existing bar if re-rendering after prestige
+  const existing = sectionTitle.querySelector(".buy-qty-bar");
+  if (existing) existing.remove();
+
   sectionTitle.style.display = "flex";
   sectionTitle.style.justifyContent = "space-between";
   sectionTitle.style.alignItems = "center";
@@ -358,6 +363,36 @@ function renderBuyQuantitySelector() {
       bar.querySelectorAll(".buy-qty-tab").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       buyQuantity = opt;
+      updateUI();
+    });
+    bar.appendChild(btn);
+  }
+  sectionTitle.appendChild(bar);
+}
+
+function renderGuacBuyQuantitySelector() {
+  const sectionTitle = guacProducersListEl.closest(".section")?.querySelector(".section-title");
+  if (!sectionTitle) return;
+  // Remove existing bar if re-rendering after prestige
+  const existing = sectionTitle.querySelector(".buy-qty-bar");
+  if (existing) existing.remove();
+
+  sectionTitle.style.display = "flex";
+  sectionTitle.style.justifyContent = "space-between";
+  sectionTitle.style.alignItems = "center";
+
+  const bar = document.createElement("div");
+  bar.className = "buy-qty-bar";
+  const options = [1, 10, 100, "max"];
+  for (const opt of options) {
+    const btn = document.createElement("button");
+    btn.className = "buy-qty-tab" + (opt === 1 ? " active" : "");
+    btn.type = "button";
+    btn.textContent = opt === "max" ? "MAX" : String(opt);
+    btn.addEventListener("click", () => {
+      bar.querySelectorAll(".buy-qty-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      guacBuyQuantity = opt;
       updateUI();
     });
     bar.appendChild(btn);
@@ -649,10 +684,10 @@ function updateUI() {
   const guacLabUnlocked = currentAps >= TUNING.guac.labUnlockAps || (state.producers.guac_lab || 0) > 0;
 
   // --- Standard producer rows ---
-  updateProducerRows(producersListEl, PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.producerLookahead);
+  updateProducerRows(producersListEl, PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.producerLookahead, buyQuantity);
 
   // --- Guac producer rows ---
-  updateProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.guacProducerLookahead);
+  updateProducerRows(guacProducersListEl, GUAC_PRODUCER_ORDER, distBonus, hpMods, currentAps, guacLabUnlocked, TUNING.reveal.guacProducerLookahead, guacBuyQuantity);
 
   // Upgrade rows: move between Research / Owned tabs (with lookahead + threshold)
   const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
@@ -752,7 +787,7 @@ function updateUI() {
   }
 }
 
-function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLabUnlocked, lookaheadLimit) {
+function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLabUnlocked, lookaheadLimit, qty) {
   const refineries = state.producers.guac_refinery || 0;
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
@@ -765,17 +800,17 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
     const singleCost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * combinedCostMult);
     const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
 
-    // Compute display cost and effective quantity based on buyQuantity
+    // Compute display cost and effective quantity based on qty
     let effectiveQty;
     let displayCost;
-    if (buyQuantity === "max") {
+    if (qty === "max") {
       effectiveQty = Calc.calcMaxAffordable(id, owned, state.avocadoCount, TUNING, combinedCostMult);
       displayCost = effectiveQty > 0
         ? Calc.calcBulkProducerCost(id, owned, effectiveQty, TUNING, combinedCostMult)
         : singleCost;
     } else {
-      effectiveQty = buyQuantity;
-      displayCost = Calc.calcBulkProducerCost(id, owned, buyQuantity, TUNING, combinedCostMult);
+      effectiveQty = qty;
+      displayCost = Calc.calcBulkProducerCost(id, owned, qty, TUNING, combinedCostMult);
     }
     const canAfford = state.avocadoCount >= displayCost && effectiveQty > 0;
 
@@ -987,7 +1022,11 @@ function confirmPrestigeAndDistill() {
   closePrestigeOverlay();
   saveGame();
   renderProducerList();
+  renderBuyQuantitySelector();
   renderGuacProducerList();
+  renderGuacBuyQuantitySelector();
+  buyQuantity = 1;
+  guacBuyQuantity = 1;
   renderUpgradeList();
   renderBenchmarks();
   updateUI();
@@ -1015,11 +1054,12 @@ function buyProducer(id) {
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
+  const activeBuyQty = GUAC_PRODUCER_ORDER.includes(id) ? guacBuyQuantity : buyQuantity;
   let qty;
-  if (buyQuantity === "max") {
+  if (activeBuyQty === "max") {
     qty = Calc.calcMaxAffordable(id, startOwned, state.avocadoCount, TUNING, combinedCostMult);
   } else {
-    qty = buyQuantity;
+    qty = activeBuyQty;
   }
   if (qty <= 0) return;
 
@@ -1231,7 +1271,11 @@ function confirmPrestige() {
   closePrestigeOverlay();
   saveGame();
   renderProducerList();
+  renderBuyQuantitySelector();
   renderGuacProducerList();
+  renderGuacBuyQuantitySelector();
+  buyQuantity = 1;
+  guacBuyQuantity = 1;
   renderUpgradeList();
   renderBenchmarks();
   updateUI();
@@ -1502,6 +1546,7 @@ loadGame();
 renderProducerList();
 renderBuyQuantitySelector();
 renderGuacProducerList();
+renderGuacBuyQuantitySelector();
 renderUpgradeList();
 renderBenchmarks();
 updateUI();
