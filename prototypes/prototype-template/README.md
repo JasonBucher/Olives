@@ -34,8 +34,8 @@ This prevents localStorage bloat and avoids loading stale transient data on relo
 ### ES Modules
 All JS files use `import`/`export`. The HTML loads `game.js` with `<script type="module">`. This keeps each system in its own file and enables tree-shaking by test runners.
 
-### Vitest Testing (`gameCalc.test.js`)
-Tests import directly from `./static/js/gameCalc.js` and run with `vitest`. 11 starter tests cover the calc utilities. The pattern: every pure function in `gameCalc.js` gets a corresponding test. No DOM mocking needed.
+### Vitest Testing (`gameCalc.test.js`, `logger.test.js`)
+Tests import directly from module files and run with `vitest`. Starter tests cover calc utilities plus the shared DOM logger helper. The pattern: every pure function in `gameCalc.js` gets a corresponding test, and reusable UI helpers (like logging) get focused module tests with lightweight mocks.
 
 ```
 npm test           # single run
@@ -46,7 +46,7 @@ npm run test:watch # watch mode
 - **Storage isolation** — `STORAGE_PREFIX` scopes localStorage so prototypes never collide
 - **Safe reset** — `isResetting` flag prevents the main loop interval from re-saving state after a reset
 - **Debug modal** — +100 resources buttons and a reset button, wired up and ready
-- **Event log** — Timestamped, capped at 60 lines, newest on top
+- **Event log** — Uses shared `createDomLogger` helper (timestamped, capped at 60 lines, newest on top)
 
 ## File map
 | File | Role |
@@ -54,8 +54,10 @@ npm run test:watch # watch mode
 | `static/js/tuning.js` | Balance constants |
 | `static/js/gameCalc.js` | Pure math/formatting functions |
 | `static/js/investments.js` | Upgrade registry |
+| `static/js/logger.js` | Reusable DOM log writer (line cap, timestamps, optional colors, `data-ts`) |
 | `static/js/game.js` | Main loop, state, DOM, save/load |
 | `static/css/style.css` | Dark theme, 3-column grid layout |
 | `gameCalc.test.js` | Unit tests for calc functions |
+| `logger.test.js` | Unit tests for reusable logger helper |
 | `index.html` | 3-column UI shell |
 | `INTENT.md` | Design philosophy |

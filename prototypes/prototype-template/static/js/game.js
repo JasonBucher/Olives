@@ -4,6 +4,7 @@
 import { TUNING } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
+import { createDomLogger } from "./logger.js";
 
 const STORAGE_PREFIX = "TEMPLATE_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -79,19 +80,11 @@ const debugAddFlorinsBtn = document.getElementById("debug-add-florins-btn");
 const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
 
 // --- Logging ---
-function logLine(message) {
-  const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const div = document.createElement("div");
-  div.className = "line";
-  div.textContent = `[${ts}] ${message}`;
-  logEl.prepend(div);
-
-  // Cap lines
-  const maxLines = 60;
-  while (logEl.children.length > maxLines) {
-    logEl.removeChild(logEl.lastChild);
-  }
-}
+const logLine = createDomLogger({
+  container: logEl,
+  maxLines: 60,
+  timestamp: "locale",
+});
 
 // --- Storage ---
 function loadGame() {
