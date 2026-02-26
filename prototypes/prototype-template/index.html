@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Olives — Prototype Template</title>
+  <title>Olives — Prototype Template Example</title>
   <link rel="stylesheet" href="static/css/style.css" />
 </head>
 <body>
@@ -11,10 +11,22 @@
     <header class="topbar">
       <div class="title">
         <h1>Olives</h1>
-        <div class="subtitle">Prototype Template</div>
+        <div class="subtitle">PROTOTYPE TEMPLATE — Example Systems Harness</div>
       </div>
       <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
     </header>
+
+    <section class="section template-banner">
+      <div class="section-title">Template Notice</div>
+      <div class="muted">
+        This is intentionally a <strong>template harness</strong>, not a full game. It exists to demonstrate and test every core system included in
+        <code>prototype-template</code>: centralized tuning, pure calc functions, investment registry, persisted-state allowlist, debug/reset flow,
+        and UI rendering patterns.
+      </div>
+      <div class="muted" style="margin-top: 6px;">
+        Use this as a copy-ready reference when creating a new prototype: replace the theme/resources and keep the system wiring.
+      </div>
+    </section>
 
     <hr class="divider" />
 
@@ -23,10 +35,20 @@
         <section class="section">
           <div class="section-title">Capital</div>
           <div class="row">
-            <div class="label">Capital</div>
-            <div class="value">(placeholder)</div>
+            <div class="label">Florins</div>
+            <div class="value"><span id="florin-count">0</span></div>
           </div>
-          <div class="muted note">Meta resources live here</div>
+          <div class="row">
+            <div class="label">Oil</div>
+            <div class="value"><span id="oil-count">0</span></div>
+          </div>
+          <div class="row">
+            <div class="label">Market Rate</div>
+            <div class="value"><span id="market-rate">0</span></div>
+          </div>
+          <div class="actions">
+            <button id="sell-oil-btn" class="btn" type="button">Sell All Oil</button>
+          </div>
         </section>
       </div>
 
@@ -43,12 +65,18 @@
             </div>
 
             <div class="row">
+              <div class="label">Click Yield</div>
+              <div class="value"><span id="click-yield">1</span></div>
+            </div>
+
+            <div class="row">
               <div class="label">OPS</div>
               <div class="value"><span id="ops-count">0.0</span></div>
             </div>
 
             <div class="actions">
               <button id="pick-olive-btn" class="btn btn-primary" type="button">Pick Olive</button>
+              <button id="press-oil-btn" class="btn" type="button">Press Oil</button>
             </div>
           </div>
 
@@ -62,18 +90,8 @@
       <div class="column">
         <section class="section">
           <div class="section-title">Institutions</div>
-          <div class="row">
-            <div class="label">Market</div>
-            <div class="value muted">Inactive</div>
-          </div>
-          <div class="row">
-            <div class="label">Church</div>
-            <div class="value muted">Inactive</div>
-          </div>
-          <div class="row">
-            <div class="label">Bank</div>
-            <div class="value muted">Inactive</div>
-          </div>
+          <div class="muted">Investment registry examples (one-shot + repeatable + market unlock).</div>
+          <div id="investments-list" class="stack" style="margin-top: 8px;"></div>
         </section>
       </div>
     </div>

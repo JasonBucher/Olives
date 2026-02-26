@@ -9,13 +9,13 @@ const STORAGE_PREFIX = "TEMPLATE_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
 
 // --- Persisted State ---
-// Only keys listed here are saved to / loaded from localStorage.
-// Add new keys here AND in createDefaultState() when extending the game.
 const PERSISTED_STATE_KEYS = [
   "oliveCount",
   "oilCount",
   "florinCount",
   "sharperPickOwned",
+  "biggerBasketsLevel",
+  "marketStallOwned",
   "meta",
 ];
 
@@ -24,16 +24,18 @@ function createDefaultState() {
     oliveCount: 0,
     oilCount: 0,
     florinCount: 0,
+
     sharperPickOwned: false,
+    biggerBasketsLevel: 0,
+    marketStallOwned: false,
 
     // Click tracking for OPS (transient — not persisted)
-    olivesPickedThisWindow: 0,
     clickWindowSeconds: 5,
     lastClickTimestamps: [],
 
     meta: {
       createdAt: null,
-      version: "template",
+      version: "template-sample-game",
     },
   };
 }
@@ -54,20 +56,23 @@ function pickPersistedState(parsed) {
   return out;
 }
 
-// --- Reset safety ---
-// Prevents the "reset doesn't reset" bug where a still-running interval re-saves state.
 let isResetting = false;
 let mainLoopInterval = null;
-
-// --- Game State ---
 let state = createDefaultState();
 
 // --- DOM ---
 const oliveCountEl = document.getElementById("olive-count");
+const oilCountEl = document.getElementById("oil-count");
+const florinCountEl = document.getElementById("florin-count");
 const opsCountEl = document.getElementById("ops-count");
+const clickYieldEl = document.getElementById("click-yield");
+const marketRateEl = document.getElementById("market-rate");
 const logEl = document.getElementById("log");
+const investmentsListEl = document.getElementById("investments-list");
 
 const pickOliveBtn = document.getElementById("pick-olive-btn");
+const pressOilBtn = document.getElementById("press-oil-btn");
+const sellOilBtn = document.getElementById("sell-oil-btn");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -78,7 +83,6 @@ const debugAddOlivesBtn = document.getElementById("debug-add-olives-btn");
 const debugAddFlorinsBtn = document.getElementById("debug-add-florins-btn");
 const debugAddOilBtn = document.getElementById("debug-add-oil-btn");
 
-// --- Logging ---
 function logLine(message) {
   const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const div = document.createElement("div");
@@ -86,27 +90,39 @@ function logLine(message) {
   div.textContent = `[${ts}] ${message}`;
   logEl.prepend(div);
 
-  // Cap lines
-  const maxLines = 60;
-  while (logEl.children.length > maxLines) {
+  while (logEl.children.length > 60) {
     logEl.removeChild(logEl.lastChild);
   }
 }
 
-// --- Storage ---
+function getClickYield() {
+  return Calc.getClickYield(
+    TUNING.production.baseClickYield,
+    state.sharperPickOwned,
+    state.biggerBasketsLevel,
+    TUNING.production.basketBonusPerLevel,
+  );
+}
+
+function getMarketMultiplier() {
+  return state.marketStallOwned ? TUNING.market.stallBonusMultiplier : 1;
+}
+
+function getOilSellValue(oilToSell = 1) {
+  return Calc.getSellValue(oilToSell, TUNING.market.baseSellPrice, getMarketMultiplier());
+}
+
 function loadGame() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    // Fresh start
     state.meta.createdAt = new Date().toISOString();
-    saveGame(); // create key immediately so it's easy to see in DevTools
+    saveGame();
     return;
   }
 
   try {
     const parsed = JSON.parse(raw);
     const persisted = pickPersistedState(parsed);
-    // Shallow merge so missing fields get defaults
     state = { ...state, ...persisted, meta: { ...state.meta, ...(persisted.meta || {}) } };
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
@@ -125,19 +141,13 @@ function resetGame() {
 
   isResetting = true;
   if (mainLoopInterval) clearInterval(mainLoopInterval);
-
   localStorage.removeItem(STORAGE_KEY);
-
-  // Cache-bust reload (useful on GitHub Pages)
   window.location.href = window.location.pathname + "?t=" + Date.now();
 }
 
-// --- OPS (click-based) ---
 function recordClick() {
   const now = Date.now();
   state.lastClickTimestamps.push(now);
-
-  // Remove clicks older than window
   const cutoff = now - state.clickWindowSeconds * 1000;
   while (state.lastClickTimestamps.length && state.lastClickTimestamps[0] < cutoff) {
     state.lastClickTimestamps.shift();
@@ -145,60 +155,136 @@ function recordClick() {
 }
 
 function computeOps() {
-  // This template only tracks click-based OPS; add passive sources later.
   const now = Date.now();
   const cutoff = now - state.clickWindowSeconds * 1000;
-  // Ensure timestamps are pruned (in case of long dt)
   state.lastClickTimestamps = state.lastClickTimestamps.filter(t => t >= cutoff);
-  const clickRate = state.lastClickTimestamps.length / state.clickWindowSeconds;
-  return clickRate; // olives per second from clicks
+  return state.lastClickTimestamps.length / state.clickWindowSeconds;
 }
 
-// --- UI ---
+function createInvestmentCard(investment) {
+  const cost = investment.cost(state, TUNING, Calc);
+  const owned = investment.isOwned(state, TUNING, Calc);
+  const canBuy = investment.canPurchase(state, TUNING, Calc);
+
+  const card = document.createElement("div");
+  card.className = "investment-card";
+
+  const lines = investment.effectLines(state, TUNING, Calc)
+    .map(line => `<div class="muted">${line}</div>`)
+    .join("");
+
+  card.innerHTML = `
+    <div class="row"><div class="label">${investment.title}</div><div class="value">Cost ${Calc.getDisplayCount(cost)}</div></div>
+    ${lines}
+  `;
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn";
+  button.textContent = owned ? "Owned" : "Buy";
+  button.disabled = owned || !canBuy;
+  button.addEventListener("click", () => {
+    investment.purchase(state, TUNING, Calc);
+    saveGame();
+    updateUI();
+    logLine(`Purchased ${investment.title}`);
+  });
+
+  actions.append(button);
+  card.append(actions);
+  return card;
+}
+
+function renderInvestments() {
+  investmentsListEl.innerHTML = "";
+  const unlocked = INVESTMENTS.filter(investment => investment.isUnlocked(state, TUNING, Calc));
+
+  if (unlocked.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.textContent = "No investments unlocked yet. Gather olives and florins to reveal starter upgrades.";
+    investmentsListEl.append(hint);
+    return;
+  }
+
+  for (const investment of unlocked) {
+    investmentsListEl.append(createInvestmentCard(investment));
+  }
+}
+
 function updateUI() {
   oliveCountEl.textContent = String(Calc.getDisplayCount(state.oliveCount));
+  oilCountEl.textContent = String(Calc.getDisplayCount(state.oilCount));
+  florinCountEl.textContent = String(Calc.getDisplayCount(state.florinCount));
   opsCountEl.textContent = Calc.formatRate(computeOps());
+  clickYieldEl.textContent = String(getClickYield());
+  marketRateEl.textContent = `${Calc.formatRate(getOilSellValue(1))} florins/oil`;
+
+  pressOilBtn.disabled = state.oliveCount < TUNING.processing.olivesPerPress;
+  sellOilBtn.disabled = state.oilCount < 1;
+
+  renderInvestments();
 }
 
-// --- Actions ---
 function pickOlive() {
-  state.oliveCount += TUNING.production.baseClickYield;
+  state.oliveCount += getClickYield();
   recordClick();
   saveGame();
   updateUI();
 }
 
-// --- Main Loop ---
+function pressOil() {
+  const result = Calc.getPressResult(state.oliveCount, TUNING.processing.olivesPerPress, TUNING.processing.oilYieldPerPress);
+  if (!result.canPress) {
+    logLine(`Need ${TUNING.processing.olivesPerPress} olives to press oil.`);
+    return;
+  }
+
+  state.oliveCount -= result.olivesSpent;
+  state.oilCount += result.oilMade;
+  saveGame();
+  updateUI();
+  logLine(`Pressed ${result.olivesSpent} olives into ${result.oilMade} oil.`);
+}
+
+function sellOil() {
+  if (state.oilCount < 1) {
+    logLine("No oil to sell.");
+    return;
+  }
+
+  const sellValue = getOilSellValue(state.oilCount);
+  const soldOil = state.oilCount;
+  state.oilCount = 0;
+  state.florinCount += sellValue;
+
+  saveGame();
+  updateUI();
+  logLine(`Sold ${Calc.getDisplayCount(soldOil)} oil for ${Calc.getDisplayCount(sellValue)} florins.`);
+}
+
 function startLoop() {
-  let last = Date.now();
   mainLoopInterval = setInterval(() => {
-    const now = Date.now();
-    const dt = (now - last) / 1000;
-    last = now;
-
-    // Future: passive production, timers, shipments, etc.
-    // Keep template minimal for now.
-
-    // UI refresh (OPS updates even if idle)
     updateUI();
-
-    // Save occasionally if desired. Keeping it light:
-    // saveGame();
   }, TUNING.production.tickMs);
 }
 
-// --- Debug Modal ---
 function openDebug() {
   debugModal.classList.add("active");
   debugModal.setAttribute("aria-hidden", "false");
 }
+
 function closeDebug() {
   debugModal.classList.remove("active");
   debugModal.setAttribute("aria-hidden", "true");
 }
 
-// --- Wire Events ---
 pickOliveBtn.addEventListener("click", pickOlive);
+pressOilBtn.addEventListener("click", pressOil);
+sellOilBtn.addEventListener("click", sellOil);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
@@ -214,22 +300,23 @@ debugAddOlivesBtn.addEventListener("click", () => {
 debugAddFlorinsBtn.addEventListener("click", () => {
   state.florinCount += 100;
   saveGame();
+  updateUI();
   logLine("Debug: +100 florins");
 });
 
 debugAddOilBtn.addEventListener("click", () => {
   state.oilCount += 100;
   saveGame();
+  updateUI();
   logLine("Debug: +100 oil");
 });
 
-// Close modal on outside click
 debugModal.addEventListener("click", (e) => {
   if (e.target === debugModal) closeDebug();
 });
 
-// --- Init ---
 loadGame();
+pressOilBtn.textContent = `Press Oil (${TUNING.processing.olivesPerPress} olives)`;
 updateUI();
 startLoop();
-logLine("Loaded prototype template.");
+logLine("Loaded template sample game. Use this to validate template systems end-to-end.");

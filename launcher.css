@@ -99,3 +99,18 @@ h1 {
     background: #dee2e6;
     color: #495057;
 }
+
+.prototype-link.template-link {
+    background: #fff4cc;
+    border-color: #e0b000;
+}
+
+.prototype-link.template-link:hover {
+    background: #ffedb3;
+    border-color: #c49100;
+}
+
+.tag.template {
+    background: #f59f00;
+    color: #fff;
+}

@@ -7,8 +7,6 @@
 //
 // This keeps game logic testable and separates "what happens" from "how it's displayed."
 
-import { TUNING } from "./tuning.js";
-
 /** Clamp a value between min and max (inclusive). */
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -37,4 +35,28 @@ export function formatRate(value) {
 /** Floor fractional values for display (e.g. 3.7 olives → "3"). */
 export function getDisplayCount(value) {
   return Math.floor(value);
+}
+
+/** Click yield with one-shot and repeatable upgrade support. */
+export function getClickYield(baseYield, sharperPickOwned, basketLevel, basketBonusPerLevel) {
+  const sharperBonus = sharperPickOwned ? 1 : 0;
+  return baseYield + sharperBonus + basketLevel * basketBonusPerLevel;
+}
+
+/** Repeatable upgrade cost. */
+export function getScaledCost(baseCost, level, costScale) {
+  return Math.floor(baseCost + level * costScale);
+}
+
+/** Convert olives to oil. Returns a payload the caller can apply to state. */
+export function getPressResult(oliveCount, olivesPerPress, oilYieldPerPress) {
+  if (oliveCount < olivesPerPress) {
+    return { olivesSpent: 0, oilMade: 0, canPress: false };
+  }
+  return { olivesSpent: olivesPerPress, oilMade: oilYieldPerPress, canPress: true };
+}
+
+/** Oil sell value with optional multiplier. */
+export function getSellValue(oilToSell, baseSellPrice, marketBonus) {
+  return oilToSell * baseSellPrice * marketBonus;
 }
