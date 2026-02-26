@@ -7,13 +7,16 @@
   <link rel="stylesheet" href="static/css/style.css" />
 </head>
 <body>
-  <div class="container">
+  <div id="game-root" class="container">
     <header class="topbar">
       <div class="title">
         <h1>Avocado Intelligence</h1>
         <div class="subtitle">Click. Grow. Prestige.</div>
       </div>
-      <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+      <div class="topbar-actions">
+        <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
+        <button id="analyzer-btn" class="btn btn-quiet" type="button">Analyzer</button>
+      </div>
     </header>
 
     <hr class="divider" />
@@ -140,6 +143,105 @@
           <div class="muted" id="benchmarks-counter" style="margin-top: 6px;">0 / 18</div>
         </section>
       </div>
+    </div>
+  </div>
+
+  <div id="analyzer-screen" class="container is-hidden">
+    <header class="topbar">
+      <div class="title">
+        <h1>Run Analyzer</h1>
+        <div class="subtitle">Inspect progression over time from telemetry logs.</div>
+      </div>
+      <button id="analyzer-back-btn" class="btn btn-quiet" type="button">Back to Game</button>
+    </header>
+    <hr class="divider" />
+
+    <div class="analyzer-layout">
+      <section class="section">
+        <div class="section-title">Upload</div>
+        <div class="subsection">
+          <input id="analyzer-file-input" class="analyzer-file-input" type="file" accept=".json,.ndjson,.txt,application/json" />
+          <div class="u-pad-top-6 analyzer-actions">
+            <button id="analyzer-upload-btn" class="btn btn-primary" type="button">Upload Log</button>
+          </div>
+          <div class="analyzer-source-row">
+            <div class="muted u-text-12">Data Source</div>
+            <div class="analyzer-source-options">
+              <label class="analyzer-source-option" for="analyzer-source-live">
+                <input id="analyzer-source-live" name="analyzer-source" type="radio" value="live" checked />
+                <span>Current Run</span>
+              </label>
+              <label class="analyzer-source-option" for="analyzer-source-file">
+                <input id="analyzer-source-file" name="analyzer-source" type="radio" value="file" disabled />
+                <span>Loaded File: <span id="analyzer-loaded-filename">none</span></span>
+              </label>
+            </div>
+          </div>
+          <div class="u-pad-top-6 analyzer-actions">
+            <button id="analyzer-snapshot-btn" class="btn" type="button">📌 Snapshot Point</button>
+            <button id="analyzer-download-normalized-btn" class="btn" type="button" disabled>Download Normalized Events (JSON)</button>
+            <button id="analyzer-download-timeseries-btn" class="btn" type="button" disabled>Download Time Series (CSV)</button>
+          </div>
+          <div id="analyzer-status" class="muted u-text-12 u-pad-top-6">Open analyzer to load current run.</div>
+        </div>
+      </section>
+
+      <div class="analyzer-overview">
+        <section class="section">
+          <div class="section-title">Run Metadata</div>
+          <div class="subsection">
+            <div class="row"><div class="label">Session ID</div><div class="value"><span id="analyzer-meta-session-id">—</span></div></div>
+            <div class="row"><div class="label">Start</div><div class="value"><span id="analyzer-meta-start">—</span></div></div>
+            <div class="row"><div class="label">End</div><div class="value"><span id="analyzer-meta-end">—</span></div></div>
+            <div class="row"><div class="label">Duration</div><div class="value"><span id="analyzer-meta-duration">—</span></div></div>
+            <div class="row"><div class="label">Version</div><div class="value"><span id="analyzer-meta-version">—</span></div></div>
+            <div class="row"><div class="label">Build</div><div class="value"><span id="analyzer-meta-build">—</span></div></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Summary</div>
+          <div class="subsection">
+            <div class="row"><div class="label">Final Avocados</div><div class="value"><span id="analyzer-summary-avocados">—</span></div></div>
+            <div class="row"><div class="label">Final Guac</div><div class="value"><span id="analyzer-summary-guac">—</span></div></div>
+            <div class="row"><div class="label">Final Wisdom</div><div class="value"><span id="analyzer-summary-wisdom">—</span></div></div>
+            <div class="row"><div class="label">Prestige Count</div><div class="value"><span id="analyzer-summary-prestige">—</span></div></div>
+            <div class="row"><div class="label">Events</div><div class="value"><span id="analyzer-summary-events">—</span></div></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="section">
+        <div class="section-title">Time Series</div>
+        <div class="subsection">
+          <div id="analyzer-series-controls" class="analyzer-series-controls"></div>
+          <div class="analyzer-chart-wrap">
+            <svg id="analyzer-chart-svg" class="analyzer-chart-svg"></svg>
+            <div id="analyzer-chart-empty" class="muted u-text-12">No chart data yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Event Timeline</div>
+        <div class="subsection">
+          <div class="analyzer-timeline-controls">
+            <label for="analyzer-timeline-filter" class="muted u-text-12">Filter</label>
+            <select id="analyzer-timeline-filter" class="analyzer-select">
+              <option value="key">Key Events</option>
+              <option value="all">All Events</option>
+              <option value="purchases">Purchases</option>
+              <option value="progression">Progression</option>
+            </select>
+          </div>
+          <div class="analyzer-table-wrap">
+          <table class="analyzer-table">
+            <thead><tr><th>Elapsed</th><th>Timestamp</th><th>Type</th><th>Details</th></tr></thead>
+            <tbody id="analyzer-timeline-body"></tbody>
+          </table>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 

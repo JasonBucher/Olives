@@ -449,3 +449,137 @@ h1 {
 .guac-section {
   border-left: 3px solid var(--primary);
 }
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.analyzer-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.analyzer-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analyzer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analyzer-file-input {
+  width: 100%;
+  border: 1px dashed var(--divider);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--muted);
+}
+
+.analyzer-series-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.analyzer-series-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.analyzer-series-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.analyzer-chart-wrap {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  min-height: 280px;
+  padding: 8px;
+  position: relative;
+}
+
+.analyzer-chart-svg {
+  width: 100%;
+  height: 280px;
+  display: block;
+}
+
+#analyzer-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.analyzer-table-wrap {
+  overflow: auto;
+}
+
+.analyzer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.analyzer-table th,
+.analyzer-table td {
+  text-align: left;
+  border-bottom: 1px solid var(--divider);
+  padding: 6px;
+  vertical-align: top;
+}
+
+
+.analyzer-source-row {
+  margin-top: 8px;
+}
+
+.analyzer-source-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.analyzer-source-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.analyzer-source-option input:disabled + span {
+  opacity: 0.6;
+}
+
+.analyzer-timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.analyzer-select {
+  border: 1px solid var(--divider);
+  background: #111612;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+}

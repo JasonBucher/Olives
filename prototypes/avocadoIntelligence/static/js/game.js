@@ -4,6 +4,8 @@ import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
 import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
+import SessionLog from "./sessionLog.js";
+import { initAnalyzerView } from "./views/analyzerView.js";
 
 const STORAGE_PREFIX = "AVO_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -87,6 +89,15 @@ function pickPersistedState(parsed) {
 // --- Reset safety ---
 let isResetting = false;
 let mainLoopInterval = null;
+
+let simMs = 0;
+function publishSimMs() { globalThis.__aiSimMs = simMs; }
+function advanceSimMs(dtMs) {
+  if (!Number.isFinite(dtMs) || dtMs <= 0) return;
+  simMs += dtMs;
+  publishSimMs();
+}
+publishSimMs();
 
 // --- Game State ---
 let state = createDefaultState();
@@ -186,8 +197,52 @@ const debugAddBigAvocadosBtn = document.getElementById("debug-add-big-avocados-b
 const debugAdd100kAvocadosBtn = document.getElementById("debug-add-100k-avocados-btn");
 const debugAdd1mAvocadosBtn = document.getElementById("debug-add-1m-avocados-btn");
 const debugAddWisdomBtn = document.getElementById("debug-add-wisdom-btn");
+const gameRootEl = document.getElementById("game-root");
+const analyzerScreenEl = document.getElementById("analyzer-screen");
+const analyzerBtn = document.getElementById("analyzer-btn");
+
+let activeView = "game";
+const analyzerView = initAnalyzerView({
+  onBack: () => closeAnalyzer(),
+  captureSnapshot: (reason = "analyzer") => captureStateSnapshot(reason),
+});
+
+function renderActiveView() {
+  const isAnalyzer = activeView === "analyzer";
+  gameRootEl?.classList.toggle("is-hidden", isAnalyzer);
+  analyzerScreenEl?.classList.toggle("is-hidden", !isAnalyzer);
+}
+
+function openAnalyzer() {
+  activeView = "analyzer";
+  renderActiveView();
+  analyzerView.notifyVisible();
+}
+
+function closeAnalyzer() {
+  activeView = "game";
+  renderActiveView();
+}
 
 // --- Logging ---
+function recordTelemetry(type, payload = {}) {
+  SessionLog.record(type, payload);
+}
+
+function captureStateSnapshot(reason = "tick") {
+  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
+  const aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks) * hpMods.apsMult * hpMods.globalMult;
+  recordTelemetry("state_snapshot", {
+    reason,
+    avocadoCount: state.avocadoCount,
+    totalAvocadosThisRun: state.totalAvocadosThisRun,
+    guacCount: state.guacCount,
+    wisdom: state.wisdom,
+    prestigeCount: state.prestigeCount,
+    aps,
+  });
+}
+
 function logLine(message) {
   const ts = new Date().toISOString();
   const div = document.createElement("div");
@@ -200,6 +255,7 @@ function logLine(message) {
   while (logEl.children.length > maxLines) {
     logEl.removeChild(logEl.lastChild);
   }
+  recordTelemetry("log_line", { message });
 }
 
 // --- Storage ---
@@ -246,6 +302,8 @@ function resetGame() {
   if (mainLoopInterval) clearInterval(mainLoopInterval);
 
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem("ai_session_log_v1");
+  sessionStorage.removeItem("ai_session_log_session_id_v1");
   window.location.href = window.location.pathname + "?t=" + Date.now();
 }
 
@@ -821,6 +879,7 @@ function pickAvocado() {
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
+  recordTelemetry("click_pick", { power });
   recordClick();
   spawnClickEmoji();
 
@@ -879,6 +938,7 @@ function confirmPrestigeAndDistill() {
 
   logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`Model distilled to v${newModelVersion}.0!`);
+  recordTelemetry("distill", { modelVersion: newModelVersion, distillationCount: newDistillationCount });
   const bonus = TUNING.distillation.bonuses[newModelVersion - 1];
   if (bonus) logLine(bonus.flavor);
 
@@ -917,6 +977,7 @@ function buyProducer(id) {
   state.producers[id] = owned + 1;
 
   logLine(`Bought ${cfg.title} (#${state.producers[id]})`);
+  recordTelemetry("purchase_producer", { id, title: cfg.title, count: state.producers[id], cost });
   saveGame();
   updateUI();
 }
@@ -928,6 +989,7 @@ function buyUpgrade(id) {
   inv.purchase(state);
   const cfg = TUNING.upgrades[id];
   logLine(`Research complete: ${cfg.title}`);
+  recordTelemetry("purchase_upgrade", { id, title: cfg.title });
   saveGame();
   updateUI();
 }
@@ -1119,7 +1181,9 @@ function startLoop() {
   mainLoopInterval = setInterval(() => {
     const now = Date.now();
     const dt = (now - last) / 1000;
+    const dtMs = now - last;
     last = now;
+    advanceSimMs(dtMs);
 
     // Production
     const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, now, TUNING);
@@ -1191,6 +1255,7 @@ function startLoop() {
 
     // Auto-save every ~5s
     tickCount++;
+    if (tickCount % 5 === 0) captureStateSnapshot("tick");
     if (tickCount % 25 === 0) saveGame();
 
     updateUI();
@@ -1278,6 +1343,7 @@ prestigeOverlay.addEventListener("click", (e) => {
 });
 
 debugBtn.addEventListener("click", openDebug);
+if (analyzerBtn) analyzerBtn.addEventListener("click", openAnalyzer);
 debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
 
@@ -1288,6 +1354,7 @@ debugAddAvocadosBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +100 avocados");
+  captureStateSnapshot("debug");
 });
 
 debugAddBigAvocadosBtn.addEventListener("click", () => {
@@ -1297,6 +1364,7 @@ debugAddBigAvocadosBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +10,000 avocados");
+  captureStateSnapshot("debug");
 });
 
 debugAdd100kAvocadosBtn.addEventListener("click", () => {
@@ -1306,6 +1374,7 @@ debugAdd100kAvocadosBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +100,000 avocados");
+  captureStateSnapshot("debug");
 });
 
 debugAdd1mAvocadosBtn.addEventListener("click", () => {
@@ -1315,6 +1384,7 @@ debugAdd1mAvocadosBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +1,000,000 avocados");
+  captureStateSnapshot("debug");
 });
 
 debugAddWisdomBtn.addEventListener("click", () => {
@@ -1324,6 +1394,7 @@ debugAddWisdomBtn.addEventListener("click", () => {
   saveGame();
   updateUI();
   logLine("Debug: +10 wisdom");
+  captureStateSnapshot("debug");
 });
 
 const debugAdd10bAvocadosBtn = document.getElementById("debug-add-10b-avocados-btn");
@@ -1334,6 +1405,7 @@ if (debugAdd10bAvocadosBtn) debugAdd10bAvocadosBtn.addEventListener("click", () 
   saveGame();
   updateUI();
   logLine("Debug: +10,000,000,000 avocados");
+  captureStateSnapshot("debug");
 });
 
 debugModal.addEventListener("click", (e) => {
@@ -1341,11 +1413,15 @@ debugModal.addEventListener("click", (e) => {
 });
 
 // --- Init ---
+SessionLog.initSession({ version: "avocadoIntelligence", build: "prototype" });
 loadGame();
+recordTelemetry("game_loaded", { createdAt: state.meta.createdAt || null });
 renderProducerList();
 renderGuacProducerList();
 renderUpgradeList();
 renderBenchmarks();
 updateUI();
+renderActiveView();
 startLoop();
+captureStateSnapshot("init");
 logLine("Avocado Intelligence loaded.");
