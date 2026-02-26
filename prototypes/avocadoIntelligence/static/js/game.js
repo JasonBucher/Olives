@@ -326,11 +326,6 @@ function renderProducerRows(listEl, order) {
     listEl.appendChild(row);
   }
 
-  // Wire buy buttons
-  listEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-buy]");
-    if (btn) buyProducer(btn.dataset.buy);
-  });
 }
 
 function renderProducerList() {
@@ -360,11 +355,6 @@ function renderUpgradeList() {
     upgradesListEl.appendChild(row);
   }
 
-  // Wire buy buttons
-  upgradesListEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-upgrade]");
-    if (btn) buyUpgrade(btn.dataset.upgrade);
-  });
 }
 
 // --- Wisdom Unlock Purchasing (used in prestige overlay) ---
@@ -1320,6 +1310,20 @@ document.querySelector(".tab-bar").addEventListener("click", (e) => {
 });
 
 // --- Wire Events ---
+// Delegated buy listeners — attached once, survive re-renders
+producersListEl.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-buy]");
+  if (btn) buyProducer(btn.dataset.buy);
+});
+guacProducersListEl.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-buy]");
+  if (btn) buyProducer(btn.dataset.buy);
+});
+upgradesListEl.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-upgrade]");
+  if (btn) buyUpgrade(btn.dataset.upgrade);
+});
+
 pickAvocadoBtn.addEventListener("click", pickAvocado);
 prestigeBtn.addEventListener("click", prestige);
 prestigeRebornBtn.addEventListener("click", confirmPrestige);
