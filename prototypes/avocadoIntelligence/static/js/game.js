@@ -1430,6 +1430,180 @@ function closeDebug() {
   debugModal.setAttribute("aria-hidden", "true");
 }
 
+// --- Bonuses Modal ---
+const bonusesModal = document.getElementById("bonuses-modal");
+const bonusesModalBody = document.getElementById("bonuses-modal-body");
+const bonusesBtn = document.getElementById("bonuses-btn");
+const bonusesCloseBtn = document.getElementById("bonuses-close-btn");
+
+function openBonusesModal() {
+  renderBonusesModal();
+  bonusesModal.classList.add("active");
+  bonusesModal.setAttribute("aria-hidden", "false");
+}
+
+function closeBonusesModal() {
+  bonusesModal.classList.remove("active");
+  bonusesModal.setAttribute("aria-hidden", "true");
+}
+
+function renderBonusesModal() {
+  bonusesModalBody.innerHTML = "";
+
+  // Helper to create a section
+  function addSection(title) {
+    const sec = document.createElement("div");
+    sec.className = "bonuses-section";
+    const h = document.createElement("div");
+    h.className = "bonuses-section-title";
+    h.textContent = title;
+    sec.appendChild(h);
+    bonusesModalBody.appendChild(sec);
+    return sec;
+  }
+
+  // Helper to create a row
+  function addRow(parent, label, value) {
+    const row = document.createElement("div");
+    row.className = "bonuses-row";
+    row.innerHTML = `<span class="bonuses-label">${label}</span> <span class="bonuses-value">${value}</span>`;
+    parent.appendChild(row);
+  }
+
+  // 1. Wisdom
+  if (state.wisdom > 0 || state.totalWisdomEarned > 0) {
+    const sec = addSection("Wisdom");
+    addRow(sec, "Wisdom Points", String(state.wisdom));
+    const perPoint = TUNING.prestige.wisdomMultPerPoint;
+    const hasWisdomBoost = !!state.upgrades.wisdom_boost;
+    const boostExtra = hasWisdomBoost ? TUNING.upgrades.wisdom_boost.wisdomMult : 0;
+    const effectivePerPoint = perPoint + boostExtra;
+    addRow(sec, "Per-Point Bonus", `+${Math.round(effectivePerPoint * 100)}% each${hasWisdomBoost ? " (includes AGI upgrade)" : ""}`);
+    const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks);
+    addRow(sec, "Total Wisdom Multiplier", `x${wisdomMult.toFixed(2)}`);
+  }
+
+  // 2. Wisdom Unlocks
+  const ownedUnlocks = Object.entries(TUNING.wisdomUnlocks).filter(([id]) => state.wisdomUnlocks[id]);
+  if (ownedUnlocks.length > 0) {
+    const sec = addSection("Wisdom Unlocks");
+    for (const [, cfg] of ownedUnlocks) {
+      addRow(sec, cfg.title, cfg.desc);
+    }
+  }
+
+  // 3. Research Upgrades
+  const ownedUpgrades = INVESTMENTS.filter(inv => inv.isOwned(state));
+  if (ownedUpgrades.length > 0) {
+    const groups = { click: [], global: [], production: [], synergy: [], guac: [] };
+    for (const inv of ownedUpgrades) {
+      const cfg = TUNING.upgrades[inv.id];
+      if (cfg.clickMult || cfg.apsPctPerClick) {
+        groups.click.push(inv);
+      } else if (cfg.globalMult || cfg.wisdomMult || cfg.unlocksGuac) {
+        groups.global.push(inv);
+      } else if (cfg.synergyPct) {
+        groups.synergy.push(inv);
+      } else if (cfg.consumeExpDelta || cfg.produceExpDelta || cfg.baseProdMult) {
+        groups.guac.push(inv);
+      } else if (cfg.producerId) {
+        groups.production.push(inv);
+      }
+    }
+
+    const sec = addSection("Research Upgrades");
+    const groupLabels = [
+      ["click", "Click"],
+      ["global", "Global"],
+      ["production", "Production"],
+      ["synergy", "Synergy"],
+      ["guac", "Guac"],
+    ];
+    for (const [key, label] of groupLabels) {
+      if (groups[key].length === 0) continue;
+      const subheader = document.createElement("div");
+      subheader.className = "bonuses-row";
+      subheader.innerHTML = `<span class="bonuses-label" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">${label} (${groups[key].length})</span>`;
+      sec.appendChild(subheader);
+      for (const inv of groups[key]) {
+        const cfg = TUNING.upgrades[inv.id];
+        addRow(sec, cfg.title, cfg.desc);
+      }
+    }
+  }
+
+  // 4. Benchmarks
+  const earnedBenchmarks = BENCHMARK_ORDER.filter(id => state.benchmarks[id]);
+  if (earnedBenchmarks.length > 0) {
+    const sec = addSection("Benchmarks");
+    for (const id of earnedBenchmarks) {
+      const cfg = TUNING.benchmarks[id];
+      let bonusText = "";
+      if (cfg.globalMult) bonusText = `+${Math.round(cfg.globalMult * 100)}% global`;
+      if (cfg.clickMult) bonusText = `+${Math.round(cfg.clickMult * 100)}% click`;
+      if (cfg.guacProdMult) bonusText = `+${Math.round(cfg.guacProdMult * 100)}% guac production`;
+      if (cfg.guacMult) bonusText = `+${Math.round(cfg.guacMult * 100)}% guac multiplier`;
+      if (cfg.wisdomMult) bonusText = `+${Math.round(cfg.wisdomMult * 100)}% wisdom`;
+      addRow(sec, cfg.title, bonusText);
+    }
+  }
+
+  // 5. Distillation
+  const mv = state.modelVersion || 0;
+  if (mv > 0) {
+    const sec = addSection("Distillation");
+    addRow(sec, "Model Version", `v${mv}.0`);
+    const distBonus = Calc.calcDistillationBonus(mv, TUNING);
+    if (distBonus.apsMult !== 1) addRow(sec, "APS Multiplier", `x${distBonus.apsMult.toFixed(1)}`);
+    if (distBonus.allProdMult !== 1) addRow(sec, "All Production", `x${distBonus.allProdMult.toFixed(1)}`);
+    if (distBonus.clickBaseBonus > 0) addRow(sec, "Base Click Power", `+${distBonus.clickBaseBonus}`);
+    if (distBonus.guacProdMult !== 1) addRow(sec, "Guac Production", `x${distBonus.guacProdMult.toFixed(1)}`);
+    if (distBonus.costMult !== 1) addRow(sec, "Producer Costs", `x${distBonus.costMult.toFixed(2)}`);
+    if (distBonus.startingWisdom > 0) addRow(sec, "Starting Wisdom", `+${distBonus.startingWisdom} per prestige`);
+    if (distBonus.multiplierCoeffBonus > 0) addRow(sec, "Guac Mult Coeff", `+${distBonus.multiplierCoeffBonus.toFixed(2)}`);
+    if (distBonus.consumeFloorBonus !== 0) addRow(sec, "Consume Floor", `${distBonus.consumeFloorBonus.toFixed(2)}`);
+    if (distBonus.wisdomEarnMult !== 1) addRow(sec, "Wisdom Earn Rate", `x${distBonus.wisdomEarnMult.toFixed(1)}`);
+    if (distBonus.unlocksFoundationModel) addRow(sec, "Foundation Model", "Unlocked");
+  }
+
+  // 6. Hyperparameters
+  const hp = state.hyperparams;
+  const isDefault = hp.learningRate === "conservative" && hp.batchSize === "small" && hp.regularization === "none";
+  if (state.prestigeCount >= 1 && !isDefault) {
+    const sec = addSection("Hyperparameters");
+    const hpMods = Calc.calcHyperparamModifiers(hp, Date.now(), TUNING);
+    const lrCfg = TUNING.hyperparams.learningRate[hp.learningRate];
+    const bsCfg = TUNING.hyperparams.batchSize[hp.batchSize];
+    const regCfg = TUNING.hyperparams.regularization[hp.regularization];
+    addRow(sec, "Learning Rate", `${lrCfg.label} — ${lrCfg.desc}`);
+    addRow(sec, "Batch Size", `${bsCfg.label} — ${bsCfg.desc}`);
+    addRow(sec, "Regularization", `${regCfg.label} — ${regCfg.desc}`);
+    const effects = [];
+    if (hpMods.apsMult !== 1) effects.push(`APS x${hpMods.apsMult.toFixed(2)}`);
+    if (hpMods.clickMult !== 1) effects.push(`Click x${hpMods.clickMult.toFixed(2)}`);
+    if (hpMods.guacConsumeMult !== 1) effects.push(`Guac consume x${hpMods.guacConsumeMult.toFixed(2)}`);
+    if (hpMods.globalMult !== 1) effects.push(`Global x${hpMods.globalMult.toFixed(2)}`);
+    if (hpMods.costMult !== 1) effects.push(`Cost x${hpMods.costMult.toFixed(2)}`);
+    if (hpMods.wisdomMult !== 1) effects.push(`Wisdom x${hpMods.wisdomMult.toFixed(2)}`);
+    if (hpMods.freezeGuacMult) effects.push("Guac mult frozen");
+    if (effects.length > 0) addRow(sec, "Net Effects", effects.join(", "));
+  }
+
+  // If nothing was added, show a message
+  if (bonusesModalBody.children.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "No active bonuses yet. Keep growing!";
+    bonusesModalBody.appendChild(empty);
+  }
+}
+
+if (bonusesBtn) bonusesBtn.addEventListener("click", openBonusesModal);
+if (bonusesCloseBtn) bonusesCloseBtn.addEventListener("click", closeBonusesModal);
+if (bonusesModal) bonusesModal.addEventListener("click", (e) => {
+  if (e.target === bonusesModal) closeBonusesModal();
+});
+
 // --- Hyperparameter Modal ---
 const hpModal = document.getElementById("hp-modal");
 const hpCloseBtn = document.getElementById("hp-close-btn");

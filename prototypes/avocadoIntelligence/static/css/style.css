@@ -719,6 +719,46 @@ h1 {
   color: var(--text);
 }
 
+/* Bonuses modal */
+.bonuses-modal {
+  width: min(780px, 95vw);
+  background: #1a211c;
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 16px 48px rgba(0,0,0,0.6);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bonuses-modal-body {
+  overflow-y: auto;
+  max-height: calc(90vh - 60px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+  align-content: start;
+}
+
+.bonuses-section {
+  margin-top: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.bonuses-section:first-child,
+.bonuses-section:nth-child(2) { margin-top: 0; }
+.bonuses-section-title { font-size: 11px; color: var(--primary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 700; }
+.bonuses-row { padding: 4px 0; font-size: 12px; color: var(--text); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.bonuses-row:last-child { border-bottom: 0; }
+.bonuses-row .bonuses-label { font-weight: 600; }
+.bonuses-row .bonuses-value { color: var(--muted); margin-left: 4px; }
+
+@media (max-width: 600px) {
+  .bonuses-modal-body { grid-template-columns: 1fr; }
+  .bonuses-section:nth-child(2) { margin-top: 12px; }
+}
+
 @media (max-width: 900px) {
   .analyzer-overview {
     grid-template-columns: 1fr;

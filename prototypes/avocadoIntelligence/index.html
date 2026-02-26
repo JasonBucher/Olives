@@ -117,7 +117,10 @@
         </section>
 
         <section class="section">
-          <div class="section-title">Compost Heap</div>
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            Compost Heap
+            <button id="bonuses-btn" class="btn" type="button">Bonuses</button>
+          </div>
           <div id="prestige-locked" class="muted note">Reach 10M total avocados this run to unlock composting.</div>
           <div id="prestige-unlocked" class="stack" style="display: none;">
             <div class="row">
@@ -320,6 +323,17 @@
           <button id="prestige-reborn-btn" class="btn btn-primary" type="button">Reborn</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Bonuses Modal -->
+  <div id="bonuses-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal bonuses-modal">
+      <div class="modal-header">
+        <div class="modal-title">Active Bonuses</div>
+        <button id="bonuses-close-btn" class="btn btn-quiet" type="button">Close</button>
+      </div>
+      <div class="modal-body bonuses-modal-body" id="bonuses-modal-body"></div>
     </div>
   </div>
 
