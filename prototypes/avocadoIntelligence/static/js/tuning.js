@@ -17,8 +17,8 @@ export const TUNING = {
     greenhouse:       { baseCost: 4000,   costGrowth: 1.15, baseRate: 18,     title: "Greenhouse",         desc: "Controlled environment. Uncontrolled ambitions." },
     harvest_bot:      { baseCost: 45000,  costGrowth: 1.15, baseRate: 80,     title: "Harvest Bot",        desc: "Picks faster than you. Doesn't need lunch." },
     guac_lab:         { baseCost: 50000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
-    guac_refinery:    { baseCost: 150000, costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling." },
-    guac_centrifuge:  { baseCost: 500000, costGrowth: 1.15, baseRate: 0,      title: "Guac Centrifuge",    desc: "Spins faster. Separates more. Consumes less." },
+    guac_refinery:    { baseCost: 150000, costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling.", requiresWisdomUnlock: "unlock_refinery" },
+    guac_centrifuge:  { baseCost: 500000, costGrowth: 1.15, baseRate: 0,      title: "Guac Centrifuge",    desc: "Spins faster. Separates more. Consumes less.", requiresWisdomUnlock: "unlock_centrifuge" },
     exchange:         { baseCost: 130000, costGrowth: 1.15, baseRate: 260,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
     data_grove:       { baseCost: 350000, costGrowth: 1.15, baseRate: 450,    title: "Data Grove",         desc: "Every tree is a data point. The forest is the model." },
     attention_head:   { baseCost: 800000, costGrowth: 1.15, baseRate: 900,    title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
@@ -41,7 +41,7 @@ export const TUNING = {
     consumeExponentFloor: 0.70, // minimum consume exponent (prevents n^0 exploit)
     baseProduction: 1,          // guac produced per lab at base
     produceExponent: 1.0,       // guac output scaling: produce = base * n^exp
-    multiplierCoeff: 0.06,      // controls ramp speed of asymptotic guac multiplier
+    multiplierCoeff: 0.03,      // controls ramp speed of asymptotic guac multiplier
     guacMultCap: 8.0,           // asymptotic cap for guac multiplier (never quite reached)
     guacMaintenanceRate: 0.5,   // avo/sec consumed per unit of guac held (maintenance cost)
     labUnlockAps: 50,           // avocados/sec needed to buy guac labs
@@ -53,17 +53,17 @@ export const TUNING = {
     efficient_saplings: { cost: 40,      unlockAt: 5,  producerId: "sapling",     prodMult: 2, title: "Ripeness Algorithms v1", desc: "Saplings produce 2x" },
     drip_irrigation:    { cost: 402,     unlockAt: 5,  producerId: "orchard_row", prodMult: 2, title: "Drip Irrigation",        desc: "Orchard Rows produce 2x" },
     drone_swarm:        { cost: 4424,    unlockAt: 5,  producerId: "drone",       prodMult: 2, title: "Guac GPUs",              desc: "Drones produce 2x" },
-    lab_coats:          { cost: 500000,  unlockAt: 5,  producerId: "guac_lab",    prodMult: 2, title: "Lab Coats",              desc: "Guac Labs produce 2x" },
+    lab_coats:          { cost: 500000,  unlockAt: 5,  producerId: "guac_lab",    prodMult: 2, title: "Lab Coats",              desc: "Guac Labs produce 2x", requiresWisdomUnlock: "unlock_lab_coats" },
     global_boost_1:     { cost: 10000,   unlockAt: 0,  globalMult: 1.5, title: "Orchard-as-a-Service", desc: "All production +50%" },
     global_boost_2:     { cost: 500000,  unlockAt: 0,  globalMult: 2,   title: "Pit-to-Cloud Pipeline", desc: "All production 2x" },
     guac_unlock:        { cost: 25000,   unlockAt: 0,  unlocksGuac: true, title: "Guacamole Protocol",  desc: "Unlocks guac processing" },
     wisdom_boost:       { cost: 1e6,     unlockAt: 0,  wisdomMult: 0.05,  title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective" },
     // Guac tuning upgrades
-    guac_recycler:      { cost: 120000,  unlockAt: 5,  producerId: "guac_lab", consumeExpDelta: -0.05, title: "Guac Recycler",          desc: "Lab consumption scaling -0.05" },
-    bulk_fermentation:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", consumeExpDelta: -0.05, title: "Bulk Fermentation",       desc: "Lab consumption scaling -0.05 more" },
-    superlinear_synth:  { cost: 100000,  guacUnlockAt: 25,  produceExpDelta: +0.05,  title: "Superlinear Synthesis",  desc: "Guac output scaling +0.05" },
-    exponential_ripen:  { cost: 500000,  guacUnlockAt: 100, produceExpDelta: +0.10,  title: "Exponential Ripening",   desc: "Guac output scaling +0.10" },
-    concentrate_proto:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5, title: "Concentrate Protocol",  desc: "Base guac output x1.5" },
+    guac_recycler:      { cost: 120000,  unlockAt: 5,  producerId: "guac_lab", consumeExpDelta: -0.05, title: "Guac Recycler",          desc: "Lab consumption scaling -0.05", requiresWisdomUnlock: "unlock_guac_recycler" },
+    bulk_fermentation:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", consumeExpDelta: -0.05, title: "Bulk Fermentation",       desc: "Lab consumption scaling -0.05 more", requiresWisdomUnlock: "unlock_bulk_fermentation" },
+    superlinear_synth:  { cost: 100000,  guacUnlockAt: 25,  produceExpDelta: +0.05,  title: "Superlinear Synthesis",  desc: "Guac output scaling +0.05", requiresWisdomUnlock: "unlock_superlinear_synth" },
+    exponential_ripen:  { cost: 500000,  guacUnlockAt: 100, produceExpDelta: +0.10,  title: "Exponential Ripening",   desc: "Guac output scaling +0.10", requiresWisdomUnlock: "unlock_exponential_ripen" },
+    concentrate_proto:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5, title: "Concentrate Protocol",  desc: "Base guac output x1.5", requiresWisdomUnlock: "unlock_concentrate_proto" },
     // Throughput Clicking chain — scales clicks with base APS (before multipliers)
     throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03, title: "Throughput Clicking I",   desc: "Each click also adds 3% of your base APS." },
     throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.06, title: "Throughput Clicking II",  desc: "Each click also adds 6% of your base APS." },
@@ -81,8 +81,8 @@ export const TUNING = {
     gpu_overclock:     { cost: 20113571,     unlockAt: 5,  producerId: "gpu_cluster", prodMult: 2, title: "GPU Overclocking",    desc: "GPU Clusters produce 2x" },
     neural_backprop:   { cost: 80454287,     unlockAt: 5,  producerId: "neural_pit",      prodMult: 2, title: "Backpropagation",            desc: "Neural Pit Networks produce 2x" },
     synth_genome:      { cost: 120681431,    unlockAt: 5,  producerId: "synth_orchard",   prodMult: 2, title: "Genetic Algorithm",           desc: "Synthetic Orchards produce 2x" },
-    catalytic_convert: { cost: 400000,  unlockAt: 3,  producerId: "guac_refinery",   consumeExpDelta: -0.05, title: "Catalytic Converter", desc: "Consumption scaling -0.05" },
-    ultracentrifuge:   { cost: 900000,  unlockAt: 3,  producerId: "guac_centrifuge", produceExpDelta: +0.05, title: "Ultracentrifuge",      desc: "Guac output scaling +0.05" },
+    catalytic_convert: { cost: 400000,  unlockAt: 3,  producerId: "guac_refinery",   consumeExpDelta: -0.05, title: "Catalytic Converter", desc: "Consumption scaling -0.05", requiresWisdomUnlock: "unlock_catalytic_convert" },
+    ultracentrifuge:   { cost: 900000,  unlockAt: 3,  producerId: "guac_centrifuge", produceExpDelta: +0.05, title: "Ultracentrifuge",      desc: "Guac output scaling +0.05", requiresWisdomUnlock: "unlock_ultracentrifuge" },
     cloud_autoscale:   { cost: 1327495743,   unlockAt: 5,  producerId: "orchard_cloud",   prodMult: 2, title: "Auto-Scaling",                desc: "Orchard Clouds produce 2x" },
     quantum_annealing: { cost: 2011357187,   unlockAt: 5,  producerId: "quantum_grove",   prodMult: 2, title: "Quantum Annealing",           desc: "Quantum Groves produce 2x" },
     recursive_improve: { cost: 20113571874,  unlockAt: 5,  producerId: "agi_nexus",       prodMult: 2, title: "Recursive Self-Improvement",  desc: "AGI Nexuses produce 2x" },
@@ -161,9 +161,19 @@ export const TUNING = {
   },
 
   wisdomUnlocks: {
-    guac_memory_1:     { wisdomCost: 3,  title: "Guac Memory I",         desc: "produceExponent +0.02 per prestige completed" },
-    guac_memory_2:     { wisdomCost: 10, title: "Guac Memory II",        desc: "consumeExponent -0.01 per prestige completed" },
-    infinite_guac:     { wisdomCost: 25, title: "Infinite Guac Theory",  desc: "consumeExponent floor lowered from 0.70 to 0.55" },
+    guac_memory_1:            { wisdomCost: 3,  title: "Guac Memory I",           desc: "produceExponent +0.02 per prestige completed" },
+    guac_memory_2:            { wisdomCost: 10, title: "Guac Memory II",          desc: "consumeExponent -0.01 per prestige completed" },
+    infinite_guac:            { wisdomCost: 25, title: "Infinite Guac Theory",    desc: "consumeExponent floor lowered from 0.70 to 0.55" },
+    unlock_guac_recycler:     { wisdomCost: 2,  title: "Guac Recycler Theory",    desc: "Unlocks Guac Recycler upgrade" },
+    unlock_refinery:          { wisdomCost: 2,  title: "Refinery Blueprints",     desc: "Unlocks Guac Refinery building" },
+    unlock_bulk_fermentation: { wisdomCost: 3,  title: "Fermentation Science",    desc: "Unlocks Bulk Fermentation upgrade" },
+    unlock_concentrate_proto: { wisdomCost: 3,  title: "Concentrate Theory",      desc: "Unlocks Concentrate Protocol upgrade" },
+    unlock_superlinear_synth: { wisdomCost: 4,  title: "Superlinear Theory",      desc: "Unlocks Superlinear Synthesis upgrade" },
+    unlock_lab_coats:         { wisdomCost: 4,  title: "Lab Safety Standards",    desc: "Unlocks Lab Coats upgrade" },
+    unlock_catalytic_convert: { wisdomCost: 4,  title: "Catalysis Research",      desc: "Unlocks Catalytic Converter upgrade" },
+    unlock_centrifuge:        { wisdomCost: 5,  title: "Centrifuge Engineering",  desc: "Unlocks Guac Centrifuge building" },
+    unlock_ultracentrifuge:   { wisdomCost: 5,  title: "Ultra Spin Theory",       desc: "Unlocks Ultracentrifuge upgrade" },
+    unlock_exponential_ripen: { wisdomCost: 6,  title: "Exponential Growth Lab",  desc: "Unlocks Exponential Ripening upgrade" },
   },
 
   benchmarks: {

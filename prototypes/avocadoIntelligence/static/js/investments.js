@@ -23,6 +23,8 @@ function makeUpgrade(id) {
     group: cfg.producerId ? "production" : cfg.clickMult ? "click" : "global",
     cost: () => cfg.cost,
     isUnlocked: (state, ctx) => {
+      // Wisdom unlock gate: must own the specified wisdom unlock
+      if (cfg.requiresWisdomUnlock && !state.wisdomUnlocks[cfg.requiresWisdomUnlock]) return false;
       // Prerequisite upgrade must be owned first
       if (cfg.requiresUpgrade && !state.upgrades[cfg.requiresUpgrade]) return false;
       // Guac-gated upgrades: must have enough guac

@@ -878,7 +878,12 @@ function updateProducerRows(listEl, order, distBonus, hpMods, currentAps, guacLa
     // 5. Soft gate checks — show as LOCKED if fail
     let softLocked = false;
     let lockMessage = "";
-    if (id === "guac_lab" && !guacLabUnlocked) {
+    // Wisdom unlock gate for producers
+    if (cfg.requiresWisdomUnlock && !state.wisdomUnlocks[cfg.requiresWisdomUnlock]) {
+      const unlockCfg = TUNING.wisdomUnlocks[cfg.requiresWisdomUnlock];
+      softLocked = true;
+      lockMessage = `Requires wisdom unlock: ${unlockCfg ? unlockCfg.title : cfg.requiresWisdomUnlock}`;
+    } else if (id === "guac_lab" && !guacLabUnlocked) {
       softLocked = true;
       lockMessage = `Requires ${TUNING.guac.labUnlockAps} avocados/sec to unlock.`;
     } else if (id === "guac_refinery" && (state.producers.guac_lab || 0) === 0) {
@@ -1035,6 +1040,10 @@ function confirmPrestigeAndDistill() {
 }
 
 function buyProducer(id) {
+  // Wisdom unlock gating for producers
+  const producerCfg = TUNING.producers[id];
+  if (producerCfg.requiresWisdomUnlock && !state.wisdomUnlocks[producerCfg.requiresWisdomUnlock]) return;
+
   // Guac lab gating — need enough APS to feed the lab
   if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
     const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
