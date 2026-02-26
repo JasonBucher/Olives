@@ -139,6 +139,10 @@ const CLICK_MESSAGES = [
 // --- Guac underfed throttle ---
 let lastUnderfedLogTime = 0;
 
+// --- Idle click prompt ---
+let lastClickTime = Date.now();
+let idlePromptShowing = false;
+
 // --- DOM ---
 const gameTitleEl = document.getElementById("game-title");
 const avocadoCountEl = document.getElementById("avocado-count");
@@ -979,15 +983,30 @@ function spawnClickEmoji(value) {
   el.innerHTML = `\u{1f951} <span class="click-value">+${Calc.formatNumber(value)}</span>`;
   // Random angle within ±15° from straight up
   const angle = (Math.random() - 0.5) * 60 * (Math.PI / 180);
-  const dx = Math.sin(angle) * 40;
-  el.style.left = `${rect.left + rect.width / 2 - 11}px`;
-  el.style.top = `${rect.top - 10}px`;
+  const dx = Math.sin(angle) * 120;
+  el.style.left = `${rect.left + rect.width / 2}px`;
+  el.style.top = `${rect.top + rect.height / 2}px`;
+  el.style.transform = "translate(-50%, -50%)";
   el.style.setProperty("--dx", `${dx}px`);
   document.body.appendChild(el);
   el.addEventListener("animationend", () => el.remove());
 }
 
+function dismissIdlePrompt() {
+  const el = document.getElementById("idle-prompt");
+  if (!el || !idlePromptShowing) return;
+  el.classList.remove("pulsing");
+  el.classList.add("dismissing");
+  idlePromptShowing = false;
+  el.addEventListener("animationend", () => {
+    el.classList.remove("dismissing");
+  }, { once: true });
+}
+
 function pickAvocado() {
+  lastClickTime = Date.now();
+  if (idlePromptShowing) dismissIdlePrompt();
+
   const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
   let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
@@ -1415,6 +1434,16 @@ function startLoop() {
 
     // Auto-save every ~5s
     if (tickCount % 25 === 0) saveGame();
+
+    // Idle click prompt — show after 60s of no clicks
+    if (!idlePromptShowing && now - lastClickTime >= 60000) {
+      const el = document.getElementById("idle-prompt");
+      if (el) {
+        el.classList.remove("dismissing");
+        el.classList.add("pulsing");
+        idlePromptShowing = true;
+      }
+    }
 
     updateUI();
   }, TUNING.production.tickMs);
