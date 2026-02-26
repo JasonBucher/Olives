@@ -4,6 +4,8 @@ import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
 import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
+import SessionLog from "./sessionLog.js";
+import { initAnalyzerView } from "./views/analyzerView.js";
 
 const STORAGE_PREFIX = "AVO_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -186,6 +188,47 @@ const debugAddBigAvocadosBtn = document.getElementById("debug-add-big-avocados-b
 const debugAdd100kAvocadosBtn = document.getElementById("debug-add-100k-avocados-btn");
 const debugAdd1mAvocadosBtn = document.getElementById("debug-add-1m-avocados-btn");
 const debugAddWisdomBtn = document.getElementById("debug-add-wisdom-btn");
+
+// --- View switching (game vs analyzer) ---
+const gameRootEl = document.getElementById("game-root");
+const analyzerScreenEl = document.getElementById("analyzer-screen");
+const analyzerBtn = document.getElementById("analyzer-btn");
+let activeView = "game";
+
+function renderActiveView() {
+  const isAnalyzer = activeView === "analyzer";
+  gameRootEl?.classList.toggle("is-hidden", isAnalyzer);
+  analyzerScreenEl?.classList.toggle("is-hidden", !isAnalyzer);
+}
+
+function openAnalyzer() {
+  activeView = "analyzer";
+  renderActiveView();
+  analyzerView?.notifyVisible();
+}
+
+function closeAnalyzer() {
+  activeView = "game";
+  renderActiveView();
+}
+
+// --- Telemetry helpers ---
+function captureStateSnapshot(reason = "tick") {
+  const hpMods = Calc.calcHyperparamModifiers(state.hyperparams, Date.now(), TUNING);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+  aps *= hpMods.apsMult * hpMods.globalMult * distBonus.apsMult * distBonus.allProdMult;
+
+  SessionLog.record("state_snapshot", {
+    avocadoCount: state.avocadoCount,
+    totalAvocadosThisRun: state.totalAvocadosThisRun,
+    guacCount: state.guacCount,
+    wisdom: state.wisdom,
+    prestigeCount: state.prestigeCount,
+    aps,
+    reason,
+  });
+}
 
 // --- Logging ---
 function logLine(message) {
@@ -877,6 +920,7 @@ function confirmPrestigeAndDistill() {
   revealedUpgrades.clear();
   setResearchTab("research");
 
+  SessionLog.record("distill", { modelVersion: newModelVersion, distillationCount: newDistillationCount });
   logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`Model distilled to v${newModelVersion}.0!`);
   const bonus = TUNING.distillation.bonuses[newModelVersion - 1];
@@ -916,6 +960,7 @@ function buyProducer(id) {
   state.avocadoCount -= cost;
   state.producers[id] = owned + 1;
 
+  SessionLog.record("purchase", { kind: "producer", id, title: cfg.title, count: state.producers[id], cost });
   logLine(`Bought ${cfg.title} (#${state.producers[id]})`);
   saveGame();
   updateUI();
@@ -927,6 +972,7 @@ function buyUpgrade(id) {
 
   inv.purchase(state);
   const cfg = TUNING.upgrades[id];
+  SessionLog.record("purchase", { kind: "upgrade", id, title: cfg.title });
   logLine(`Research complete: ${cfg.title}`);
   saveGame();
   updateUI();
@@ -1094,6 +1140,7 @@ function confirmPrestige() {
   // Reset research tab to "Research"
   setResearchTab("research");
 
+  SessionLog.record("prestige", { wisdomGain, prestigeCount: newPrestigeCount });
   logLine(`\u267b\ufe0f The orchard collapses into nutrient memory.`);
   logLine(`\u2728 You gained ${wisdomGain} Wisdom. (Prestige #${newPrestigeCount})`);
 
@@ -1189,8 +1236,11 @@ function startLoop() {
       }
     }
 
-    // Auto-save every ~5s
+    // Telemetry snapshot every 5 ticks (~1s)
     tickCount++;
+    if (tickCount % 5 === 0) captureStateSnapshot("tick");
+
+    // Auto-save every ~5s
     if (tickCount % 25 === 0) saveGame();
 
     updateUI();
@@ -1277,6 +1327,8 @@ prestigeOverlay.addEventListener("click", (e) => {
   if (e.target === prestigeOverlay) closePrestigeOverlay();
 });
 
+if (analyzerBtn) analyzerBtn.addEventListener("click", openAnalyzer);
+
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
 debugResetBtn.addEventListener("click", resetGame);
@@ -1341,11 +1393,19 @@ debugModal.addEventListener("click", (e) => {
 });
 
 // --- Init ---
+SessionLog.initSession();
+
+const analyzerView = initAnalyzerView({
+  onBack: closeAnalyzer,
+  captureSnapshot: (reason) => captureStateSnapshot(reason),
+});
+
 loadGame();
 renderProducerList();
 renderGuacProducerList();
 renderUpgradeList();
 renderBenchmarks();
 updateUI();
+captureStateSnapshot("init");
 startLoop();
 logLine("Avocado Intelligence loaded.");
