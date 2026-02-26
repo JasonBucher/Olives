@@ -141,14 +141,11 @@ const avocadoCountEl = document.getElementById("avocado-count");
 const apsCountEl = document.getElementById("aps-count");
 const guacRowEl = document.getElementById("guac-row");
 const guacCountEl = document.getElementById("guac-count");
-const guacMultRowEl = document.getElementById("guac-mult-row");
-const guacMultEl = document.getElementById("guac-mult");
 const wisdomRowEl = document.getElementById("wisdom-row");
 const wisdomCountEl = document.getElementById("wisdom-count");
-const wisdomMultRowEl = document.getElementById("wisdom-mult-row");
-const wisdomMultEl = document.getElementById("wisdom-mult");
 const totalMultRowEl = document.getElementById("total-mult-row");
 const totalMultEl = document.getElementById("total-mult");
+const totalMultTooltipEl = document.getElementById("total-mult-tooltip");
 const logEl = document.getElementById("log");
 
 const pickAvocadoBtn = document.getElementById("pick-avocado-btn");
@@ -616,19 +613,18 @@ function updateUI() {
   const refineries = state.producers.guac_refinery || 0;
   const centrifuges = state.producers.guac_centrifuge || 0;
   if (hasGuac) {
-    if (labs > 0) {
-      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
-      guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (+${Calc.formatRate(guacPerSec)}/sec)`;
-    } else {
-      guacCountEl.textContent = `${Calc.formatNumber(state.guacCount)} (need Guac Labs)`;
-    }
+    guacCountEl.textContent = Calc.formatNumber(state.guacCount);
   }
 
-  // Guac multiplier row — show when guac > 0
-  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
-  guacMultRowEl.style.display = state.guacCount > 0 ? "" : "none";
-  if (state.guacCount > 0) {
-    guacMultEl.textContent = `x${guacMult.toFixed(2)}`;
+  // Guac/sec row — show when guac labs owned
+  const guacPsRowEl = document.getElementById("guac-ps-row");
+  const guacPsEl = document.getElementById("guac-ps");
+  if (guacPsRowEl) {
+    guacPsRowEl.style.display = (hasGuac && labs > 0) ? "" : "none";
+    if (labs > 0 && guacPsEl) {
+      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
+      guacPsEl.textContent = Calc.formatNumber(guacPerSec);
+    }
   }
 
   // Wisdom row
@@ -637,18 +633,27 @@ function updateUI() {
     wisdomCountEl.textContent = String(state.wisdom);
   }
 
-  // Wisdom multiplier row
+  // Total multiplier row — show all APS multipliers combined
+  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
   const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks);
-  wisdomMultRowEl.style.display = state.wisdom > 0 ? "" : "none";
-  if (state.wisdom > 0) {
-    wisdomMultEl.textContent = `x${wisdomMult.toFixed(2)}`;
+  const benchBonus = Calc.calcBenchmarkBonus(state.benchmarks, TUNING);
+  let upgradeGlobalMult = 1;
+  for (const [uid, ucfg] of Object.entries(TUNING.upgrades)) {
+    if (ucfg.globalMult && state.upgrades[uid]) upgradeGlobalMult *= ucfg.globalMult;
   }
-
-  // Total multiplier row — show when any multiplier is active
-  const hasMultipliers = state.guacCount > 0 || state.wisdom > 0;
-  totalMultRowEl.style.display = hasMultipliers ? "" : "none";
-  if (hasMultipliers) {
-    totalMultEl.textContent = `x${(guacMult * wisdomMult).toFixed(2)}`;
+  const totalMult = guacMult * wisdomMult * benchBonus.globalMult * upgradeGlobalMult * distBonus.apsMult * distBonus.allProdMult;
+  totalMultRowEl.style.display = totalMult > 1 ? "" : "none";
+  if (totalMult > 1) {
+    totalMultEl.textContent = `x${totalMult.toFixed(2)}`;
+    // Build tooltip breakdown — only show components > 1
+    const lines = [];
+    if (guacMult > 1) lines.push(`Guacamole x${guacMult.toFixed(2)}`);
+    if (wisdomMult > 1) lines.push(`Wisdom x${wisdomMult.toFixed(2)}`);
+    if (upgradeGlobalMult > 1) lines.push(`Research x${upgradeGlobalMult.toFixed(2)}`);
+    if (benchBonus.globalMult > 1) lines.push(`Benchmarks x${benchBonus.globalMult.toFixed(2)}`);
+    if (distBonus.apsMult > 1) lines.push(`Distillation APS x${distBonus.apsMult.toFixed(1)}`);
+    if (distBonus.allProdMult > 1) lines.push(`Distillation Prod x${distBonus.allProdMult.toFixed(1)}`);
+    if (totalMultTooltipEl) totalMultTooltipEl.textContent = lines.join("  ·  ");
   }
 
   // Model version bar

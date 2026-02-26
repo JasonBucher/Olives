@@ -516,6 +516,37 @@ h1 {
   transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.3s;
 }
 
+/* Total multiplier tooltip */
+.total-mult-wrapper {
+  position: relative;
+}
+
+.total-mult-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #252a27;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.6;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+}
+
+.total-mult-wrapper:hover .total-mult-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.3s;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
