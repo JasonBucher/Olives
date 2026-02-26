@@ -293,6 +293,8 @@ function resetGame() {
   if (mainLoopInterval) clearInterval(mainLoopInterval);
 
   localStorage.removeItem(STORAGE_KEY);
+  SessionLog.clear();
+  sessionStorage.removeItem("AVO_session_id");
   window.location.href = window.location.pathname + "?t=" + Date.now();
 }
 
