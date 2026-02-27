@@ -1764,8 +1764,19 @@ function applyGiftEffect(effectId, cfg, now, x, y) {
   // Spawn floating text
   spawnGiftResultText(cfg.text, arrow, arrowClass, x, y);
 
-  // Log it
-  logLine(`\u{1f381} ${cfg.text}`);
+  // Log it — include mechanical detail
+  let logDetail = "";
+  if (cfg.field && cfg.mult !== undefined && cfg.durationMs) {
+    const label = cfg.field === "aps" ? "APS" : "Clicks";
+    logDetail = ` (${label} ×${cfg.mult} for ${cfg.durationMs / 1000}s)`;
+  } else if (effectId === "free_purchase") {
+    logDetail = " (next research upgrade is free)";
+  } else if (effectId === "wisdom_grant") {
+    logDetail = ` (+${cfg.wisdomAmount || 1} wisdom)`;
+  } else if (effectId === "avocado_rain") {
+    logDetail = ` (+${cfg.apsSeconds || 60}s of APS)`;
+  }
+  logLine(`\u{1f381} ${cfg.text}${logDetail}`);
   SessionLog.record("gift", { effectId, text: cfg.text, negative: !!cfg.negative });
 
   saveGame();
