@@ -116,8 +116,10 @@ const tuning = {
   },
   prestige: {
     unlockThreshold: 1e7,
-    divisor: 1000,
+    divisor: 30,
+    scalingRoot: 3,
     wisdomMultPerPoint: 0.10,
+    firstPrestigeBonus: 3,
   },
   wisdomUnlocks: {
     // Orchard Roots branch
@@ -133,7 +135,7 @@ const tuning = {
     guac_sommelier:    { wisdomCost: 8, requires: "guac_protocol", branch: "guac_economy", title: "Guac Sommelier", desc: "Guac coeff +0.005", effect: { guacCoeffBonus: 0.005 } },
     guac_singularity:  { wisdomCost: 20, requires: "guac_sommelier", branch: "guac_economy", title: "Guac Singularity", desc: "Guac coeff +0.01", effect: { guacCoeffBonus: 0.01 } },
     // Wisdom Amp
-    inner_peace:          { wisdomCost: 2, requires: null, branch: "wisdom_amp", title: "Inner Peace", desc: "Begin" },
+    inner_peace:          { wisdomCost: 2, requires: null, branch: "wisdom_amp", title: "Inner Peace", desc: "Wisdom +20%", effect: { wisdomMultBonus: 0.02 } },
     wisdom_boost:         { wisdomCost: 3, requires: "inner_peace", branch: "wisdom_amp", title: "AGI", desc: "Wisdom +50%", effect: { wisdomMultBonus: 0.05 } },
     guac_memory_1:        { wisdomCost: 3, requires: "inner_peace", branch: "wisdom_amp", title: "Guac Memory I", desc: "+0.02 per prestige" },
     guac_memory_2:        { wisdomCost: 10, requires: "guac_memory_1", branch: "wisdom_amp", title: "Guac Memory II", desc: "-0.01 per prestige" },
@@ -142,14 +144,14 @@ const tuning = {
     accelerated_decay:    { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp", title: "Accelerated Decay", desc: "Threshold 2M", effect: { prestigeThreshold: 2e6 } },
     recursive_insight:    { wisdomCost: 12, requires: "wisdom_boost", branch: "wisdom_amp", title: "Recursive Insight", desc: "Wisdom earn +25%", effect: { wisdomEarnMult: 1.25 } },
     // Neural Architecture
-    backpropagation:      { wisdomCost: 2, requires: null, branch: "neural_arch", title: "Backpropagation", desc: "Begin" },
+    backpropagation:      { wisdomCost: 2, requires: null, branch: "neural_arch", title: "Backpropagation", desc: "+5%", effect: { globalApsMult: 1.05 } },
     weight_initialization: { wisdomCost: 4, requires: "backpropagation", branch: "neural_arch", title: "Weight Init", desc: "+10%", effect: { globalApsMult: 1.10 } },
     batch_normalization:  { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch", title: "Batch Norm", desc: "+20%", effect: { globalApsMult: 1.20 } },
     dropout_prevention:   { wisdomCost: 5, requires: "backpropagation", branch: "neural_arch", title: "Dropout Prevention", desc: "Bench +25%", effect: { benchmarkBonusMult: 1.25 } },
     gradient_clipping:    { wisdomCost: 8, requires: "backpropagation", branch: "neural_arch", title: "Gradient Clipping", desc: "Research -10%", effect: { researchCostMult: 0.90 } },
     adaptive_learning:    { wisdomCost: 20, requires: "gradient_clipping", branch: "neural_arch", title: "Adaptive Learning", desc: "Research -20%", effect: { researchCostMult: 0.80 } },
     // Training Data
-    curriculum_learning:  { wisdomCost: 3, requires: null, branch: "training_data", title: "Curriculum Learning", desc: "Unlocks regimens" },
+    curriculum_learning:  { wisdomCost: 3, requires: null, branch: "training_data", title: "Curriculum Learning", desc: "Unlocks regimens. +1 click", effect: { baseClickBonus: 1 } },
     click_specialization: { wisdomCost: 4, requires: "curriculum_learning", branch: "training_data", title: "Click Spec", desc: "Unlocks click focus" },
     scale_specialization: { wisdomCost: 4, requires: "curriculum_learning", branch: "training_data", title: "Scale Spec", desc: "Unlocks scale focus" },
     guac_specialization:  { wisdomCost: 6, requires: "curriculum_learning", branch: "training_data", title: "Guac Spec", desc: "Unlocks guac focus" },
@@ -703,23 +705,48 @@ describe("calcWisdomEarned", () => {
     expect(calcWisdomEarned(9999999, tuning)).toBe(0);
   });
 
-  it("returns 3 at exactly threshold (1e7)", () => {
-    // floor(sqrt(1e7) / 1000) = floor(3162.27 / 1000) = 3
-    expect(calcWisdomEarned(1e7, tuning)).toBe(3);
+  it("returns 7 at exactly threshold (1e7) with cube root", () => {
+    // floor(cbrt(1e7) / 30) = floor(215.44 / 30) = floor(7.18) = 7
+    expect(calcWisdomEarned(1e7, tuning)).toBe(7);
   });
 
-  it("returns floor of sqrt scaling", () => {
-    // floor(sqrt(4e7) / 1000) = floor(6324.5 / 1000) = 6
-    expect(calcWisdomEarned(4e7, tuning)).toBe(6);
+  it("returns floor of cube root scaling", () => {
+    // floor(cbrt(4e7) / 30) = floor(341.99 / 30) = floor(11.4) = 11
+    expect(calcWisdomEarned(4e7, tuning)).toBe(11);
   });
 
-  it("grows with sqrt of total", () => {
-    // floor(sqrt(100e6) / 1000) = floor(10000 / 1000) = 10
-    expect(calcWisdomEarned(100e6, tuning)).toBe(10);
+  it("grows with cube root of total", () => {
+    // floor(cbrt(100e6) / 30) = floor(464.16 / 30) = floor(15.47) = 15
+    expect(calcWisdomEarned(100e6, tuning)).toBe(15);
   });
 
   it("returns 0 at zero avocados", () => {
     expect(calcWisdomEarned(0, tuning)).toBe(0);
+  });
+
+  it("guarantees minimum 1 wisdom above threshold", () => {
+    // At threshold with very high divisor that would give 0 from formula
+    const stingyTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 99999 } };
+    // floor(cbrt(1e7) / 99999) = floor(215.44 / 99999) = 0, but min floor => 1
+    expect(calcWisdomEarned(1e7, stingyTuning)).toBe(1);
+  });
+
+  it("cube root is tighter than sqrt at high values", () => {
+    // At 10B: cbrt(1e10) / 30 = floor(2154.4 / 30) = 71
+    expect(calcWisdomEarned(1e10, tuning)).toBe(71);
+    // At 1T: cbrt(1e12) / 30 = floor(10000 / 30) = 333
+    expect(calcWisdomEarned(1e12, tuning)).toBe(333);
+  });
+
+  it("respects scalingRoot parameter (can revert to sqrt)", () => {
+    const sqrtTuning = { ...tuning, prestige: { ...tuning.prestige, scalingRoot: 2, divisor: 750 } };
+    // floor(sqrt(1e7) / 750) = floor(3162.27 / 750) = 4
+    expect(calcWisdomEarned(1e7, sqrtTuning)).toBe(4);
+  });
+
+  it("applies wisdom earn mult from tree", () => {
+    // base = 7 at 1e7, recursive_insight gives 1.25x => floor(7 * 1.25) = 8
+    expect(calcWisdomEarned(1e7, tuning, { inner_peace: true, wisdom_boost: true, recursive_insight: true })).toBe(8);
   });
 });
 
@@ -733,8 +760,8 @@ describe("calcWisdomBonus", () => {
     expect(calcWisdomBonus(10, {}, tuning)).toBeCloseTo(2);
   });
 
-  it("wisdom_boost upgrade increases effectiveness", () => {
-    // with wisdom_boost: mult = 0.10 + 0.05 = 0.15
+  it("wisdom_boost upgrade increases effectiveness (legacy path)", () => {
+    // with wisdom_boost upgrade (no wisdomUnlocks): mult = 0.10 + 0.05 = 0.15
     // 1 + 10 * 0.15 = 2.5
     expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning)).toBeCloseTo(2.5);
   });
@@ -748,6 +775,21 @@ describe("calcWisdomBonus", () => {
     // mult = 0.10 * 1.05 = 0.105
     // 1 + 10 * 0.105 = 2.05
     expect(calcWisdomBonus(10, {}, tuning, { convergence: true })).toBeCloseTo(2.05);
+  });
+
+  it("inner_peace wisdomMultBonus aggregates with wisdom_boost via tree", () => {
+    // inner_peace: +0.02, wisdom_boost: +0.05 => total +0.07
+    // mult = 0.10 + 0.07 = 0.17
+    // 1 + 10 * 0.17 = 2.70
+    const wisdomUnlocks = { inner_peace: true, wisdom_boost: true };
+    expect(calcWisdomBonus(10, {}, tuning, undefined, wisdomUnlocks)).toBeCloseTo(2.7);
+  });
+
+  it("inner_peace alone gives small wisdom bonus", () => {
+    // inner_peace: +0.02 => mult = 0.10 + 0.02 = 0.12
+    // 1 + 10 * 0.12 = 2.20
+    const wisdomUnlocks = { inner_peace: true };
+    expect(calcWisdomBonus(10, {}, tuning, undefined, wisdomUnlocks)).toBeCloseTo(2.2);
   });
 });
 
@@ -1282,9 +1324,9 @@ describe("calcWisdomEffectAggregate", () => {
   });
 
   it("multiplies in multiply mode", () => {
-    // weight_initialization: 1.10, batch_normalization: 1.20
+    // backpropagation: 1.05, weight_initialization: 1.10, batch_normalization: 1.20
     const owned = { backpropagation: true, weight_initialization: true, batch_normalization: true };
-    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.32);
+    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.386);
   });
 
   it("sums in sum mode", () => {
@@ -1293,9 +1335,10 @@ describe("calcWisdomEffectAggregate", () => {
     expect(calcWisdomEffectAggregate("guacCoeffBonus", owned, tuning, "sum", 0)).toBeCloseTo(0.015);
   });
 
-  it("single node in multiply mode", () => {
+  it("two nodes in multiply mode", () => {
+    // backpropagation: 1.05, weight_initialization: 1.10
     const owned = { backpropagation: true, weight_initialization: true };
-    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.10);
+    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.155);
   });
 
   it("single node in sum mode", () => {
@@ -1343,14 +1386,19 @@ describe("calcWisdomGlobalApsMult", () => {
     expect(calcWisdomGlobalApsMult({}, tuning)).toBe(1);
   });
 
-  it("returns 1.10 with weight_initialization only", () => {
-    expect(calcWisdomGlobalApsMult({ backpropagation: true, weight_initialization: true }, tuning)).toBeCloseTo(1.10);
+  it("returns 1.05 with backpropagation only (gate node now has effect)", () => {
+    expect(calcWisdomGlobalApsMult({ backpropagation: true }, tuning)).toBeCloseTo(1.05);
   });
 
-  it("multiplicatively stacks weight_initialization + batch_normalization", () => {
+  it("multiplicatively stacks backpropagation + weight_initialization", () => {
+    // 1.05 * 1.10 = 1.155
+    expect(calcWisdomGlobalApsMult({ backpropagation: true, weight_initialization: true }, tuning)).toBeCloseTo(1.155);
+  });
+
+  it("multiplicatively stacks all three", () => {
     const owned = { backpropagation: true, weight_initialization: true, batch_normalization: true };
-    // 1.10 * 1.20 = 1.32
-    expect(calcWisdomGlobalApsMult(owned, tuning)).toBeCloseTo(1.32);
+    // 1.05 * 1.10 * 1.20 = 1.386
+    expect(calcWisdomGlobalApsMult(owned, tuning)).toBeCloseTo(1.386);
   });
 });
 
@@ -1617,40 +1665,41 @@ describe("canPrestige — with wisdom tree", () => {
 describe("calcWisdomEarned — with wisdom tree", () => {
   it("respects lowered threshold", () => {
     const wUnlocks = { inner_peace: true, efficient_composting: true };
-    // threshold = 5M, sqrt(5e6)/1000 = 2236/1000 = 2
-    expect(calcWisdomEarned(5e6, tuning, wUnlocks)).toBe(2);
+    // threshold = 5M, cbrt(5e6)/30 = floor(171.0/30) = floor(5.7) = 5
+    expect(calcWisdomEarned(5e6, tuning, wUnlocks)).toBe(5);
     // Below threshold
     expect(calcWisdomEarned(4999999, tuning, wUnlocks)).toBe(0);
   });
 
   it("applies wisdom earn mult from recursive_insight", () => {
     const wUnlocks = { inner_peace: true, wisdom_boost: true, recursive_insight: true };
-    // default threshold 1e7, sqrt(1e7)/1000 = 3, * 1.25 = 3.75 → floor = 3
-    expect(calcWisdomEarned(1e7, tuning, wUnlocks)).toBe(3);
-    // At 4e7: sqrt(4e7)/1000 = 6.32, * 1.25 = 7.9 → floor = 7
-    expect(calcWisdomEarned(4e7, tuning, wUnlocks)).toBe(7);
+    // default threshold 1e7, cbrt(1e7)/30 = 7, * 1.25 = 8.75 → floor = 8
+    expect(calcWisdomEarned(1e7, tuning, wUnlocks)).toBe(8);
+    // At 4e7: cbrt(4e7)/30 = floor(341.99/30) = 11, * 1.25 = 13.75 → floor = 13
+    expect(calcWisdomEarned(4e7, tuning, wUnlocks)).toBe(13);
   });
 
   it("defaults to no earn mult without wisdomUnlocks param", () => {
-    expect(calcWisdomEarned(1e7, tuning)).toBe(3);
+    expect(calcWisdomEarned(1e7, tuning)).toBe(7);
   });
 });
 
 describe("calcWisdomBonus — with wisdom tree", () => {
-  it("uses wisdom tree wisdom_boost over legacy upgrade", () => {
-    // Wisdom tree wisdom_boost: effect.wisdomMultBonus = 0.05
-    // mult = 0.10 + 0.05 = 0.15, bonus = 1 + 10 * 0.15 = 2.5
-    expect(calcWisdomBonus(10, {}, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.5);
+  it("uses aggregated wisdomMultBonus from tree nodes", () => {
+    // inner_peace: +0.02, wisdom_boost: +0.05 => total +0.07
+    // mult = 0.10 + 0.07 = 0.17, bonus = 1 + 10 * 0.17 = 2.7
+    expect(calcWisdomBonus(10, {}, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.7);
   });
 
-  it("falls back to legacy upgrade when wisdom tree boost not owned", () => {
+  it("falls back to legacy upgrade when wisdomUnlocks is empty", () => {
     // Legacy upgrades.wisdom_boost: wisdomMult = 0.05
-    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, {})).toBeCloseTo(2.5);
+    // No wisdomUnlocks path => uses legacy: 0.10 + 0.05 = 0.15
+    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, {})).toBeCloseTo(2.0);
   });
 
-  it("prefers wisdom tree over legacy when both present", () => {
-    // Both owned — wisdom tree should take priority
-    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.5);
+  it("uses tree path when wisdomUnlocks provided (tree takes priority)", () => {
+    // wisdomUnlocks present => uses tree aggregate (inner_peace +0.02, wisdom_boost +0.05)
+    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.7);
   });
 });
 
@@ -1717,10 +1766,10 @@ describe("calcTotalAps — with wisdom tree and regimens", () => {
   const baseProducers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
 
   it("applies wisdom tree global APS mult", () => {
-    // base = 1, weight_initialization gives 1.10x
+    // base = 1, backpropagation 1.05x * weight_initialization 1.10x = 1.155
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks);
-    expect(result).toBeCloseTo(1.1);
+    expect(result).toBeCloseTo(1.155);
   });
 
   it("applies regimen producer mult", () => {
@@ -1730,10 +1779,10 @@ describe("calcTotalAps — with wisdom tree and regimens", () => {
   });
 
   it("stacks wisdom tree and regimen multipliers", () => {
-    // base = 1, weight_init 1.10, scale_focus 1.50 → 1.65
+    // base = 1, backpropagation 1.05 * weight_init 1.10 = 1.155, scale_focus 1.50 → 1.7325
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks, ["scale_focus"]);
-    expect(result).toBeCloseTo(1.65);
+    expect(result).toBeCloseTo(1.7325);
   });
 });
 
@@ -1768,6 +1817,85 @@ describe("calcGuacProduction — with regimens", () => {
 
   it("returns normal production without regimens", () => {
     expect(calcGuacProduction(10, tuning, {}, {}, 0)).toBeCloseTo(10);
+  });
+});
+
+// ========== Gate Node Effect Tests ==========
+
+describe("gate node effects — inner_peace wisdomMultBonus", () => {
+  it("inner_peace alone provides +0.02 wisdom mult bonus", () => {
+    const wUnlocks = { inner_peace: true };
+    // mult = 0.10 + 0.02 = 0.12, bonus = 1 + 10 * 0.12 = 2.2
+    expect(calcWisdomBonus(10, {}, tuning, undefined, wUnlocks)).toBeCloseTo(2.2);
+  });
+
+  it("inner_peace stacks with wisdom_boost", () => {
+    const wUnlocks = { inner_peace: true, wisdom_boost: true };
+    // mult = 0.10 + 0.02 + 0.05 = 0.17, bonus = 1 + 10 * 0.17 = 2.7
+    expect(calcWisdomBonus(10, {}, tuning, undefined, wUnlocks)).toBeCloseTo(2.7);
+  });
+});
+
+describe("gate node effects — backpropagation globalApsMult", () => {
+  it("backpropagation alone provides +5% global APS", () => {
+    const wUnlocks = { backpropagation: true };
+    expect(calcWisdomGlobalApsMult(wUnlocks, tuning)).toBeCloseTo(1.05);
+  });
+
+  it("backpropagation stacks with weight_initialization", () => {
+    const wUnlocks = { backpropagation: true, weight_initialization: true };
+    // 1.05 * 1.10 = 1.155
+    expect(calcWisdomGlobalApsMult(wUnlocks, tuning)).toBeCloseTo(1.155);
+  });
+
+  it("backpropagation effect reflected in calcTotalAps", () => {
+    const producers = { sapling: 10 };
+    // base = 10 * 0.1 = 1, * 1.05 = 1.05
+    const wUnlocks = { backpropagation: true };
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, undefined, wUnlocks)).toBeCloseTo(1.05);
+  });
+});
+
+describe("gate node effects — curriculum_learning baseClickBonus", () => {
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("curriculum_learning adds +1 base click yield", () => {
+    const wUnlocks = { curriculum_learning: true };
+    // base = 1 + 1 = 2
+    expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, wUnlocks)).toBe(2);
+  });
+
+  it("baseClickBonus stacks with click multiplier upgrades", () => {
+    const wUnlocks = { curriculum_learning: true };
+    // base = 1 + 1 = 2, * 2 (strong_thumb) = 4
+    expect(calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning, undefined, wUnlocks)).toBe(4);
+  });
+
+  it("no bonus without wisdom unlock", () => {
+    expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, {})).toBe(1);
+  });
+});
+
+// ========== Min-1 Wisdom Floor Tests ==========
+
+describe("calcWisdomEarned — min-1 floor", () => {
+  it("returns at least 1 when above threshold even with high divisor", () => {
+    const highDivTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 999999 } };
+    expect(calcWisdomEarned(1e7, highDivTuning)).toBe(1);
+  });
+
+  it("returns at least 1 at exactly threshold", () => {
+    const highDivTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 999999 } };
+    expect(calcWisdomEarned(1e7, highDivTuning)).toBe(1);
+  });
+
+  it("still returns 0 below threshold", () => {
+    expect(calcWisdomEarned(9999999, tuning)).toBe(0);
+  });
+
+  it("returns formula value when formula gives more than 1", () => {
+    // At 1e7 with normal tuning: cbrt(1e7)/30 = 7
+    expect(calcWisdomEarned(1e7, tuning)).toBe(7);
   });
 });
 

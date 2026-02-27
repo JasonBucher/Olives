@@ -190,7 +190,7 @@ export const TUNING = {
     thick_skin:          { wisdomCost: 10, requires: "muscle_memory",     branch: "orchard_roots",     title: "Thick Skin",             desc: "Clicks +100% (replaces Muscle Memory)", effect: { clickMult: 2.0 } },
 
     // ── Branch 2: Guac Economy (13 nodes, 71w) ──
-    guac_protocol:           { wisdomCost: 2,  requires: null,                    branch: "guac_economy",      title: "Guacamole Protocol",     desc: "Unlocks guac processing", effect: { unlocksGuac: true } },
+    guac_protocol:           { wisdomCost: 2,  requires: null,                    branch: "guac_economy",      title: "Guacamole Protocol",     desc: "Unlocks guac processing", effect: { unlocksGuac: true }, autoGrant: true },
     unlock_guac_recycler:    { wisdomCost: 2,  requires: "guac_protocol",         branch: "guac_economy",      title: "Guac Recycler Theory",   desc: "Unlocks research: guac lab consumption -0.05" },
     unlock_bulk_fermentation:{ wisdomCost: 3,  requires: "unlock_guac_recycler",  branch: "guac_economy",      title: "Fermentation Science",   desc: "Unlocks research: guac lab consumption -0.05 more" },
     unlock_catalytic_convert:{ wisdomCost: 4,  requires: "unlock_bulk_fermentation", branch: "guac_economy",   title: "Catalysis Research",     desc: "Unlocks research: refinery consumption -0.05" },
@@ -205,7 +205,7 @@ export const TUNING = {
     guac_singularity:        { wisdomCost: 20, requires: "guac_sommelier",        branch: "guac_economy",      title: "Guac Singularity",       desc: "Guac multiplier coefficient +0.01 more", effect: { guacCoeffBonus: 0.01 } },
 
     // ── Branch 3: Wisdom Amplification (8 nodes, 76w) ──
-    inner_peace:         { wisdomCost: 2,  requires: null,              branch: "wisdom_amp",        title: "Inner Peace",            desc: "Begin the path to deeper wisdom" },
+    inner_peace:         { wisdomCost: 2,  requires: null,              branch: "wisdom_amp",        title: "Inner Peace",            desc: "Wisdom bonus +20% more effective", effect: { wisdomMultBonus: 0.02 } },
     wisdom_boost:        { wisdomCost: 3,  requires: "inner_peace",    branch: "wisdom_amp",        title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective", effect: { wisdomMultBonus: 0.05 } },
     recursive_insight:   { wisdomCost: 12, requires: "wisdom_boost",   branch: "wisdom_amp",        title: "Recursive Insight",      desc: "Wisdom earn rate +25%", effect: { wisdomEarnMult: 1.25 } },
     guac_memory_1:       { wisdomCost: 3,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Guac Memory I",          desc: "produceExponent +0.02 per prestige" },
@@ -215,7 +215,7 @@ export const TUNING = {
     accelerated_decay:   { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp",  title: "Accelerated Decay",      desc: "Prestige threshold lowered to 2M (replaces Efficient Composting)", effect: { prestigeThreshold: 2e6 } },
 
     // ── Branch 4: Neural Architecture (7 nodes, 89w) ──
-    backpropagation:     { wisdomCost: 2,  requires: null,                  branch: "neural_arch",       title: "Backpropagation",        desc: "Begin optimizing neural pathways" },
+    backpropagation:     { wisdomCost: 2,  requires: null,                  branch: "neural_arch",       title: "Backpropagation",        desc: "All production +5%", effect: { globalApsMult: 1.05 } },
     weight_initialization:{ wisdomCost: 4, requires: "backpropagation",     branch: "neural_arch",       title: "Weight Initialization",  desc: "All production +10%", effect: { globalApsMult: 1.10 } },
     batch_normalization: { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch",     title: "Batch Normalization",    desc: "All production +20% (stacks)", effect: { globalApsMult: 1.20 } },
     residual_connections:{ wisdomCost: 25, requires: "batch_normalization", branch: "neural_arch",       title: "Residual Connections",   desc: "All production +50% (stacks)", effect: { globalApsMult: 1.50 } },
@@ -226,7 +226,7 @@ export const TUNING = {
     // placeholder effect on root nodes without mechanical effects — the node itself is the gate
 
     // ── Branch 5: Training Data (5 nodes, 32w) ──
-    curriculum_learning: { wisdomCost: 3,  requires: null,                   branch: "training_data",     title: "Curriculum Learning",    desc: "Unlocks Training Regimens — choose a focus for each run" },
+    curriculum_learning: { wisdomCost: 3,  requires: null,                   branch: "training_data",     title: "Curriculum Learning",    desc: "Unlocks Training Regimens. +1 base click yield.", effect: { baseClickBonus: 1 } },
     click_specialization:{ wisdomCost: 4,  requires: "curriculum_learning",  branch: "training_data",     title: "Click Specialization",   desc: "Unlocks Click Focus regimen: clicks 3x, producers -30%" },
     scale_specialization:{ wisdomCost: 4,  requires: "curriculum_learning",  branch: "training_data",     title: "Scale Specialization",   desc: "Unlocks Scale Focus regimen: producers +50%, clicks -50%" },
     guac_specialization: { wisdomCost: 6,  requires: "curriculum_learning",  branch: "training_data",     title: "Guac Specialization",    desc: "Unlocks Guac Focus regimen: guac output 2x, production -20%" },
@@ -298,8 +298,10 @@ export const TUNING = {
 
   prestige: {
     unlockThreshold: 1e7,         // total avocados this run to unlock prestige
-    divisor: 750,                 // wisdom = floor(sqrt(total) / divisor)
+    divisor: 30,                  // wisdom = floor(cbrt(total) / divisor)
+    scalingRoot: 3,               // 3 = cube root, 2 = square root
     wisdomMultPerPoint: 0.10,     // +10% per wisdom point
+    firstPrestigeBonus: 3,        // bonus wisdom on first prestige
   },
 
   reveal: {

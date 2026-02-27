@@ -427,6 +427,12 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ben
 export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens) {
   let power = tuning.production.baseClickYield;
 
+  // Base click bonus from wisdom tree (e.g. curriculum_learning)
+  if (wisdomUnlocks) {
+    const clickBonus = calcWisdomEffectAggregate("baseClickBonus", wisdomUnlocks, tuning, "sum", 0);
+    power += clickBonus;
+  }
+
   // Flat click bonus from producers (e.g. influencers)
   for (const [id, count] of Object.entries(producers)) {
     const p = tuning.producers[id];
@@ -487,7 +493,12 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
 export function calcWisdomEarned(totalAvocadosThisRun, tuning, wisdomUnlocks) {
   const threshold = wisdomUnlocks ? calcPrestigeThreshold(wisdomUnlocks, tuning) : tuning.prestige.unlockThreshold;
   if (totalAvocadosThisRun < threshold) return 0;
-  let base = Math.floor(Math.sqrt(totalAvocadosThisRun) / tuning.prestige.divisor);
+
+  const root = tuning.prestige.scalingRoot || 2;
+  let base = Math.floor(
+    Math.pow(totalAvocadosThisRun, 1 / root) / tuning.prestige.divisor
+  );
+
   // Apply wisdom earn mult from tree (recursive_insight)
   if (wisdomUnlocks) {
     const earnMult = calcWisdomEffect("wisdomEarnMult", wisdomUnlocks, tuning, 1);
@@ -495,18 +506,17 @@ export function calcWisdomEarned(totalAvocadosThisRun, tuning, wisdomUnlocks) {
       base = Math.floor(base * earnMult);
     }
   }
-  return base;
+  // Every prestige above threshold earns at least 1 wisdom
+  return Math.max(base, 1);
 }
 
 /** Calculate the wisdom bonus multiplier. */
 export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks) {
   let mult = tuning.prestige.wisdomMultPerPoint;
-  // wisdom_boost: check wisdom tree first, then legacy upgrade
-  if (wisdomUnlocks && wisdomUnlocks.wisdom_boost) {
-    const wbCfg = tuning.wisdomUnlocks.wisdom_boost;
-    if (wbCfg && wbCfg.effect && wbCfg.effect.wisdomMultBonus) {
-      mult += wbCfg.effect.wisdomMultBonus;
-    }
+  // Wisdom mult bonus from tree (aggregate all nodes with wisdomMultBonus)
+  if (wisdomUnlocks) {
+    const treeBonus = calcWisdomEffectAggregate("wisdomMultBonus", wisdomUnlocks, tuning, "sum", 0);
+    mult += treeBonus;
   } else if (upgrades.wisdom_boost) {
     mult += tuning.upgrades.wisdom_boost ? tuning.upgrades.wisdom_boost.wisdomMult : 0.05;
   }

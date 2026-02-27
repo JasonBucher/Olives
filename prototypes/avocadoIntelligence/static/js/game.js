@@ -1188,6 +1188,10 @@ function openPrestigeOverlay() {
 
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
   overlayWisdomGain = Math.floor(Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks) * distBonus.wisdomEarnMult);
+  // First-prestige bonus
+  if ((state.prestigeCount || 0) === 0 && TUNING.prestige.firstPrestigeBonus) {
+    overlayWisdomGain += TUNING.prestige.firstPrestigeBonus;
+  }
   overlayPurchases = {};
 
   const newPrestigeCount = (state.prestigeCount || 0) + 1;
@@ -1199,8 +1203,11 @@ function openPrestigeOverlay() {
     ["Prestige #", `${newPrestigeCount}`],
     ["Avocados This Run", Calc.formatNumber(state.totalAvocadosThisRun)],
     ["Wisdom Gained", `+${overlayWisdomGain}`],
-    ["Total Wisdom After", `${totalWisdom}`],
   ];
+  if ((state.prestigeCount || 0) === 0 && TUNING.prestige.firstPrestigeBonus) {
+    rows.push(["First Prestige Bonus", `+${TUNING.prestige.firstPrestigeBonus} (included above)`]);
+  }
+  rows.push(["Total Wisdom After", `${totalWisdom}`]);
   for (const [label, value] of rows) {
     const row = document.createElement("div");
     row.className = "row";
@@ -1319,6 +1326,16 @@ function renderPrestigeWisdomUnlocks(availableWisdom) {
             <div class="wisdom-node-desc">${cfg.desc}</div>
           </div>
           <span class="muted">Owned</span>
+        `;
+      } else if (cfg.autoGrant) {
+        // Auto-granted nodes show a special badge instead of buy button
+        row.classList.add("owned");
+        row.innerHTML = `
+          <div class="wisdom-node-info">
+            <div class="wisdom-node-title">${cfg.title}</div>
+            <div class="wisdom-node-desc">${cfg.desc}</div>
+          </div>
+          <span class="muted">Free on prestige</span>
         `;
       } else if (!prereqMet) {
         row.classList.add("locked");
@@ -1500,6 +1517,13 @@ function confirmPrestige() {
   for (const id of Object.keys(overlayPurchases)) {
     if (!state.wisdomUnlocks[id]) { // only deduct for new purchases
       wisdomAfterPurchases -= TUNING.wisdomUnlocks[id].wisdomCost;
+    }
+  }
+
+  // Auto-grant wisdom unlocks flagged as autoGrant (free, no wisdom cost)
+  for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
+    if (cfg.autoGrant && !keptWisdomUnlocks[id]) {
+      keptWisdomUnlocks[id] = true;
     }
   }
 
