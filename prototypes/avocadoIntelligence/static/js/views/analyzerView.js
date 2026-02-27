@@ -118,24 +118,41 @@ export function computeRunAnalysis(events) {
   }
 
   // Extract gift event markers for chart overlay
-  const giftMarkers = [];
+  // Track spawns and match with clicks by giftId
+  const giftSpawns = new Map(); // giftId → { ms, tRelSec }
+  const clickedGiftIds = new Set();
   for (const ev of events) {
-    if (ev.type === "gift") {
-      giftMarkers.push({
+    if (ev.type === "gift_spawn" && ev.payload.giftId) {
+      giftSpawns.set(ev.payload.giftId, {
         ms: ev.ms,
         tRelSec: (ev.ms - first.ms) / 1000,
-        effectId: ev.payload.effectId || "",
-        text: ev.payload.text || "",
-        negative: !!ev.payload.negative,
       });
     }
+    if (ev.type === "gift" && ev.payload.giftId) {
+      clickedGiftIds.add(ev.payload.giftId);
+    }
+  }
+  const giftMarkers = [];
+  for (const [giftId, spawn] of giftSpawns) {
+    const clicked = clickedGiftIds.has(giftId);
+    // Find the click event for effect details
+    const clickEv = clicked ? events.find(e => e.type === "gift" && e.payload.giftId === giftId) : null;
+    giftMarkers.push({
+      ms: spawn.ms,
+      tRelSec: spawn.tRelSec,
+      giftId,
+      clicked,
+      effectId: clickEv?.payload.effectId || "",
+      text: clickEv?.payload.text || "",
+      negative: !!(clickEv?.payload.negative),
+    });
   }
 
   // Build timeline rows for key events
   const timelineRows = [];
   for (const ev of events) {
     const isKey = [
-      "purchase", "prestige", "distill", "state_snapshot", "gift",
+      "purchase", "prestige", "distill", "state_snapshot", "gift", "gift_spawn", "gift_miss",
     ].includes(ev.type);
 
     let details = "";
@@ -148,7 +165,11 @@ export function computeRunAnalysis(events) {
     } else if (ev.type === "state_snapshot") {
       details = ev.payload.reason || "";
     } else if (ev.type === "gift") {
-      details = `🎁 ${ev.payload.text || ev.payload.effectId || ""}`;
+      details = `🎁 ✓ ${ev.payload.text || ev.payload.effectId || ""}`;
+    } else if (ev.type === "gift_spawn") {
+      details = `🎁 spawned (#${ev.payload.giftId || "?"})`;
+    } else if (ev.type === "gift_miss") {
+      details = `🎁 missed (#${ev.payload.giftId || "?"})`;
     }
 
     timelineRows.push({
@@ -365,9 +386,13 @@ export function initAnalyzerView({ onBack, captureSnapshot }) {
     const markers = currentAnalysis.giftMarkers || [];
     for (const m of markers) {
       const x = PAD + ((m.tRelSec - t0) / tSpan) * plotW;
-      const color = m.negative ? "#e06c75" : "#e8a438";
-      giftLines += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H - PAD}" stroke="${color}" stroke-width="1" stroke-dasharray="4,2" opacity="0.6" />`;
+      const color = m.clicked ? (m.negative ? "#e06c75" : "#e8a438") : "#555";
+      const opacity = m.clicked ? "0.6" : "0.3";
+      giftLines += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H - PAD}" stroke="${color}" stroke-width="1" stroke-dasharray="4,2" opacity="${opacity}" />`;
       giftLines += `<text x="${x}" y="${PAD - 4}" text-anchor="middle" fill="${color}" font-size="10">🎁</text>`;
+      if (m.clicked) {
+        giftLines += `<text x="${x}" y="${PAD - 14}" text-anchor="middle" fill="#7ec87e" font-size="10">✓</text>`;
+      }
     }
 
     chartSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -408,7 +433,7 @@ export function initAnalyzerView({ onBack, captureSnapshot }) {
     for (const row of rows) {
       if (filter === "key" && !row.isKey) continue;
       if (filter === "purchases" && row.type !== "purchase") continue;
-      if (filter === "gifts" && row.type !== "gift") continue;
+      if (filter === "gifts" && !["gift", "gift_spawn", "gift_miss"].includes(row.type)) continue;
       if (filter === "progression" && !["state_snapshot", "prestige", "distill"].includes(row.type)) continue;
 
       const tr = document.createElement("tr");

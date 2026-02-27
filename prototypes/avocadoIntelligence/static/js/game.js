@@ -146,6 +146,7 @@ let idlePromptShowing = false;
 // --- Wrapped Gift tracking (session-only, not persisted) ---
 let lastGiftSpawnTime = 0;
 let activeGiftElements = [];
+let nextGiftId = 1;
 
 // --- DOM ---
 const gameTitleEl = document.getElementById("game-title");
@@ -1666,6 +1667,11 @@ function spawnGift(now) {
   el.style.left = `${vw * 0.1 + Math.random() * vw * 0.8}px`;
   el.style.top = `${vh * 0.1 + Math.random() * vh * 0.8}px`;
 
+  const giftId = nextGiftId++;
+  el.dataset.giftId = giftId;
+
+  SessionLog.record("gift_spawn", { giftId });
+
   const totalLifetime = cfg.spawnInDuration + cfg.breatheDuration + cfg.fadeOutDuration;
 
   // Transition to breathing after spawn-in
@@ -1680,7 +1686,7 @@ function spawnGift(now) {
 
   // Remove after total lifetime
   const removeTimer = setTimeout(() => {
-    removeGiftElement(el);
+    removeGiftElement(el, "missed");
   }, totalLifetime);
 
   el.addEventListener("click", (e) => {
@@ -1695,13 +1701,18 @@ function spawnGift(now) {
   activeGiftElements.push(el);
 }
 
-function removeGiftElement(el) {
+function removeGiftElement(el, reason) {
+  const giftId = Number(el.dataset.giftId) || 0;
+  if (reason === "missed" && giftId) {
+    SessionLog.record("gift_miss", { giftId });
+  }
   if (el.parentNode) el.parentNode.removeChild(el);
   activeGiftElements = activeGiftElements.filter(g => g !== el);
 }
 
 function onGiftClick(giftEl, spawnTime) {
   const now = Date.now();
+  const giftId = Number(giftEl.dataset.giftId) || 0;
   const pool = Calc.getGiftEffectPool(TUNING.wrappedGift.effects, state.wisdomUnlocks);
   if (pool.length === 0) {
     removeGiftElement(giftEl);
@@ -1723,10 +1734,10 @@ function onGiftClick(giftEl, spawnTime) {
   removeGiftElement(giftEl);
 
   // Apply effect
-  applyGiftEffect(effectId, effectCfg, now, giftX, giftY);
+  applyGiftEffect(effectId, effectCfg, now, giftX, giftY, giftId);
 }
 
-function applyGiftEffect(effectId, cfg, now, x, y) {
+function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   let arrow = "";
   let arrowClass = "";
 
@@ -1777,7 +1788,7 @@ function applyGiftEffect(effectId, cfg, now, x, y) {
     logDetail = ` (+${cfg.apsSeconds || 60}s of APS)`;
   }
   logLine(`\u{1f381} ${cfg.text}${logDetail}`);
-  SessionLog.record("gift", { effectId, text: cfg.text, negative: !!cfg.negative });
+  SessionLog.record("gift", { giftId, effectId, text: cfg.text, negative: !!cfg.negative });
 
   saveGame();
   updateUI();
