@@ -1351,15 +1351,22 @@ function renderPrestigeWisdomUnlocks(availableWisdom) {
           <span class="muted">Owned</span>
         `;
       } else if (cfg.autoGrant) {
-        // Auto-granted nodes show a special badge instead of buy button
-        row.classList.add("owned");
+        // Auto-granted nodes — show a "Free" button to claim in overlay
         row.innerHTML = `
           <div class="wisdom-node-info">
             <div class="wisdom-node-title">${cfg.title}</div>
             <div class="wisdom-node-desc">${cfg.desc}</div>
           </div>
-          <span class="muted">Free on prestige</span>
         `;
+        const btn = document.createElement("button");
+        btn.className = "btn upgrade-buy";
+        btn.type = "button";
+        btn.textContent = "Free";
+        btn.addEventListener("click", () => {
+          overlayPurchases[id] = true;
+          renderPrestigeWisdomUnlocks(availableWisdom);
+        });
+        row.appendChild(btn);
       } else if (!prereqMet) {
         row.classList.add("locked");
         const parentCfg = TUNING.wisdomUnlocks[cfg.requires];
