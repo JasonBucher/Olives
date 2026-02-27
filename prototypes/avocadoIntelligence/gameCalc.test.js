@@ -7,14 +7,14 @@ import {
   calcGuacMultiplier, calcGuacConsumption, calcGuacProduction,
   calcEffectiveConsumeExponent, calcEffectiveProduceExponent,
   calcEffectiveBaseProduction,
-  calcBenchmarkBonus,
+  calcAchievementBonus,
   calcDistillationCost, canDistill, calcDistillationBonus,
   calcSynergyMultiplier,
   // Wisdom tree functions
   isWisdomUnlockAvailable, getWisdomNodeDepth,
   calcWisdomEffect, calcWisdomEffectAggregate,
   calcWisdomProducerCostMult, calcWisdomClickMult, calcWisdomGlobalApsMult,
-  calcWisdomBenchmarkBonusMult, calcWisdomGuacCoeffBonus,
+  calcWisdomAchievementBonusMult, calcWisdomGuacCoeffBonus,
   calcWisdomDistillCostMult, calcWisdomDistillBonusMult,
   calcWisdomResearchCostMult,
   calcPrestigeThreshold, calcStartingResources,
@@ -78,9 +78,11 @@ const tuning = {
     superlinear_synth:  { cost: 100000, guacUnlockAt: 25,  produceExpDelta: +0.05 },
     exponential_ripen:  { cost: 500000, guacUnlockAt: 100, produceExpDelta: +0.10 },
     concentrate_proto:  { cost: 200000, unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5 },
-    throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03 },
-    throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  apsPctPerClick: 0.06 },
-    throughput_click_3: { cost: 50000, apsUnlockAt: 100, apsPctPerClick: 0.10 },
+    throughput_click_1: { cost: 500,     apsUnlockAt: 1,     apsPctPerClick: 0.05 },
+    throughput_click_2: { cost: 5000,   apsUnlockAt: 10,   apsPctPerClick: 0.10 },
+    throughput_click_3: { cost: 50000,  apsUnlockAt: 100,  apsPctPerClick: 0.15 },
+    throughput_click_4: { cost: 500000, apsUnlockAt: 1000, apsPctPerClick: 0.20 },
+    throughput_click_5: { cost: 5000000, apsUnlockAt: 10000, apsPctPerClick: 0.25 },
     attention_focus:    { cost: 3218171,   unlockAt: 5,  producerId: "attention_head", prodMult: 2 },
     transformer_scale:  { cost: 603407156, unlockAt: 5,  producerId: "transformer", prodMult: 2 },
     seed_catalog:       { cost: 140,       unlockAt: 5,  producerId: "seed_bank", prodMult: 2 },
@@ -108,12 +110,14 @@ const tuning = {
     syn_drone_orchard:      { cost: 500000, synergySource: "drone",          synergyTarget: "orchard_row", synergyPct: 0.04, sourceReq: 3, targetReq: 5 },
     syn_gpu_data:           { cost: 40e12,  synergySource: "gpu_cluster",    synergyTarget: "data_grove",  synergyPct: 0.02, sourceReq: 1, targetReq: 3 },
   },
-  benchmarks: {
+  achievements: {
     hello_world:      { title: "Hello, World", globalMult: 0.02 },
     overfitting:      { title: "Overfitting",  clickMult: 0.05 },
     guac_online:      { title: "Guac Online",  guacProdMult: 0.05 },
     loss_convergence: { title: "Loss Convergence", guacMult: 0.03 },
     convergence:      { title: "Convergence",  wisdomMult: 0.05 },
+    first_pick:       { title: "First Pick",   baseClickBonus: 1 },
+    thousand_clicks:  { title: "Keyboard Warrior", baseClickBonus: 5 },
     no_bonus:         { title: "No Bonus" },
   },
   prestige: {
@@ -149,7 +153,7 @@ const tuning = {
     backpropagation:      { wisdomCost: 2, requires: null, branch: "neural_arch", title: "Backpropagation", desc: "+5%", effect: { globalApsMult: 1.05 } },
     weight_initialization: { wisdomCost: 4, requires: "backpropagation", branch: "neural_arch", title: "Weight Init", desc: "+10%", effect: { globalApsMult: 1.10 } },
     batch_normalization:  { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch", title: "Batch Norm", desc: "+20%", effect: { globalApsMult: 1.20 } },
-    dropout_prevention:   { wisdomCost: 5, requires: "backpropagation", branch: "neural_arch", title: "Dropout Prevention", desc: "Bench +25%", effect: { benchmarkBonusMult: 1.25 } },
+    dropout_prevention:   { wisdomCost: 5, requires: "backpropagation", branch: "neural_arch", title: "Dropout Prevention", desc: "Bench +25%", effect: { achievementBonusMult: 1.25 } },
     gradient_clipping:    { wisdomCost: 8, requires: "backpropagation", branch: "neural_arch", title: "Gradient Clipping", desc: "Research -10%", effect: { researchCostMult: 0.90 } },
     adaptive_learning:    { wisdomCost: 20, requires: "gradient_clipping", branch: "neural_arch", title: "Adaptive Learning", desc: "Research -20%", effect: { researchCostMult: 0.80 } },
     // Training Data
@@ -645,9 +649,9 @@ describe("calcTotalAps", () => {
     expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(1 * 2.0 * guacMult);
   });
 
-  it("applies benchmark global multiplier", () => {
+  it("applies achievement global multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1, benchmark global = 1 + 0.02 = 1.02, total = 1 * 1.02 = 1.02
+    // base = 1, achievement global = 1 + 0.02 = 1.02, total = 1 * 1.02 = 1.02
     expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.02);
   });
 });
@@ -689,12 +693,14 @@ describe("calcClickPower", () => {
   });
 
   it("adds base APS percentage from throughput_click_1", () => {
-    expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 100, tuning)).toBe(4);
+    // 1 + 100 * 0.05 = 6
+    expect(calcClickPower({ throughput_click_1: true }, noProducers, 0, 0, 100, tuning)).toBe(6);
   });
 
   it("highest throughput tier wins (not additive)", () => {
     const upgrades = { throughput_click_1: true, throughput_click_2: true, throughput_click_3: true };
-    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(11);
+    // 1 + 100 * 0.15 = 16
+    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(16);
   });
 
   it("throughput bonus is zero when baseAps is zero", () => {
@@ -772,8 +778,8 @@ describe("calcWisdomBonus", () => {
     expect(calcWisdomBonus(0, { wisdom_boost: true }, tuning)).toBe(1);
   });
 
-  it("applies benchmark wisdom effectiveness bonus", () => {
-    // convergence benchmark: wisdomMult = 0.05
+  it("applies achievement wisdom effectiveness bonus", () => {
+    // convergence achievement: wisdomMult = 0.05
     // mult = 0.10 * 1.05 = 0.105
     // 1 + 10 * 0.105 = 2.05
     expect(calcWisdomBonus(10, {}, tuning, { convergence: true })).toBeCloseTo(2.05);
@@ -940,11 +946,11 @@ describe("calcGuacProduction — effective tuning", () => {
   });
 });
 
-// ---------- Benchmark bonus tests ----------
+// ---------- Achievement bonus tests ----------
 
-describe("calcBenchmarkBonus", () => {
-  it("returns all-1 multipliers with no benchmarks", () => {
-    const b = calcBenchmarkBonus({}, tuning);
+describe("calcAchievementBonus", () => {
+  it("returns all-1 multipliers with no achievements", () => {
+    const b = calcAchievementBonus({}, tuning);
     expect(b.globalMult).toBe(1);
     expect(b.clickMult).toBe(1);
     expect(b.guacProdMult).toBe(1);
@@ -952,42 +958,64 @@ describe("calcBenchmarkBonus", () => {
     expect(b.wisdomMult).toBe(1);
   });
 
-  it("sums global multiplier from benchmarks", () => {
-    const b = calcBenchmarkBonus({ hello_world: true }, tuning);
+  it("sums global multiplier from achievements", () => {
+    const b = calcAchievementBonus({ hello_world: true }, tuning);
     expect(b.globalMult).toBeCloseTo(1.02);
   });
 
   it("sums click multiplier", () => {
-    const b = calcBenchmarkBonus({ overfitting: true }, tuning);
+    const b = calcAchievementBonus({ overfitting: true }, tuning);
     expect(b.clickMult).toBeCloseTo(1.05);
   });
 
   it("sums guac production multiplier", () => {
-    const b = calcBenchmarkBonus({ guac_online: true }, tuning);
+    const b = calcAchievementBonus({ guac_online: true }, tuning);
     expect(b.guacProdMult).toBeCloseTo(1.05);
   });
 
   it("sums guac multiplier", () => {
-    const b = calcBenchmarkBonus({ loss_convergence: true }, tuning);
+    const b = calcAchievementBonus({ loss_convergence: true }, tuning);
     expect(b.guacMult).toBeCloseTo(1.03);
   });
 
   it("sums wisdom multiplier", () => {
-    const b = calcBenchmarkBonus({ convergence: true }, tuning);
+    const b = calcAchievementBonus({ convergence: true }, tuning);
     expect(b.wisdomMult).toBeCloseTo(1.05);
   });
 
-  it("ignores benchmarks with no bonus", () => {
-    const b = calcBenchmarkBonus({ no_bonus: true }, tuning);
+  it("ignores achievements with no bonus", () => {
+    const b = calcAchievementBonus({ no_bonus: true }, tuning);
     expect(b.globalMult).toBe(1);
     expect(b.clickMult).toBe(1);
   });
 
-  it("stacks multiple benchmarks", () => {
-    const b = calcBenchmarkBonus({ hello_world: true, overfitting: true, convergence: true }, tuning);
+  it("stacks multiple achievements", () => {
+    const b = calcAchievementBonus({ hello_world: true, overfitting: true, convergence: true }, tuning);
     expect(b.globalMult).toBeCloseTo(1.02);
     expect(b.clickMult).toBeCloseTo(1.05);
     expect(b.wisdomMult).toBeCloseTo(1.05);
+  });
+
+  it("sums baseClickBonus from achievements", () => {
+    const b = calcAchievementBonus({ first_pick: true }, tuning);
+    expect(b.baseClickBonus).toBe(1);
+  });
+
+  it("stacks multiple baseClickBonus achievements", () => {
+    const b = calcAchievementBonus({ first_pick: true, thousand_clicks: true }, tuning);
+    expect(b.baseClickBonus).toBe(6); // 1 + 5
+  });
+
+  it("returns 0 baseClickBonus with no achievements", () => {
+    const b = calcAchievementBonus({}, tuning);
+    expect(b.baseClickBonus).toBe(0);
+  });
+
+  it("amplifies baseClickBonus with wisdom tree achievement bonus mult", () => {
+    const wUnlocks = { backpropagation: true, dropout_prevention: true };
+    const b = calcAchievementBonus({ first_pick: true }, tuning, wUnlocks);
+    // 1 * 1.25 = 1.25
+    expect(b.baseClickBonus).toBeCloseTo(1.25);
   });
 });
 
@@ -1404,13 +1432,13 @@ describe("calcWisdomGlobalApsMult", () => {
   });
 });
 
-describe("calcWisdomBenchmarkBonusMult", () => {
+describe("calcWisdomAchievementBonusMult", () => {
   it("returns 1 with no wisdom unlocks", () => {
-    expect(calcWisdomBenchmarkBonusMult({}, tuning)).toBe(1);
+    expect(calcWisdomAchievementBonusMult({}, tuning)).toBe(1);
   });
 
   it("returns 1.25 with dropout_prevention", () => {
-    expect(calcWisdomBenchmarkBonusMult({ backpropagation: true, dropout_prevention: true }, tuning)).toBe(1.25);
+    expect(calcWisdomAchievementBonusMult({ backpropagation: true, dropout_prevention: true }, tuning)).toBe(1.25);
   });
 });
 
@@ -1715,16 +1743,16 @@ describe("calcGuacMultiplier — with wisdom tree", () => {
   });
 });
 
-describe("calcBenchmarkBonus — with wisdom tree", () => {
-  it("amplifies benchmark bonuses with dropout_prevention", () => {
+describe("calcAchievementBonus — with wisdom tree", () => {
+  it("amplifies achievement bonuses with dropout_prevention", () => {
     const wUnlocks = { backpropagation: true, dropout_prevention: true };
-    const b = calcBenchmarkBonus({ hello_world: true }, tuning, wUnlocks);
+    const b = calcAchievementBonus({ hello_world: true }, tuning, wUnlocks);
     // globalMult: 1 + 0.02 * 1.25 = 1.025 (vs 1.02 without)
     expect(b.globalMult).toBeCloseTo(1.025);
   });
 
   it("returns normal bonuses without wisdom tree", () => {
-    const b = calcBenchmarkBonus({ hello_world: true }, tuning);
+    const b = calcAchievementBonus({ hello_world: true }, tuning);
     expect(b.globalMult).toBeCloseTo(1.02);
   });
 });
@@ -1875,6 +1903,43 @@ describe("gate node effects — curriculum_learning baseClickBonus", () => {
 
   it("no bonus without wisdom unlock", () => {
     expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, {})).toBe(1);
+  });
+
+  it("achievement baseClickBonus adds to base before multipliers", () => {
+    // first_pick: baseClickBonus 1 → base = 1 + 1 = 2
+    expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, { first_pick: true })).toBe(2);
+  });
+
+  it("achievement baseClickBonus stacks with wisdom baseClickBonus", () => {
+    const wUnlocks = { curriculum_learning: true };
+    // base = 1 + 1 (wisdom) + 1 (achievement) = 3
+    expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, { first_pick: true }, wUnlocks)).toBe(3);
+  });
+
+  it("achievement baseClickBonus is multiplied by click upgrades", () => {
+    // base = 1 + 5 (thousand_clicks) = 6, * 2 (strong_thumb) = 12
+    expect(calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning, { thousand_clicks: true })).toBe(12);
+  });
+
+  it("multiple achievement baseClickBonus stack additively", () => {
+    // base = 1 + 1 + 5 = 7
+    expect(calcClickPower({}, noProducers, 0, 0, 0, tuning, { first_pick: true, thousand_clicks: true })).toBe(7);
+  });
+});
+
+describe("calcClickPower — throughput tiers IV and V", () => {
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("throughput_click_4 adds 20% of base APS", () => {
+    const upgrades = { throughput_click_1: true, throughput_click_2: true, throughput_click_3: true, throughput_click_4: true };
+    // 1 + 100 * 0.20 = 21
+    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(21);
+  });
+
+  it("throughput_click_5 adds 25% of base APS", () => {
+    const upgrades = { throughput_click_1: true, throughput_click_2: true, throughput_click_3: true, throughput_click_4: true, throughput_click_5: true };
+    // 1 + 100 * 0.25 = 26
+    expect(calcClickPower(upgrades, noProducers, 0, 0, 100, tuning)).toBe(26);
   });
 });
 
@@ -2056,22 +2121,22 @@ describe("gift buffs integration with calcTotalAps / calcClickPower", () => {
   const upgrades = {};
   const wisdom = 0;
   const guacCount = 0;
-  const benchmarks = {};
+  const achievements = {};
   const wisdomUnlocks = {};
   const activeRegimens = [];
 
   it("APS doubles with an active ×2 APS buff", () => {
     const now = 10000;
-    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
-    const buffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens);
+    const buffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens,
       [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 20000 }], now);
     expect(buffedAps).toBeCloseTo(baseAps * 2);
   });
 
   it("APS halves with an active ×0.5 APS debuff", () => {
     const now = 10000;
-    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
-    const debuffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens);
+    const debuffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens,
       [{ id: "aps_drain", field: "aps", multiplier: 0.5, expiresAt: 20000 }], now);
     expect(debuffedAps).toBeCloseTo(baseAps * 0.5);
   });
@@ -2079,24 +2144,24 @@ describe("gift buffs integration with calcTotalAps / calcClickPower", () => {
   it("click power triples with an active ×3 click buff", () => {
     const now = 10000;
     const baseAps = calcBaseAps(producers, upgrades, tuning);
-    const baseClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens);
-    const buffedClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+    const baseClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens);
+    const buffedClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens,
       [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 20000 }], now);
     expect(buffedClick).toBeCloseTo(baseClick * 3);
   });
 
   it("expired gift buffs have no effect on APS", () => {
     const now = 10000;
-    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
-    const expiredAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens);
+    const expiredAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens,
       [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }], now);
     expect(expiredAps).toBeCloseTo(baseAps);
   });
 
   it("empty activeGiftBuffs array has no effect", () => {
     const now = 10000;
-    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
-    const withEmpty = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens, [], now);
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens);
+    const withEmpty = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens, [], now);
     expect(withEmpty).toBeCloseTo(baseAps);
   });
 });

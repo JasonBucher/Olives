@@ -1,11 +1,12 @@
 // Avocado Intelligence — main game loop and state
 
-import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER, WISDOM_BRANCH_ORDER } from "./tuning.js";
+import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER, WISDOM_BRANCH_ORDER, ACHIEVEMENT_CATEGORIES } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
-import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
+import { checkAchievements, ACHIEVEMENT_ORDER } from "./achievements.js";
 import SessionLog from "./sessionLog.js";
 import { initAnalyzerView } from "./views/analyzerView.js";
+import { initAchievementsView } from "./views/achievementsView.js";
 
 const STORAGE_PREFIX = "AVO_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -21,7 +22,7 @@ const PERSISTED_STATE_KEYS = [
   "wisdom",
   "wisdomUnlocks",
   "prestigeCount",
-  "benchmarks",
+  "achievements",
   "totalWisdomEarned",
   "modelVersion",
   "distillationCount",
@@ -30,6 +31,11 @@ const PERSISTED_STATE_KEYS = [
   "persistentUpgrades",
   "activeGiftBuffs",
   "freeNextPurchase",
+  "totalClicksAllTime",
+  "totalGiftsOpened",
+  "giftEffectsSeen",
+  "unlockedThemes",
+  "activeTheme",
   "meta",
 ];
 
@@ -49,7 +55,7 @@ function createDefaultState() {
     wisdom: 0,
     wisdomUnlocks: {},
     prestigeCount: 0,
-    benchmarks: {},
+    achievements: {},
     totalWisdomEarned: 0,
     modelVersion: 0,
     distillationCount: 0,
@@ -58,10 +64,21 @@ function createDefaultState() {
     persistentUpgrades: [],
     activeGiftBuffs: [],
     freeNextPurchase: false,
+    totalClicksAllTime: 0,
+    totalGiftsOpened: 0,
+    giftEffectsSeen: {},
+    unlockedThemes: ["default"],
+    activeTheme: "default",
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
     lastClickTimestamps: [],
+
+    // Quirky achievement tracking (transient — not persisted)
+    _clickFrenzyTriggered: false,
+    _idleAchievementTriggered: false,
+    _konamiTriggered: false,
+    newAchievementIds: new Set(),
 
     meta: {
       createdAt: null,
@@ -184,9 +201,10 @@ const prestigeRebornBtn = document.getElementById("prestige-reborn-btn");
 // Distillation UI (inside prestige overlay)
 const prestigeDistillationEl = document.getElementById("prestige-distillation");
 
-// Benchmarks UI
-const benchmarksListEl = document.getElementById("benchmarks-list");
-const benchmarksCounterEl = document.getElementById("benchmarks-counter");
+// Achievements UI
+const achievementsBtnEl = document.getElementById("achievements-btn");
+const achievementsBadgeEl = document.getElementById("achievements-badge");
+const achievementsScreenEl = document.getElementById("achievements-screen");
 
 // Debug UI
 const debugBtn = document.getElementById("debug-btn");
@@ -199,16 +217,16 @@ const debugAdd100kAvocadosBtn = document.getElementById("debug-add-100k-avocados
 const debugAdd1mAvocadosBtn = document.getElementById("debug-add-1m-avocados-btn");
 const debugAddWisdomBtn = document.getElementById("debug-add-wisdom-btn");
 
-// --- View switching (game vs analyzer) ---
+// --- View switching (game vs analyzer vs achievements) ---
 const gameRootEl = document.getElementById("game-root");
 const analyzerScreenEl = document.getElementById("analyzer-screen");
 const analyzerBtn = document.getElementById("analyzer-btn");
 let activeView = "game";
 
 function renderActiveView() {
-  const isAnalyzer = activeView === "analyzer";
-  gameRootEl?.classList.toggle("is-hidden", isAnalyzer);
-  analyzerScreenEl?.classList.toggle("is-hidden", !isAnalyzer);
+  gameRootEl?.classList.toggle("is-hidden", activeView !== "game");
+  analyzerScreenEl?.classList.toggle("is-hidden", activeView !== "analyzer");
+  achievementsScreenEl?.classList.toggle("is-hidden", activeView !== "achievements");
 }
 
 function openAnalyzer() {
@@ -222,10 +240,23 @@ function closeAnalyzer() {
   renderActiveView();
 }
 
+function openAchievements() {
+  activeView = "achievements";
+  renderActiveView();
+  achievementsView?.render(state);
+}
+
+function closeAchievements() {
+  activeView = "game";
+  state.newAchievementIds.clear();
+  updateAchievementBadge();
+  renderActiveView();
+}
+
 // --- Telemetry helpers ---
 function captureStateSnapshot(reason = "tick") {
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
   aps *= distBonus.apsMult * distBonus.allProdMult;
 
   SessionLog.record("state_snapshot", {
@@ -275,13 +306,23 @@ function loadGame() {
       producers: { ...defaults.producers, ...(persisted.producers || {}) },
       upgrades: { ...(persisted.upgrades || {}) },
       wisdomUnlocks: { ...(persisted.wisdomUnlocks || {}) },
-      benchmarks: { ...(persisted.benchmarks || {}) },
+      achievements: { ...(persisted.achievements || {}) },
       activeRegimens: persisted.activeRegimens || [],
       persistentUpgrades: persisted.persistentUpgrades || [],
       activeGiftBuffs: persisted.activeGiftBuffs || [],
       freeNextPurchase: persisted.freeNextPurchase || false,
+      totalClicksAllTime: persisted.totalClicksAllTime || 0,
+      totalGiftsOpened: persisted.totalGiftsOpened || 0,
+      giftEffectsSeen: { ...(persisted.giftEffectsSeen || {}) },
+      unlockedThemes: persisted.unlockedThemes || ["default"],
+      activeTheme: persisted.activeTheme || "default",
       meta: { ...defaults.meta, ...(persisted.meta || {}) },
     };
+
+    // --- Migration: benchmarks → achievements ---
+    if (persisted.benchmarks && !persisted.achievements) {
+      state.achievements = { ...persisted.benchmarks };
+    }
 
     // --- Migration: guac_unlock → guac_protocol wisdom unlock ---
     if ((state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock) && !state.wisdomUnlocks.guac_protocol) {
@@ -553,74 +594,22 @@ function renderDistillation() {
     const earned = i < mv;
     const isNext = i === mv && dc < maxDistills;
     const row = document.createElement("div");
-    row.className = `benchmark-row ${earned ? "earned" : "hint"}`;
+    row.className = `achievement-row ${earned ? "earned" : "hint"}`;
     let prefix = earned ? "\u2713" : (isNext ? "\u2190 next" : "");
-    row.innerHTML = `<strong>v${i + 1}.0</strong> ${prefix ? `<span class="${earned ? "benchmark-check" : "muted"}">${prefix}</span>` : ""} <span class="muted">${b.desc}</span>`;
+    row.innerHTML = `<strong>v${i + 1}.0</strong> ${prefix ? `<span class="${earned ? "achievement-check" : "muted"}">${prefix}</span>` : ""} <span class="muted">${b.desc}</span>`;
     prestigeDistillationEl.appendChild(row);
   }
 }
 
-// --- Benchmarks Rendering ---
-const BENCHMARK_PHASES = ["Early", "Mid", "Prestige", "Endgame"];
-
-function renderBenchmarks() {
-  if (!benchmarksListEl) return;
-  benchmarksListEl.innerHTML = "";
-  const total = BENCHMARK_ORDER.length;
-  let earned = 0;
-  let hintCount = 0;
-
-  // Count earned
-  for (const id of BENCHMARK_ORDER) {
-    if (state.benchmarks[id]) earned++;
-  }
-
-  // Group benchmarks by phase
-  for (const phase of BENCHMARK_PHASES) {
-    const phaseIds = BENCHMARK_ORDER.filter(id => TUNING.benchmarks[id].phase === phase);
-    if (phaseIds.length === 0) continue;
-
-    const phaseEarned = phaseIds.filter(id => state.benchmarks[id]).length;
-    const phaseTotal = phaseIds.length;
-    const allEarned = phaseEarned === phaseTotal;
-
-    // Phase header
-    const header = document.createElement("div");
-    header.className = "benchmark-phase-header";
-    header.innerHTML = `<span>${phase}</span> <span class="muted">${phaseEarned}/${phaseTotal}</span>`;
-    if (allEarned) header.classList.add("complete");
-    benchmarksListEl.appendChild(header);
-
-    // Phase content — earned benchmarks collapsed if all earned, else show earned + hints
-    for (const id of phaseIds) {
-      const cfg = TUNING.benchmarks[id];
-      const isEarned = !!state.benchmarks[id];
-
-      if (isEarned) {
-        // If all earned in this phase, skip individual display
-        if (allEarned) continue;
-        const row = document.createElement("div");
-        row.className = "benchmark-row earned";
-        let bonusText = "";
-        if (cfg.globalMult) bonusText = ` (+${Math.round(cfg.globalMult * 100)}% global)`;
-        if (cfg.clickMult) bonusText = ` (+${Math.round(cfg.clickMult * 100)}% click)`;
-        if (cfg.guacProdMult) bonusText = ` (+${Math.round(cfg.guacProdMult * 100)}% guac prod)`;
-        if (cfg.guacMult) bonusText = ` (+${Math.round(cfg.guacMult * 100)}% guac mult)`;
-        if (cfg.wisdomMult) bonusText = ` (+${Math.round(cfg.wisdomMult * 100)}% wisdom)`;
-        row.innerHTML = `<span class="benchmark-check">\u2713</span> <strong>${cfg.title}</strong>${bonusText}`;
-        benchmarksListEl.appendChild(row);
-      } else if (hintCount < 3) {
-        hintCount++;
-        const row = document.createElement("div");
-        row.className = "benchmark-row hint";
-        row.innerHTML = `<span class="benchmark-lock">?</span> ${cfg.desc}`;
-        benchmarksListEl.appendChild(row);
-      }
-    }
-  }
-
-  if (benchmarksCounterEl) {
-    benchmarksCounterEl.textContent = `${earned} / ${total}`;
+// --- Achievement badge update ---
+function updateAchievementBadge() {
+  if (!achievementsBadgeEl) return;
+  const count = state.newAchievementIds.size;
+  if (count > 0) {
+    achievementsBadgeEl.textContent = String(count);
+    achievementsBadgeEl.style.display = "";
+  } else {
+    achievementsBadgeEl.style.display = "none";
   }
 }
 
@@ -630,10 +619,10 @@ let tickCount = 0;
 function updateUI() {
   const now = Date.now();
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -663,7 +652,7 @@ function updateUI() {
   if (guacPsRowEl) {
     guacPsRowEl.style.display = (hasGuac && labs > 0) ? "" : "none";
     if (labs > 0 && guacPsEl) {
-      let guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
+      let guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.achievements, state.activeRegimens);
       const guacBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
       guacPerSec *= guacBuffs.guacMult;
       guacPsEl.textContent = Calc.formatNumber(guacPerSec);
@@ -677,14 +666,14 @@ function updateUI() {
   }
 
   // Total multiplier row — show all APS multipliers combined
-  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks);
-  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks, state.wisdomUnlocks);
-  const benchBonus = Calc.calcBenchmarkBonus(state.benchmarks, TUNING, state.wisdomUnlocks);
+  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.achievements, state.wisdomUnlocks);
+  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.achievements, state.wisdomUnlocks);
+  const achBonus = Calc.calcAchievementBonus(state.achievements, TUNING, state.wisdomUnlocks);
   let upgradeGlobalMult = 1;
   for (const [uid, ucfg] of Object.entries(TUNING.upgrades)) {
     if (ucfg.globalMult && state.upgrades[uid]) upgradeGlobalMult *= ucfg.globalMult;
   }
-  const totalMult = guacMult * wisdomMult * benchBonus.globalMult * upgradeGlobalMult * distBonus.apsMult * distBonus.allProdMult;
+  const totalMult = guacMult * wisdomMult * achBonus.globalMult * upgradeGlobalMult * distBonus.apsMult * distBonus.allProdMult;
   totalMultRowEl.style.display = totalMult > 1 ? "" : "none";
   if (totalMult > 1) {
     totalMultEl.textContent = `x${totalMult.toFixed(2)}`;
@@ -693,7 +682,7 @@ function updateUI() {
     if (guacMult > 1) lines.push(`Guacamole x${guacMult.toFixed(2)}`);
     if (wisdomMult > 1) lines.push(`Wisdom x${wisdomMult.toFixed(2)}`);
     if (upgradeGlobalMult > 1) lines.push(`Research x${upgradeGlobalMult.toFixed(2)}`);
-    if (benchBonus.globalMult > 1) lines.push(`Benchmarks x${benchBonus.globalMult.toFixed(2)}`);
+    if (achBonus.globalMult > 1) lines.push(`Achievements x${achBonus.globalMult.toFixed(2)}`);
     if (distBonus.apsMult > 1) lines.push(`Distillation APS x${distBonus.apsMult.toFixed(1)}`);
     if (distBonus.allProdMult > 1) lines.push(`Distillation Prod x${distBonus.allProdMult.toFixed(1)}`);
     if (totalMultTooltipEl) totalMultTooltipEl.textContent = lines.join("  ·  ");
@@ -910,7 +899,7 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
       }
       if (id === "guac_lab" && (state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock)) {
         const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
-        const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
+        const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.achievements, state.activeRegimens);
         rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
       }
       if (id === "guac_refinery") {
@@ -1027,18 +1016,37 @@ function dismissIdlePrompt() {
   }, { once: true });
 }
 
+// --- Click frenzy detection ---
+const recentClickTimesForFrenzy = [];
+
 function pickAvocado() {
   const clickNow = Date.now();
   lastClickTime = clickNow;
   if (idlePromptShowing) dismissIdlePrompt();
 
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
+  state.totalClicksAllTime = (state.totalClicksAllTime || 0) + 1;
   recordClick();
   spawnClickEmoji(power);
+
+  // Click frenzy detection (10+ clicks in 3 seconds)
+  recentClickTimesForFrenzy.push(clickNow);
+  while (recentClickTimesForFrenzy.length > 0 && clickNow - recentClickTimesForFrenzy[0] > 3000) {
+    recentClickTimesForFrenzy.shift();
+  }
+  if (recentClickTimesForFrenzy.length >= 10 && !state._clickFrenzyTriggered) {
+    state._clickFrenzyTriggered = true;
+    clickParticleEndTime = clickNow + 30000;
+  }
+
+  // Spawn avocado particles if click_frenzy_100 active
+  if (clickParticleEndTime > clickNow) {
+    spawnClickParticles(clickNow);
+  }
 
   // Flavor text (1-in-10 chance)
   if (Math.random() < 0.1) {
@@ -1049,8 +1057,27 @@ function pickAvocado() {
   updateUI();
 }
 
+// --- Click particles for click_frenzy_100 quirky achievement ---
+let clickParticleEndTime = 0;
+
+function spawnClickParticles() {
+  const btn = pickAvocadoBtn.getBoundingClientRect();
+  const count = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("div");
+    el.className = "click-particle";
+    el.textContent = "🥑";
+    el.style.left = `${btn.left + Math.random() * btn.width}px`;
+    el.style.top = `${btn.top + Math.random() * btn.height}px`;
+    el.style.setProperty("--dx", `${(Math.random() - 0.5) * 120}px`);
+    el.style.setProperty("--dy", `${-30 - Math.random() * 80}px`);
+    document.body.appendChild(el);
+    el.addEventListener("animationend", () => el.remove(), { once: true });
+  }
+}
+
 function confirmPrestigeAndDistill() {
-  if (!confirm("Compost AND Distill? This resets wisdom, producers, upgrades, and prestige count. Wisdom unlocks and benchmarks are kept. You gain a permanent Model Version upgrade.")) return;
+  if (!confirm("Compost AND Distill? This resets wisdom, producers, upgrades, and prestige count. Wisdom unlocks and achievements are kept. You gain a permanent Model Version upgrade.")) return;
 
   // First apply the prestige wisdom gain to totalWisdomSinceLastDistill
   const wisdomGain = overlayWisdomGain;
@@ -1059,7 +1086,7 @@ function confirmPrestigeAndDistill() {
 
   const newModelVersion = (state.modelVersion || 0) + 1;
   const newDistillationCount = (state.distillationCount || 0) + 1;
-  const keptBenchmarks = { ...state.benchmarks };
+  const keptAchievements = { ...state.achievements };
   const keptAllTime = state.totalAvocadosAllTime;
 
   // Full reset — wisdom unlocks persist through distillation (wisdom itself resets to 0,
@@ -1076,7 +1103,7 @@ function confirmPrestigeAndDistill() {
   state.wisdom = 0;
   state.wisdomUnlocks = keptWisdomUnlocks;
   state.prestigeCount = 0;
-  state.benchmarks = keptBenchmarks;
+  state.achievements = keptAchievements;
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = 0;
   state.modelVersion = newModelVersion;
@@ -1114,7 +1141,6 @@ function confirmPrestigeAndDistill() {
   buyQuantity = 1;
   guacBuyQuantity = 1;
   renderUpgradeList();
-  renderBenchmarks();
   renderRegimenSection();
   updateUI();
 }
@@ -1126,7 +1152,7 @@ function buyProducer(id) {
 
   // Guac lab gating — need enough APS to feed the lab
   if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
-    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
+    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
     if (currentAps < TUNING.guac.labUnlockAps) return;
   }
 
@@ -1535,7 +1561,7 @@ function confirmPrestige() {
   const newWisdom = state.wisdom + wisdomGain;
   const keptWisdomUnlocks = { ...state.wisdomUnlocks };
   const newPrestigeCount = (state.prestigeCount || 0) + 1;
-  const keptBenchmarks = { ...state.benchmarks };
+  const keptAchievements = { ...state.achievements };
   const newTotalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
   const newTotalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + wisdomGain;
 
@@ -1569,7 +1595,7 @@ function confirmPrestige() {
   state.wisdom = wisdomAfterPurchases;
   state.wisdomUnlocks = keptWisdomUnlocks; // persists through prestige
   state.prestigeCount = newPrestigeCount;
-  state.benchmarks = keptBenchmarks; // benchmarks persist forever
+  state.achievements = keptAchievements; // achievements persist forever
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = newTotalWisdomSinceLastDistill;
   state.activeRegimens = []; // reset regimens on prestige
@@ -1623,7 +1649,6 @@ function confirmPrestige() {
   buyQuantity = 1;
   guacBuyQuantity = 1;
   renderUpgradeList();
-  renderBenchmarks();
   renderRegimenSection();
   updateUI();
 }
@@ -1774,6 +1799,10 @@ function onGiftClick(giftEl, spawnTime) {
 }
 
 function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
+  state.totalGiftsOpened = (state.totalGiftsOpened || 0) + 1;
+  if (!state.giftEffectsSeen) state.giftEffectsSeen = {};
+  state.giftEffectsSeen[effectId] = true;
+
   let arrow = "";
   let arrowClass = "";
 
@@ -1798,7 +1827,7 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
     arrow = "\u25b2"; arrowClass = "gift-arrow-up";
   } else if (effectId === "avocado_rain") {
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
     aps *= distBonus.apsMult * distBonus.allProdMult;
     const grant = aps * (cfg.apsSeconds || 60);
     state.avocadoCount += grant;
@@ -1901,7 +1930,7 @@ function startLoop() {
 
     // Production
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
     aps *= distBonus.apsMult * distBonus.allProdMult;
     if (aps > 0) {
       const produced = aps * dt;
@@ -1924,7 +1953,7 @@ function startLoop() {
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
         // Guac produced proportional to actual vs desired consumption
-        let fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens) * dt;
+        let fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.achievements, state.activeRegimens) * dt;
         // Apply gift buff to guac production
         const guacGiftBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, now);
         fullGuac *= guacGiftBuffs.guacMult;
@@ -1938,7 +1967,7 @@ function startLoop() {
     }
 
     // Guac multiplier milestones (log every 0.25 increase)
-    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks);
+    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.achievements, state.wisdomUnlocks);
     const nextMilestone = lastGuacMultMilestone + 0.25;
     if (guacMult >= nextMilestone) {
       lastGuacMultMilestone = Math.floor(guacMult * 4) / 4; // snap to 0.25 grid
@@ -1956,16 +1985,31 @@ function startLoop() {
       }
     }
 
-    // Check benchmarks every 5th tick (~1/s)
+    // Idle achievement: 30 min with no clicks + APS > 0
+    if (aps > 0 && !state._idleAchievementTriggered && now - lastClickTime >= 1800000) {
+      state._idleAchievementTriggered = true;
+    }
+
+    // Check achievements every 5th tick (~1/s)
     if (tickCount % 5 === 0) {
-      const newBenchmarks = checkBenchmarks(state, aps);
-      for (const id of newBenchmarks) {
-        state.benchmarks[id] = true;
-        const cfg = TUNING.benchmarks[id];
-        logLine(`Benchmark: ${cfg.title}`);
+      const guacMultForCtx = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.achievements, state.wisdomUnlocks);
+      const newAchievements = checkAchievements(state, { aps, guacMult: guacMultForCtx });
+      for (const id of newAchievements) {
+        state.achievements[id] = true;
+        const cfg = TUNING.achievements[id];
+        logLine(`🏆 Achievement: ${cfg.title}`);
+        state.newAchievementIds.add(id);
+
+        // Handle quirky effects
+        if (cfg.quirkyEffect) {
+          handleQuirkyEffect(cfg.quirkyEffect, id);
+        }
       }
-      if (newBenchmarks.length > 0) {
-        renderBenchmarks();
+      if (newAchievements.length > 0) {
+        updateAchievementBadge();
+        if (activeView === "achievements") {
+          achievementsView?.render(state);
+        }
       }
     }
 
@@ -1997,6 +2041,106 @@ function startLoop() {
     updateUI();
   }, TUNING.production.tickMs);
 }
+
+// --- Quirky Achievement Effects ---
+function handleQuirkyEffect(effectType, achievementId) {
+  switch (effectType) {
+    case "theme_midnight":
+      if (!state.unlockedThemes.includes("midnight")) {
+        state.unlockedThemes.push("midnight");
+      }
+      break;
+    case "theme_sunset":
+      if (!state.unlockedThemes.includes("sunset")) {
+        state.unlockedThemes.push("sunset");
+      }
+      break;
+    case "theme_matrix":
+      if (!state.unlockedThemes.includes("matrix")) {
+        state.unlockedThemes.push("matrix");
+      }
+      break;
+    case "speed_lines":
+      document.querySelector(".pick-wrapper")?.classList.add("speed-active");
+      break;
+    case "click_particles":
+      clickParticleEndTime = Date.now() + 30000;
+      break;
+    case "title_afk":
+      if (gameTitleEl) {
+        gameTitleEl.textContent = "Avocado (AFK Mode)";
+        document.title = "Avocado (AFK Mode)";
+        setTimeout(() => {
+          const normal = (state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado";
+          gameTitleEl.textContent = normal;
+          document.title = normal;
+        }, 60000);
+      }
+      break;
+    case "title_contra":
+      if (gameTitleEl) {
+        gameTitleEl.textContent = "Contra Avocado";
+        document.title = "Contra Avocado";
+        setTimeout(() => {
+          const normal = (state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado";
+          gameTitleEl.textContent = normal;
+          document.title = normal;
+        }, 10000);
+      }
+      break;
+    case "title_permanent":
+      if (gameTitleEl) {
+        gameTitleEl.textContent = "Avocado Intelligence";
+        document.title = "Avocado Intelligence";
+      }
+      break;
+  }
+  saveGame();
+}
+
+// --- Theme System ---
+function applyTheme(themeId) {
+  const theme = TUNING.themes[themeId];
+  if (!theme) return;
+  const root = document.documentElement;
+  // Reset to defaults first
+  if (themeId === "default") {
+    root.style.removeProperty("--bg");
+    root.style.removeProperty("--panel");
+    root.style.removeProperty("--primary");
+    root.style.removeProperty("--text");
+    root.style.removeProperty("--muted");
+  } else {
+    for (const [prop, value] of Object.entries(theme)) {
+      root.style.setProperty(prop, value);
+    }
+  }
+  state.activeTheme = themeId;
+  saveGame();
+}
+
+// --- Konami Code ---
+const KONAMI_SEQUENCE = [
+  "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+  "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight",
+  "KeyB", "KeyA",
+];
+let konamiProgress = 0;
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === KONAMI_SEQUENCE[konamiProgress]) {
+    konamiProgress++;
+    if (konamiProgress === KONAMI_SEQUENCE.length) {
+      konamiProgress = 0;
+      if (!state._konamiTriggered) {
+        state._konamiTriggered = true;
+        logLine("🕹️ ↑↑↓↓←→←→BA — Konami code activated!");
+      }
+    }
+  } else {
+    konamiProgress = e.code === KONAMI_SEQUENCE[0] ? 1 : 0;
+  }
+});
 
 // --- Debug Modal ---
 function openDebug() {
@@ -2057,7 +2201,7 @@ function renderBonusesModal() {
     const boostExtra = hasWisdomBoost ? 0.05 : 0;
     const effectivePerPoint = perPoint + boostExtra;
     addRow(sec, "Per-Point Bonus", `+${Math.round(effectivePerPoint * 100)}% each${hasWisdomBoost ? " (includes AGI)" : ""}`);
-    const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks, state.wisdomUnlocks);
+    const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.achievements, state.wisdomUnlocks);
     addRow(sec, "Total Wisdom Multiplier", `x${wisdomMult.toFixed(2)}`);
   }
 
@@ -2129,12 +2273,12 @@ function renderBonusesModal() {
     }
   }
 
-  // 4. Benchmarks
-  const earnedBenchmarks = BENCHMARK_ORDER.filter(id => state.benchmarks[id]);
-  if (earnedBenchmarks.length > 0) {
-    const sec = addSection("Benchmarks");
-    for (const id of earnedBenchmarks) {
-      const cfg = TUNING.benchmarks[id];
+  // 4. Achievements
+  const earnedAchievements = ACHIEVEMENT_ORDER.filter(id => state.achievements[id]);
+  if (earnedAchievements.length > 0) {
+    const sec = addSection("Achievements");
+    for (const id of earnedAchievements) {
+      const cfg = TUNING.achievements[id];
       let bonusText = "";
       if (cfg.globalMult) bonusText = `+${Math.round(cfg.globalMult * 100)}% global`;
       if (cfg.clickMult) bonusText = `+${Math.round(cfg.clickMult * 100)}% click`;
@@ -2214,6 +2358,7 @@ prestigeOverlay.addEventListener("click", (e) => {
 });
 
 if (analyzerBtn) analyzerBtn.addEventListener("click", openAnalyzer);
+if (achievementsBtnEl) achievementsBtnEl.addEventListener("click", openAchievements);
 
 debugBtn.addEventListener("click", openDebug);
 debugCloseBtn.addEventListener("click", closeDebug);
@@ -2292,14 +2437,28 @@ const analyzerView = initAnalyzerView({
   captureSnapshot: (reason) => captureStateSnapshot(reason),
 });
 
+const achievementsView = initAchievementsView({
+  onBack: closeAchievements,
+  onThemeChange: applyTheme,
+  onAcknowledge: () => updateAchievementBadge(),
+});
+
 loadGame();
 renderProducerList();
 renderBuyQuantitySelector();
 renderGuacProducerList();
 renderGuacBuyQuantitySelector();
 renderUpgradeList();
-renderBenchmarks();
 renderRegimenSection();
+updateAchievementBadge();
+// Apply saved theme on load
+if (state.activeTheme && state.activeTheme !== "default") {
+  applyTheme(state.activeTheme);
+}
+// Apply speed_demon visual if already earned and conditions met
+if (state.achievements.speed_demon) {
+  document.querySelector(".pick-wrapper")?.classList.add("speed-active");
+}
 updateUI();
 captureStateSnapshot("init");
 startLoop();

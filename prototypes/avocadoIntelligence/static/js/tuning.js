@@ -65,9 +65,11 @@ export const TUNING = {
     exponential_ripen:  { cost: 500000,  guacUnlockAt: 100, produceExpDelta: +0.10,  title: "Exponential Ripening",   desc: "Guac output scaling +0.10", requiresWisdomUnlock: "unlock_exponential_ripen" },
     concentrate_proto:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", baseProdMult: 1.5, title: "Concentrate Protocol",  desc: "Base guac output x1.5", requiresWisdomUnlock: "unlock_concentrate_proto" },
     // Throughput Clicking chain — scales clicks with base APS (before multipliers)
-    throughput_click_1: { cost: 500,   apsUnlockAt: 1,   apsPctPerClick: 0.03, title: "Throughput Clicking I",   desc: "Each click also adds 3% of your base APS." },
-    throughput_click_2: { cost: 5000,  apsUnlockAt: 10,  requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.06, title: "Throughput Clicking II",  desc: "Each click also adds 6% of your base APS." },
-    throughput_click_3: { cost: 50000, apsUnlockAt: 100, requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.10, title: "Throughput Clicking III", desc: "Each click also adds 10% of your base APS." },
+    throughput_click_1: { cost: 500,     apsUnlockAt: 1,     apsPctPerClick: 0.05, title: "Throughput Clicking I",   desc: "Each click also adds 5% of your base APS." },
+    throughput_click_2: { cost: 5000,   apsUnlockAt: 10,   requiresUpgrade: "throughput_click_1", apsPctPerClick: 0.10, title: "Throughput Clicking II",  desc: "Each click also adds 10% of your base APS." },
+    throughput_click_3: { cost: 50000,  apsUnlockAt: 100,  requiresUpgrade: "throughput_click_2", guacUnlockAt: 50, apsPctPerClick: 0.15, title: "Throughput Clicking III", desc: "Each click also adds 15% of your base APS." },
+    throughput_click_4: { cost: 500000, apsUnlockAt: 1000, requiresUpgrade: "throughput_click_3", apsPctPerClick: 0.20, title: "Throughput Clicking IV",  desc: "Each click also adds 20% of your base APS." },
+    throughput_click_5: { cost: 5000000, apsUnlockAt: 10000, requiresUpgrade: "throughput_click_4", apsPctPerClick: 0.25, title: "Throughput Clicking V", desc: "Each click also adds 25% of your base APS." },
     dark_pool:         { cost: 392e6,        unlockAt: 5,  producerId: "exchange",       prodMult: 2, title: "Dark Pool Access",       desc: "Avocado Exchanges produce 2x" },
     pit_optimization:  { cost: 1.16e12,      unlockAt: 5,  producerId: "pit_miner",      prodMult: 2, title: "Pit Optimization",       desc: "Pit Miners produce 2x" },
     attention_focus:   { cost: 77e9,         unlockAt: 5,  producerId: "attention_head", prodMult: 2, title: "Multi-Head Attention",  desc: "Attention Heads produce 2x" },
@@ -219,7 +221,7 @@ export const TUNING = {
     weight_initialization:{ wisdomCost: 4, requires: "backpropagation",     branch: "neural_arch",       title: "Weight Initialization",  desc: "All production +10%", effect: { globalApsMult: 1.10 } },
     batch_normalization: { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch",     title: "Batch Normalization",    desc: "All production +20% (stacks)", effect: { globalApsMult: 1.20 } },
     residual_connections:{ wisdomCost: 25, requires: "batch_normalization", branch: "neural_arch",       title: "Residual Connections",   desc: "All production +50% (stacks)", effect: { globalApsMult: 1.50 } },
-    dropout_prevention:  { wisdomCost: 5,  requires: "backpropagation",     branch: "neural_arch",       title: "Dropout Prevention",     desc: "Benchmark bonuses +25% more effective", effect: { benchmarkBonusMult: 1.25 } },
+    dropout_prevention:  { wisdomCost: 5,  requires: "backpropagation",     branch: "neural_arch",       title: "Dropout Prevention",     desc: "Achievement bonuses +25% more effective", effect: { achievementBonusMult: 1.25 } },
     gradient_clipping:   { wisdomCost: 8,  requires: "backpropagation",     branch: "neural_arch",       title: "Gradient Clipping",      desc: "Research costs -10%", effect: { researchCostMult: 0.90 } },
     adaptive_learning:   { wisdomCost: 20, requires: "gradient_clipping",   branch: "neural_arch",       title: "Adaptive Learning",      desc: "Research costs -20% (replaces Gradient Clipping)", effect: { researchCostMult: 0.80 } },
 
@@ -270,38 +272,108 @@ export const TUNING = {
     guac_focus:  { title: "Guac Focus",   desc: "Guac 2x, production -20%",   guacOutputMult: 2.0, producerMult: 0.80, requiresUnlock: "guac_specialization" },
   },
 
-  benchmarks: {
-    // Early
-    first_inference:    { title: "First Inference",               desc: "Click once.",                           clickMult: 0.02, phase: "Early" },
-    hello_world:        { title: "Hello, World",                  desc: "Reach 1 APS.",                          globalMult: 0.02, phase: "Early" },
-    batch_processing:   { title: "Batch Processing",              desc: "Own 10 Avocado Saplings.",              globalMult: 0.01, phase: "Early" },
-    overfitting:        { title: "Overfitting",                   desc: "Buy all click upgrades.",               clickMult: 0.05, phase: "Early" },
-    feature_extraction: { title: "Feature Extraction",            desc: "Reach 100 APS.",                        globalMult: 0.03, phase: "Early" },
-    first_epoch:        { title: "First Epoch",                   desc: "Own 5+ of any 3 different producers.",  globalMult: 0.02, phase: "Early" },
-    // Mid
-    guac_online:        { title: "Guac Protocol Online",          desc: "Produce first guac.",                   guacProdMult: 0.05, phase: "Mid" },
-    data_pipeline:      { title: "Data Pipeline",                 desc: "Own 5 Irrigation Drones and 5 Orchard Rows.", globalMult: 0.02, phase: "Mid" },
-    gradient_descent:   { title: "Gradient Descent",              desc: "Reach 1,000 APS.",                      globalMult: 0.05, phase: "Mid" },
-    deep_network:       { title: "Deep Network",                  desc: "Own 1 of every standard producer up to Pit Miner.", globalMult: 0.03, phase: "Mid" },
-    scaling_laws:       { title: "Scaling Laws",                  desc: "Reach 5,000 APS.",                      globalMult: 0.03, phase: "Mid" },
-    attention_is_all:   { title: "Attention Is All You Need",     desc: "Own 1 Attention Head.",                 globalMult: 0.03, phase: "Mid" },
-    loss_convergence:   { title: "Loss Convergence",              desc: "Accumulate 100 guac.",                  guacMult: 0.03, phase: "Mid" },
-    singularity:        { title: "The Singularity",               desc: "Reach 10,000 APS.",                     globalMult: 0.05, phase: "Mid" },
-    guac_reservoir:     { title: "Guac Reservoir",                desc: "Accumulate 1,000 guac.",                guacMult: 0.05, phase: "Mid" },
-    // Prestige
-    convergence:        { title: "Convergence",                   desc: "Prestige for the first time.",          wisdomMult: 0.05, phase: "Prestige" },
-    fine_tuning:        { title: "Fine-Tuning",                   desc: "Complete 3 prestiges.",                 globalMult: 0.03, phase: "Prestige" },
-    overfit_prevention: { title: "Overfit Prevention",            desc: "Complete 5 prestiges.",                 wisdomMult: 0.05, phase: "Prestige" },
-    transfer_learning:  { title: "Transfer Learning",             desc: "Buy all 3 scaling wisdom unlocks.",     globalMult: 0.03, phase: "Prestige" },
-    agi_achieved:       { title: "AGI Achieved",                  desc: "Accumulate 50 lifetime wisdom.",        globalMult: 0.05, phase: "Prestige" },
-    superintelligence:  { title: "Superintelligence",             desc: "Reach 100,000 APS.",                    globalMult: 0.10, phase: "Prestige" },
-    paperclip_moment:   { title: "The Paperclip Moment",          desc: "1 billion all-time avocados.",          globalMult: 0.05, phase: "Prestige" },
-    // Endgame
-    first_distillation: { title: "First Distillation",            desc: "Distill to Model v1.0.",                globalMult: 0.05, phase: "Endgame" },
-    architecture_search:{ title: "Architecture Search",           desc: "Reach Model v3.0.",                     globalMult: 0.05, phase: "Endgame" },
-    guac_ocean:         { title: "Guac Ocean",                    desc: "Accumulate 10,000 guac.",               guacMult: 0.05, phase: "Endgame" },
-    million_aps:        { title: "Compute Saturated",             desc: "Reach 1,000,000 APS.",                  globalMult: 0.10, phase: "Endgame" },
-    full_stack:         { title: "Full Stack",                    desc: "Own 1 of every standard producer.",     globalMult: 0.05, phase: "Endgame" },
+  achievements: {
+    // ── 🌱 Seedlings (8) ──
+    first_pick:        { emoji: "🌱", title: "First Pick",               hint: "Every journey begins with a single...",            baseClickBonus: 1, category: "seedlings" },
+    hello_world:       { emoji: "🌱", title: "Hello, World",             hint: "Your first words in avocado...",                    clickMult: 0.02, category: "seedlings" },
+    batch_processing:  { emoji: "🌱", title: "Batch Processing",         hint: "Quantity has a quality all its own...",             clickMult: 0.01, category: "seedlings" },
+    first_upgrade:     { emoji: "🌱", title: "Peer Review",              hint: "Knowledge compounds...",                            clickMult: 0.01, category: "seedlings" },
+    first_epoch:       { emoji: "🌱", title: "First Epoch",              hint: "Diversify your portfolio of trees...",              clickMult: 0.02, category: "seedlings" },
+    hundred_clicks:    { emoji: "🌱", title: "Carpal Tunnel Initiate",   hint: "Click, click, click...",                            baseClickBonus: 2, category: "seedlings" },
+    seed_hoarder:      { emoji: "🌱", title: "Seed Hoarder",             hint: "Save up for a rainy day...",                        clickMult: 0.01, category: "seedlings" },
+    overfitting:       { emoji: "🌱", title: "Overfitting",              hint: "Max out your manual labor...",                      baseClickBonus: 3, category: "seedlings" },
+
+    // ── 🏭 Production (10) ──
+    feature_extraction:{ emoji: "🏭", title: "Feature Extraction",       hint: "Triple digits per second...",                       clickMult: 0.03, category: "production" },
+    gradient_descent:  { emoji: "🏭", title: "Gradient Descent",         hint: "Four digits of throughput...",                      clickMult: 0.05, category: "production" },
+    scaling_laws:      { emoji: "🏭", title: "Scaling Laws",             hint: "The curve steepens...",                             clickMult: 0.03, category: "production" },
+    singularity:       { emoji: "🏭", title: "The Singularity",          hint: "Five zeroes...",                                    clickMult: 0.05, category: "production" },
+    superintelligence: { emoji: "🏭", title: "Superintelligence",        hint: "Six digits. The orchard hums...",                   clickMult: 0.25, category: "production" },
+    million_aps:       { emoji: "🏭", title: "Compute Saturated",        hint: "Seven figures of throughput...",                    clickMult: 0.25, category: "production" },
+    data_pipeline:     { emoji: "🏭", title: "Data Pipeline",            hint: "Air and soil, working together...",                 clickMult: 0.02, category: "production" },
+    deep_network:      { emoji: "🏭", title: "Deep Network",             hint: "One of everything, up to the miners...",           clickMult: 0.03, category: "production" },
+    full_stack:        { emoji: "🏭", title: "Full Stack",               hint: "A complete orchard infrastructure...",              clickMult: 0.05, category: "production" },
+    attention_is_all:  { emoji: "🏭", title: "Attention Is All You Need",hint: "Focus on what matters...",                          clickMult: 0.03, category: "production" },
+
+    // ── 🥑 Guacamole (8) ──
+    guac_online:       { emoji: "🥑", title: "Guac Protocol Online",     hint: "Your first batch of guac...",                       guacProdMult: 0.05, category: "guacamole" },
+    loss_convergence:  { emoji: "🥑", title: "Loss Convergence",         hint: "Triple-digit guac reserves...",                     guacMult: 0.03, category: "guacamole" },
+    guac_reservoir:    { emoji: "🥑", title: "Guac Reservoir",           hint: "A thousand units of green gold...",                 guacMult: 0.05, category: "guacamole" },
+    guac_ocean:        { emoji: "🥑", title: "Guac Ocean",               hint: "An ocean of guacamole...",                          guacMult: 0.05, category: "guacamole" },
+    guac_universe:     { emoji: "🥑", title: "Guac Universe",            hint: "Guac beyond comprehension...",                      guacMult: 0.08, category: "guacamole" },
+    refinery_chain:    { emoji: "🥑", title: "Supply Chain",             hint: "Multiple layers of refinement...",                  guacProdMult: 0.03, category: "guacamole" },
+    centrifuge_array:  { emoji: "🥑", title: "Centrifuge Array",         hint: "The spin cycle never stops...",                     guacProdMult: 0.03, category: "guacamole" },
+    guac_ascendant:    { emoji: "🥑", title: "Guac Ascendant",           hint: "Your guac multiplier reaches a milestone...",       guacMult: 0.05, category: "guacamole" },
+
+    // ── 🔬 Research (8) ──
+    five_upgrades:     { emoji: "🔬", title: "Literature Review",        hint: "Consume knowledge systematically...",               clickMult: 0.01, category: "research" },
+    ten_upgrades:      { emoji: "🔬", title: "Research Grant",           hint: "Funded and focused...",                             clickMult: 0.02, category: "research" },
+    twenty_upgrades:   { emoji: "🔬", title: "Tenure Track",             hint: "Deep expertise developing...",                      clickMult: 0.03, category: "research" },
+    forty_upgrades:    { emoji: "🔬", title: "Distinguished Professor",  hint: "The lab is full of papers...",                      clickMult: 0.03, category: "research" },
+    sixty_upgrades:    { emoji: "🔬", title: "Nobel Committee",          hint: "Most of the known research...",                     clickMult: 0.15, category: "research" },
+    first_synergy:     { emoji: "🔬", title: "Cross-Pollination",        hint: "Two producers, working together...",                clickMult: 0.02, category: "research" },
+    five_synergies:    { emoji: "🔬", title: "Research Network",         hint: "A web of interconnected discoveries...",            clickMult: 0.03, category: "research" },
+    all_synergies:     { emoji: "🔬", title: "Unified Field Theory",     hint: "Every connection mapped...",                        clickMult: 0.15, category: "research" },
+
+    // ── ♻️ Prestige (8) ──
+    convergence:       { emoji: "♻️", title: "Convergence",              hint: "The first compost cycle...",                        wisdomMult: 0.05, category: "prestige" },
+    fine_tuning:       { emoji: "♻️", title: "Fine-Tuning",              hint: "Three rounds of refinement...",                     clickMult: 0.03, category: "prestige" },
+    overfit_prevention:{ emoji: "♻️", title: "Overfit Prevention",       hint: "Five cycles of learning...",                        wisdomMult: 0.05, category: "prestige" },
+    ten_prestiges:     { emoji: "♻️", title: "Compost Veteran",          hint: "Double digits of decay...",                         clickMult: 0.05, category: "prestige" },
+    twenty_prestiges:  { emoji: "♻️", title: "Compost Addict",           hint: "You can stop any time...",                          wisdomMult: 0.03, category: "prestige" },
+    agi_achieved:      { emoji: "♻️", title: "AGI Achieved",             hint: "Accumulate deep wisdom...",                         clickMult: 0.05, category: "prestige" },
+    transfer_learning: { emoji: "♻️", title: "Transfer Learning",       hint: "Master the guac memory upgrades...",                clickMult: 0.03, category: "prestige" },
+    paperclip_moment:  { emoji: "♻️", title: "The Paperclip Moment",     hint: "A billion avocados across all time...",             clickMult: 0.15, category: "prestige" },
+
+    // ── 🧬 Distillation (6) ──
+    first_distillation:{ emoji: "🧬", title: "First Distillation",       hint: "Compress the model for the first time...",          clickMult: 0.05, category: "distillation" },
+    architecture_search:{ emoji: "🧬", title: "Architecture Search",     hint: "Three versions deep...",                            clickMult: 0.05, category: "distillation" },
+    model_v5:          { emoji: "🧬", title: "Production Ready",         hint: "The penultimate version...",                        clickMult: 0.20, category: "distillation" },
+    model_v6:          { emoji: "🧬", title: "Emergent Intelligence",    hint: "The final form...",                                 clickMult: 0.25, category: "distillation" },
+    double_distill:    { emoji: "🧬", title: "Double Down",              hint: "Two distillations complete...",                     clickMult: 0.03, category: "distillation" },
+    speed_distill:     { emoji: "🧬", title: "Speed Run",                hint: "Distill before your fifth compost...",              wisdomMult: 0.03, category: "distillation" },
+
+    // ── 🎁 Gifts (7) ──
+    first_gift:        { emoji: "🎁", title: "Unboxing",                 hint: "Open your first gift...",                           clickMult: 0.01, category: "gifts" },
+    five_gifts:        { emoji: "🎁", title: "Gift Collector",           hint: "A handful of surprises...",                         clickMult: 0.02, category: "gifts" },
+    twenty_gifts:      { emoji: "🎁", title: "Dedicated Unboxer",        hint: "Never miss a present...",                           clickMult: 0.02, category: "gifts" },
+    fifty_gifts:       { emoji: "🎁", title: "Gift Goblin",              hint: "Fifty boxes opened...",                             globalMult: 0.03, category: "gifts" },
+    hundred_gifts:     { emoji: "🎁", title: "Santa's Helper",           hint: "Triple digits of gifts...",                         clickMult: 0.03, category: "gifts" },
+    got_frenzy:        { emoji: "🎁", title: "Click Frenzy Survivor",    hint: "Experience the frenzy...",                          globalMult: 0.02, category: "gifts" },
+    wisdom_gift:       { emoji: "🎁", title: "Enlightened Delivery",     hint: "Wisdom from an unexpected source...",               wisdomMult: 0.02, category: "gifts" },
+
+    // ── 🏋️ Training (4) ──
+    first_regimen:     { emoji: "🏋️", title: "Training Montage",         hint: "Choose a focus for the first time...",              clickMult: 0.02, category: "training" },
+    dual_regimen:      { emoji: "🏋️", title: "Dual Wielder",             hint: "Two regimens at once...",                           clickMult: 0.03, category: "training" },
+    all_regimens_tried:{ emoji: "🏋️", title: "Jack of All Trades",       hint: "Try every regimen at least once...",                clickMult: 0.02, category: "training" },
+    persistent_full:   { emoji: "🏋️", title: "Total Recall",             hint: "Fill all memory slots...",                          clickMult: 0.03, category: "training" },
+
+    // ── 📈 Scaling (8) ──
+    trillion_alltime:  { emoji: "📈", title: "Trillion Club",            hint: "Twelve zeroes of lifetime avocados...",             clickMult: 0.03, category: "scaling" },
+    quadrillion_alltime:{ emoji: "📈", title: "Quadrillion Orchard",     hint: "Fifteen zeroes...",                                 clickMult: 0.05, category: "scaling" },
+    sapling_army:      { emoji: "📈", title: "Sapling Army",             hint: "Fifty little trees...",                             baseClickBonus: 3, category: "scaling" },
+    hundred_producers: { emoji: "📈", title: "Mass Production",          hint: "A hundred units of one type...",                    baseClickBonus: 5, category: "scaling" },
+    thousand_clicks:   { emoji: "📈", title: "Keyboard Warrior",         hint: "A thousand manual picks...",                        baseClickBonus: 5, category: "scaling" },
+    ten_thousand_clicks:{ emoji: "📈", title: "Click Singularity",       hint: "Ten thousand deliberate actions...",                baseClickBonus: 15, category: "scaling" },
+    wisdom_50:         { emoji: "📈", title: "Deep Knowledge",           hint: "Half a hundred wisdom...",                          wisdomMult: 0.03, category: "scaling" },
+    wisdom_200:        { emoji: "📈", title: "Wisdom Overflow",          hint: "Two hundred points of wisdom...",                   wisdomMult: 0.05, category: "scaling" },
+
+    // ── ✨ Quirky (8) — unique effects ──
+    night_owl:         { emoji: "🌙", title: "Night Owl",                hint: "Burn the midnight oil...",                          clickMult: 0.01, category: "quirky", quirkyEffect: "theme_midnight" },
+    sunset_theme:      { emoji: "🌅", title: "Golden Hour",              hint: "The sun sets on the orchard...",                    clickMult: 0.01, category: "quirky", quirkyEffect: "theme_sunset" },
+    matrix_theme:      { emoji: "💚", title: "There Is No Avocado",      hint: "See the code behind the guac...",                   clickMult: 0.01, category: "quirky", quirkyEffect: "theme_matrix" },
+    speed_demon:       { emoji: "⚡", title: "Speed Demon",              hint: "Velocity incarnate...",                             clickMult: 0.02, category: "quirky", quirkyEffect: "speed_lines" },
+    click_frenzy_100:  { emoji: "🔥", title: "Frenzy Mode",              hint: "Click like the wind...",                            baseClickBonus: 5, category: "quirky", quirkyEffect: "click_particles" },
+    patient_zero:      { emoji: "🐌", title: "Patient Zero",             hint: "Good things come to those who wait...",             clickMult: 0.02, category: "quirky", quirkyEffect: "title_afk" },
+    secret_konami:     { emoji: "🕹️", title: "???",                      hint: "???",                                              clickMult: 0.03, category: "quirky", quirkyEffect: "title_contra", hidden: true },
+    dedication:        { emoji: "🏆", title: "Dedication",               hint: "Return to the orchard again and again...",          clickMult: 0.03, category: "quirky", quirkyEffect: "title_permanent" },
+  },
+
+  themes: {
+    default:  {},
+    midnight: { "--bg": "#0a0e1a", "--panel": "#11162a", "--primary": "#4a6cc7", "--text": "#d8e0f0", "--muted": "#7889a6" },
+    sunset:   { "--bg": "#1a120a", "--panel": "#211a12", "--primary": "#c78a3f", "--text": "#f0e8d8", "--muted": "#a69878" },
+    matrix:   { "--bg": "#000000", "--panel": "#0a0f0a", "--primary": "#00cc33", "--text": "#00ff41", "--muted": "#00994d" },
   },
 
   prestige: {
@@ -375,4 +447,18 @@ export const GUAC_PRODUCER_ORDER = ["guac_lab", "guac_refinery", "guac_centrifug
 export const WISDOM_BRANCH_ORDER = [
   "orchard_roots", "guac_economy", "wisdom_amp",
   "neural_arch", "training_data", "persistent_memory", "reinforcement_learning", "inference_engine",
+];
+
+// Achievement categories — display order and labels
+export const ACHIEVEMENT_CATEGORIES = [
+  { id: "seedlings",    emoji: "🌱", title: "Seedlings" },
+  { id: "production",   emoji: "🏭", title: "Production" },
+  { id: "guacamole",    emoji: "🥑", title: "Guacamole" },
+  { id: "research",     emoji: "🔬", title: "Research" },
+  { id: "prestige",     emoji: "♻️", title: "Prestige" },
+  { id: "distillation", emoji: "🧬", title: "Distillation" },
+  { id: "gifts",        emoji: "🎁", title: "Gifts" },
+  { id: "training",     emoji: "🏋️", title: "Training" },
+  { id: "scaling",      emoji: "📈", title: "Scaling" },
+  { id: "quirky",       emoji: "✨", title: "Quirky" },
 ];

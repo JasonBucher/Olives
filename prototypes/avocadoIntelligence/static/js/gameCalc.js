@@ -134,9 +134,9 @@ export function calcWisdomGlobalApsMult(wisdomUnlocks, tuning) {
   return calcWisdomEffectAggregate("globalApsMult", wisdomUnlocks, tuning, "multiply", 1);
 }
 
-/** Benchmark bonus amplifier from wisdom tree. */
-export function calcWisdomBenchmarkBonusMult(wisdomUnlocks, tuning) {
-  return calcWisdomEffect("benchmarkBonusMult", wisdomUnlocks, tuning, 1);
+/** Achievement bonus amplifier from wisdom tree. */
+export function calcWisdomAchievementBonusMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("achievementBonusMult", wisdomUnlocks, tuning, 1);
 }
 
 /** Additive guac multiplier coefficient bonus from wisdom tree. */
@@ -354,7 +354,7 @@ export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, w
 }
 
 /** Calculate guac produced per second at full feed. */
-export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount, benchmarks, activeRegimens) {
+export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount, achievements, activeRegimens) {
   if (labCount <= 0) return 0;
   let exp;
   let base;
@@ -366,8 +366,8 @@ export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, pr
     base = tuning.guac.baseProduction;
   }
   let result = base * Math.pow(labCount, exp);
-  if (benchmarks) {
-    const bb = calcBenchmarkBonus(benchmarks, tuning);
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
     result *= bb.guacProdMult;
   }
   // Apply regimen guac output mult
@@ -379,14 +379,14 @@ export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, pr
 }
 
 /** Calculate the guac global multiplier (asymptotic soft cap). */
-export function calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks) {
+export function calcGuacMultiplier(guacCount, tuning, achievements, wisdomUnlocks) {
   const coeffBonus = wisdomUnlocks ? calcWisdomGuacCoeffBonus(wisdomUnlocks, tuning) : 0;
   const coeff = tuning.guac.multiplierCoeff + coeffBonus;
   const cap = tuning.guac.guacMultCap;
   const logTerm = Math.log2(1 + guacCount) * coeff;
   let mult = 1 + (cap - 1) * (logTerm / (1 + logTerm));
-  if (benchmarks) {
-    const bb = calcBenchmarkBonus(benchmarks, tuning);
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
     mult = 1 + (mult - 1) * bb.guacMult;
   }
   return mult;
@@ -420,7 +420,7 @@ export function calcBaseAps(producers, upgrades, tuning) {
 
 /** Calculate total avocados per second from all producers.
  *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
-export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
   let total = calcBaseAps(producers, upgrades, tuning);
   // Apply global multipliers from upgrades
   let globalMult = 1;
@@ -431,12 +431,12 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ben
   }
   total *= globalMult;
   // Apply wisdom bonus
-  total *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks);
+  total *= calcWisdomBonus(wisdom, upgrades, tuning, achievements, wisdomUnlocks);
   // Apply guac multiplier
-  total *= calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks);
-  // Apply benchmark global bonus
-  if (benchmarks) {
-    const bb = calcBenchmarkBonus(benchmarks, tuning);
+  total *= calcGuacMultiplier(guacCount, tuning, achievements, wisdomUnlocks);
+  // Apply achievement global bonus
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
     total *= bb.globalMult;
   }
   // Apply wisdom tree global APS mult (Neural Architecture branch)
@@ -458,13 +458,19 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ben
 
 /** Calculate click power (avocados per click). baseAps is pre-multiplier APS.
  *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
   let power = tuning.production.baseClickYield;
 
   // Base click bonus from wisdom tree (e.g. curriculum_learning)
   if (wisdomUnlocks) {
     const clickBonus = calcWisdomEffectAggregate("baseClickBonus", wisdomUnlocks, tuning, "sum", 0);
     power += clickBonus;
+  }
+
+  // Base click bonus from achievements
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
+    power += bb.baseClickBonus;
   }
 
   // Flat click bonus from producers (e.g. influencers)
@@ -502,12 +508,12 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   }
   power *= globalMult;
   // Wisdom bonus
-  power *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks);
+  power *= calcWisdomBonus(wisdom, upgrades, tuning, achievements, wisdomUnlocks);
   // Guac multiplier
-  power *= calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks);
-  // Benchmark bonuses
-  if (benchmarks) {
-    const bb = calcBenchmarkBonus(benchmarks, tuning);
+  power *= calcGuacMultiplier(guacCount, tuning, achievements, wisdomUnlocks);
+  // Achievement bonuses
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
     power *= bb.globalMult;
     power *= bb.clickMult;
   }
@@ -550,7 +556,7 @@ export function calcWisdomEarned(totalAvocadosThisRun, tuning, wisdomUnlocks) {
 }
 
 /** Calculate the wisdom bonus multiplier. */
-export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks) {
+export function calcWisdomBonus(wisdom, upgrades, tuning, achievements, wisdomUnlocks) {
   let mult = tuning.prestige.wisdomMultPerPoint;
   // Wisdom mult bonus from tree (aggregate all nodes with wisdomMultBonus)
   if (wisdomUnlocks) {
@@ -559,9 +565,9 @@ export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlo
   } else if (upgrades.wisdom_boost) {
     mult += tuning.upgrades.wisdom_boost ? tuning.upgrades.wisdom_boost.wisdomMult : 0.05;
   }
-  // Benchmark wisdom effectiveness bonus
-  if (benchmarks) {
-    const bb = calcBenchmarkBonus(benchmarks, tuning);
+  // Achievement wisdom effectiveness bonus
+  if (achievements) {
+    const bb = calcAchievementBonus(achievements, tuning);
     mult *= bb.wisdomMult;
   }
   return 1 + wisdom * mult;
@@ -574,20 +580,21 @@ export function canPrestige(totalAvocadosThisRun, tuning, wisdomUnlocks) {
 }
 
 /**
- * Calculate benchmark bonus multipliers from earned benchmarks.
- * Returns { globalMult, clickMult, guacProdMult, guacMult, wisdomMult }.
+ * Calculate achievement bonus multipliers from earned achievements.
+ * Returns { globalMult, clickMult, guacProdMult, guacMult, wisdomMult, baseClickBonus }.
  */
-export function calcBenchmarkBonus(benchmarks, tuning, wisdomUnlocks) {
-  const result = { globalMult: 1, clickMult: 1, guacProdMult: 1, guacMult: 1, wisdomMult: 1 };
-  if (!tuning.benchmarks) return result;
-  const bbMult = wisdomUnlocks ? calcWisdomBenchmarkBonusMult(wisdomUnlocks, tuning) : 1;
-  for (const [id, cfg] of Object.entries(tuning.benchmarks)) {
-    if (!benchmarks[id]) continue;
-    if (cfg.globalMult)   result.globalMult   += cfg.globalMult * bbMult;
-    if (cfg.clickMult)    result.clickMult    += cfg.clickMult * bbMult;
-    if (cfg.guacProdMult) result.guacProdMult += cfg.guacProdMult * bbMult;
-    if (cfg.guacMult)     result.guacMult     += cfg.guacMult * bbMult;
-    if (cfg.wisdomMult)   result.wisdomMult   += cfg.wisdomMult * bbMult;
+export function calcAchievementBonus(achievements, tuning, wisdomUnlocks) {
+  const result = { globalMult: 1, clickMult: 1, guacProdMult: 1, guacMult: 1, wisdomMult: 1, baseClickBonus: 0 };
+  if (!tuning.achievements) return result;
+  const bbMult = wisdomUnlocks ? calcWisdomAchievementBonusMult(wisdomUnlocks, tuning) : 1;
+  for (const [id, cfg] of Object.entries(tuning.achievements)) {
+    if (!achievements[id]) continue;
+    if (cfg.globalMult)     result.globalMult     += cfg.globalMult * bbMult;
+    if (cfg.clickMult)      result.clickMult      += cfg.clickMult * bbMult;
+    if (cfg.guacProdMult)   result.guacProdMult   += cfg.guacProdMult * bbMult;
+    if (cfg.guacMult)       result.guacMult       += cfg.guacMult * bbMult;
+    if (cfg.wisdomMult)     result.wisdomMult     += cfg.wisdomMult * bbMult;
+    if (cfg.baseClickBonus) result.baseClickBonus += cfg.baseClickBonus * bbMult;
   }
   return result;
 }

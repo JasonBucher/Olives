@@ -14,6 +14,7 @@
         <div class="subtitle">Click. Grow. Prestige.</div>
       </div>
       <div class="topbar-actions">
+        <button id="achievements-btn" class="btn btn-quiet" type="button">🏆 <span id="achievements-badge" class="achievement-badge" style="display:none;">0</span></button>
         <button id="analyzer-btn" class="btn btn-quiet" type="button">Analyzer</button>
         <button id="debug-btn" class="btn btn-quiet" type="button">Debug</button>
       </div>
@@ -100,7 +101,7 @@
         </section>
       </div>
 
-      <!-- Right Column: Research + Distillation + Compost + Benchmarks -->
+      <!-- Right Column: Research + Distillation + Compost -->
       <div class="column">
         <section class="section">
           <div class="section-title">Research</div>
@@ -134,12 +135,6 @@
           </div>
         </section>
 
-        <section class="section" id="benchmarks-section">
-          <div class="section-title">Benchmarks</div>
-          <div class="muted">AI milestones. Some grant permanent bonuses.</div>
-          <div id="benchmarks-list" style="margin-top: 8px;"></div>
-          <div class="muted" id="benchmarks-counter" style="margin-top: 6px;">0 / 18</div>
-        </section>
       </div>
     </div>
   </div>
@@ -231,6 +226,23 @@
         </div>
       </section>
     </div>
+  </div>
+
+  <!-- Achievements Screen -->
+  <div id="achievements-screen" class="container is-hidden">
+    <header class="topbar">
+      <div class="title">
+        <h1>Achievements</h1>
+        <div class="subtitle" id="achievements-subtitle">0 / 75 earned</div>
+      </div>
+      <button id="achievements-back-btn" class="btn btn-quiet" type="button">Back to Game</button>
+    </header>
+
+    <hr class="divider" />
+
+    <div id="achievements-filter-bar" class="achievements-filter-bar"></div>
+    <div id="achievements-grid" class="achievements-grid"></div>
+    <div id="achievements-theme-selector" class="achievements-theme-selector" style="display:none;"></div>
   </div>
 
   <!-- Debug Modal -->
