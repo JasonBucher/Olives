@@ -65,6 +65,160 @@ export function formatNumber(value) {
   return rounded.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
+// ── Wisdom Tree Functions ──────────────────────────────────────────
+
+/** Check if a wisdom unlock's prerequisite is met (owned or pending in overlay). */
+export function isWisdomUnlockAvailable(id, wisdomUnlocks, overlayPurchases, tuning) {
+  const cfg = tuning.wisdomUnlocks[id];
+  if (!cfg) return false;
+  if (cfg.requires === null) return true; // root node
+  return !!(wisdomUnlocks[cfg.requires] || (overlayPurchases && overlayPurchases[cfg.requires]));
+}
+
+/** Walk the requires chain to get depth (ROOT = 0). */
+export function getWisdomNodeDepth(id, tuning) {
+  let depth = 0;
+  let current = id;
+  while (current) {
+    const cfg = tuning.wisdomUnlocks[current];
+    if (!cfg || cfg.requires === null) break;
+    current = cfg.requires;
+    depth++;
+  }
+  return depth;
+}
+
+/** Get a "replaces" effect value — deepest owned node wins for a given effectKey. */
+export function calcWisdomEffect(effectKey, wisdomUnlocks, tuning, defaultValue) {
+  let best = null;
+  let bestDepth = -1;
+  for (const [id, cfg] of Object.entries(tuning.wisdomUnlocks)) {
+    if (!wisdomUnlocks[id]) continue;
+    if (!cfg.effect || cfg.effect[effectKey] === undefined) continue;
+    const depth = getWisdomNodeDepth(id, tuning);
+    if (depth > bestDepth) {
+      bestDepth = depth;
+      best = cfg.effect[effectKey];
+    }
+  }
+  return best !== null ? best : defaultValue;
+}
+
+/** Aggregate an effect across all owned nodes — multiply or sum mode. */
+export function calcWisdomEffectAggregate(effectKey, wisdomUnlocks, tuning, mode, identity) {
+  let result = identity;
+  for (const [id, cfg] of Object.entries(tuning.wisdomUnlocks)) {
+    if (!wisdomUnlocks[id]) continue;
+    if (!cfg.effect || cfg.effect[effectKey] === undefined) continue;
+    if (mode === "multiply") {
+      result *= cfg.effect[effectKey];
+    } else {
+      result += cfg.effect[effectKey];
+    }
+  }
+  return result;
+}
+
+/** Producer cost multiplier from wisdom tree (replaces semantics: deepest wins). */
+export function calcWisdomProducerCostMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("producerCostMult", wisdomUnlocks, tuning, 1);
+}
+
+/** Click multiplier from wisdom tree (replaces semantics: deepest wins). */
+export function calcWisdomClickMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("clickMult", wisdomUnlocks, tuning, 1);
+}
+
+/** Global APS multiplier from Neural Architecture branch (multiplicative stacking). */
+export function calcWisdomGlobalApsMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffectAggregate("globalApsMult", wisdomUnlocks, tuning, "multiply", 1);
+}
+
+/** Benchmark bonus amplifier from wisdom tree. */
+export function calcWisdomBenchmarkBonusMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("benchmarkBonusMult", wisdomUnlocks, tuning, 1);
+}
+
+/** Additive guac multiplier coefficient bonus from wisdom tree. */
+export function calcWisdomGuacCoeffBonus(wisdomUnlocks, tuning) {
+  return calcWisdomEffectAggregate("guacCoeffBonus", wisdomUnlocks, tuning, "sum", 0);
+}
+
+/** Distillation cost multiplier (replaces semantics: deepest wins). */
+export function calcWisdomDistillCostMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("distillCostMult", wisdomUnlocks, tuning, 1);
+}
+
+/** Distillation bonus amplifier (multiplicative stacking). */
+export function calcWisdomDistillBonusMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffectAggregate("distillBonusMult", wisdomUnlocks, tuning, "multiply", 1);
+}
+
+/** Research cost multiplier (replaces semantics: deepest wins). */
+export function calcWisdomResearchCostMult(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("researchCostMult", wisdomUnlocks, tuning, 1);
+}
+
+/** Prestige threshold from wisdom tree (replaces semantics: deepest wins). */
+export function calcPrestigeThreshold(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("prestigeThreshold", wisdomUnlocks, tuning, tuning.prestige.unlockThreshold);
+}
+
+/** Calculate starting resources from wisdom tree (max-per-producer across all owned nodes). */
+export function calcStartingResources(wisdomUnlocks, tuning) {
+  let avocados = 0;
+  const producers = {};
+  for (const [id, cfg] of Object.entries(tuning.wisdomUnlocks)) {
+    if (!wisdomUnlocks[id]) continue;
+    if (!cfg.effect) continue;
+    if (cfg.effect.startingAvocados) {
+      avocados = Math.max(avocados, cfg.effect.startingAvocados);
+    }
+    if (cfg.effect.startingProducers) {
+      for (const [pid, count] of Object.entries(cfg.effect.startingProducers)) {
+        producers[pid] = Math.max(producers[pid] || 0, count);
+      }
+    }
+  }
+  return { avocados, producers };
+}
+
+/** Return array of unlocked regimen IDs. */
+export function calcAvailableRegimens(wisdomUnlocks, tuning) {
+  if (!tuning.trainingRegimens) return [];
+  const result = [];
+  for (const [id, cfg] of Object.entries(tuning.trainingRegimens)) {
+    if (cfg.requiresUnlock && wisdomUnlocks[cfg.requiresUnlock]) {
+      result.push(id);
+    }
+  }
+  return result;
+}
+
+/** Return max number of simultaneous regimens (1 or 2 with dual_curriculum). */
+export function calcMaxRegimens(wisdomUnlocks) {
+  return wisdomUnlocks.dual_curriculum ? 2 : 1;
+}
+
+/** Calculate combined regimen modifiers. */
+export function calcRegimenModifiers(activeRegimens, tuning) {
+  const result = { clickMult: 1, producerMult: 1, guacOutputMult: 1 };
+  if (!tuning.trainingRegimens || !activeRegimens) return result;
+  for (const id of activeRegimens) {
+    const cfg = tuning.trainingRegimens[id];
+    if (!cfg) continue;
+    if (cfg.clickMult) result.clickMult *= cfg.clickMult;
+    if (cfg.producerMult) result.producerMult *= cfg.producerMult;
+    if (cfg.guacOutputMult) result.guacOutputMult *= cfg.guacOutputMult;
+  }
+  return result;
+}
+
+/** Return number of persistent upgrade slots (0-3, replaces semantics). */
+export function calcPersistentSlots(wisdomUnlocks, tuning) {
+  return calcWisdomEffect("persistentSlots", wisdomUnlocks, tuning, 0);
+}
+
 /** Calculate the cost of the next producer unit. */
 export function calcProducerCost(id, ownedCount, tuning) {
   const p = tuning.producers[id];
@@ -173,7 +327,7 @@ export function calcGuacConsumption(labCount, tuning, refineryCount, upgrades, w
 }
 
 /** Calculate guac produced per second at full feed. */
-export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount, benchmarks) {
+export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, prestigeCount, benchmarks, activeRegimens) {
   if (labCount <= 0) return 0;
   let exp;
   let base;
@@ -189,12 +343,18 @@ export function calcGuacProduction(labCount, tuning, upgrades, wisdomUnlocks, pr
     const bb = calcBenchmarkBonus(benchmarks, tuning);
     result *= bb.guacProdMult;
   }
+  // Apply regimen guac output mult
+  if (activeRegimens && activeRegimens.length > 0) {
+    const regMods = calcRegimenModifiers(activeRegimens, tuning);
+    result *= regMods.guacOutputMult;
+  }
   return result;
 }
 
 /** Calculate the guac global multiplier (asymptotic soft cap). */
-export function calcGuacMultiplier(guacCount, tuning, benchmarks) {
-  const coeff = tuning.guac.multiplierCoeff;
+export function calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks) {
+  const coeffBonus = wisdomUnlocks ? calcWisdomGuacCoeffBonus(wisdomUnlocks, tuning) : 0;
+  const coeff = tuning.guac.multiplierCoeff + coeffBonus;
   const cap = tuning.guac.guacMultCap;
   const logTerm = Math.log2(1 + guacCount) * coeff;
   let mult = 1 + (cap - 1) * (logTerm / (1 + logTerm));
@@ -232,7 +392,7 @@ export function calcBaseAps(producers, upgrades, tuning) {
 }
 
 /** Calculate total avocados per second from all producers. */
-export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks) {
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens) {
   let total = calcBaseAps(producers, upgrades, tuning);
   // Apply global multipliers from upgrades
   let globalMult = 1;
@@ -243,19 +403,28 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ben
   }
   total *= globalMult;
   // Apply wisdom bonus
-  total *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks);
+  total *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks);
   // Apply guac multiplier
-  total *= calcGuacMultiplier(guacCount, tuning, benchmarks);
+  total *= calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks);
   // Apply benchmark global bonus
   if (benchmarks) {
     const bb = calcBenchmarkBonus(benchmarks, tuning);
     total *= bb.globalMult;
   }
+  // Apply wisdom tree global APS mult (Neural Architecture branch)
+  if (wisdomUnlocks) {
+    total *= calcWisdomGlobalApsMult(wisdomUnlocks, tuning);
+  }
+  // Apply regimen producer mult
+  if (activeRegimens && activeRegimens.length > 0) {
+    const regMods = calcRegimenModifiers(activeRegimens, tuning);
+    total *= regMods.producerMult;
+  }
   return total;
 }
 
 /** Calculate click power (avocados per click). baseAps is pre-multiplier APS. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks) {
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens) {
   let power = tuning.production.baseClickYield;
 
   // Flat click bonus from producers (e.g. influencers)
@@ -293,30 +462,53 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   }
   power *= globalMult;
   // Wisdom bonus
-  power *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks);
+  power *= calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks);
   // Guac multiplier
-  power *= calcGuacMultiplier(guacCount, tuning, benchmarks);
+  power *= calcGuacMultiplier(guacCount, tuning, benchmarks, wisdomUnlocks);
   // Benchmark bonuses
   if (benchmarks) {
     const bb = calcBenchmarkBonus(benchmarks, tuning);
     power *= bb.globalMult;
     power *= bb.clickMult;
   }
+  // Wisdom tree click mult
+  if (wisdomUnlocks) {
+    power *= calcWisdomClickMult(wisdomUnlocks, tuning);
+  }
+  // Regimen click mult
+  if (activeRegimens && activeRegimens.length > 0) {
+    const regMods = calcRegimenModifiers(activeRegimens, tuning);
+    power *= regMods.clickMult;
+  }
   return power;
 }
 
 /** Calculate wisdom points earned from total avocados this run. */
-export function calcWisdomEarned(totalAvocadosThisRun, tuning) {
-  if (totalAvocadosThisRun < tuning.prestige.unlockThreshold) return 0;
-  return Math.floor(Math.sqrt(totalAvocadosThisRun) / tuning.prestige.divisor);
+export function calcWisdomEarned(totalAvocadosThisRun, tuning, wisdomUnlocks) {
+  const threshold = wisdomUnlocks ? calcPrestigeThreshold(wisdomUnlocks, tuning) : tuning.prestige.unlockThreshold;
+  if (totalAvocadosThisRun < threshold) return 0;
+  let base = Math.floor(Math.sqrt(totalAvocadosThisRun) / tuning.prestige.divisor);
+  // Apply wisdom earn mult from tree (recursive_insight)
+  if (wisdomUnlocks) {
+    const earnMult = calcWisdomEffect("wisdomEarnMult", wisdomUnlocks, tuning, 1);
+    if (earnMult !== 1) {
+      base = Math.floor(base * earnMult);
+    }
+  }
+  return base;
 }
 
 /** Calculate the wisdom bonus multiplier. */
-export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks) {
+export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks, wisdomUnlocks) {
   let mult = tuning.prestige.wisdomMultPerPoint;
-  // wisdom_boost upgrade increases effectiveness
-  if (upgrades.wisdom_boost) {
-    mult += tuning.upgrades.wisdom_boost.wisdomMult;
+  // wisdom_boost: check wisdom tree first, then legacy upgrade
+  if (wisdomUnlocks && wisdomUnlocks.wisdom_boost) {
+    const wbCfg = tuning.wisdomUnlocks.wisdom_boost;
+    if (wbCfg && wbCfg.effect && wbCfg.effect.wisdomMultBonus) {
+      mult += wbCfg.effect.wisdomMultBonus;
+    }
+  } else if (upgrades.wisdom_boost) {
+    mult += tuning.upgrades.wisdom_boost ? tuning.upgrades.wisdom_boost.wisdomMult : 0.05;
   }
   // Benchmark wisdom effectiveness bonus
   if (benchmarks) {
@@ -327,24 +519,26 @@ export function calcWisdomBonus(wisdom, upgrades, tuning, benchmarks) {
 }
 
 /** Check whether the player can prestige based on total avocados earned this run. */
-export function canPrestige(totalAvocadosThisRun, tuning) {
-  return totalAvocadosThisRun >= tuning.prestige.unlockThreshold;
+export function canPrestige(totalAvocadosThisRun, tuning, wisdomUnlocks) {
+  const threshold = wisdomUnlocks ? calcPrestigeThreshold(wisdomUnlocks, tuning) : tuning.prestige.unlockThreshold;
+  return totalAvocadosThisRun >= threshold;
 }
 
 /**
  * Calculate benchmark bonus multipliers from earned benchmarks.
  * Returns { globalMult, clickMult, guacProdMult, guacMult, wisdomMult }.
  */
-export function calcBenchmarkBonus(benchmarks, tuning) {
+export function calcBenchmarkBonus(benchmarks, tuning, wisdomUnlocks) {
   const result = { globalMult: 1, clickMult: 1, guacProdMult: 1, guacMult: 1, wisdomMult: 1 };
   if (!tuning.benchmarks) return result;
+  const bbMult = wisdomUnlocks ? calcWisdomBenchmarkBonusMult(wisdomUnlocks, tuning) : 1;
   for (const [id, cfg] of Object.entries(tuning.benchmarks)) {
     if (!benchmarks[id]) continue;
-    if (cfg.globalMult)   result.globalMult   += cfg.globalMult;
-    if (cfg.clickMult)    result.clickMult    += cfg.clickMult;
-    if (cfg.guacProdMult) result.guacProdMult += cfg.guacProdMult;
-    if (cfg.guacMult)     result.guacMult     += cfg.guacMult;
-    if (cfg.wisdomMult)   result.wisdomMult   += cfg.wisdomMult;
+    if (cfg.globalMult)   result.globalMult   += cfg.globalMult * bbMult;
+    if (cfg.clickMult)    result.clickMult    += cfg.clickMult * bbMult;
+    if (cfg.guacProdMult) result.guacProdMult += cfg.guacProdMult * bbMult;
+    if (cfg.guacMult)     result.guacMult     += cfg.guacMult * bbMult;
+    if (cfg.wisdomMult)   result.wisdomMult   += cfg.wisdomMult * bbMult;
   }
   return result;
 }
@@ -352,11 +546,15 @@ export function calcBenchmarkBonus(benchmarks, tuning) {
 /**
  * Calculate the distillation cost (wisdom required) for the next distillation.
  */
-export function calcDistillationCost(distillationCount, tuning) {
+export function calcDistillationCost(distillationCount, tuning, wisdomUnlocks) {
   if (!tuning.distillation) return Infinity;
   const costs = tuning.distillation.costs;
   if (distillationCount >= costs.length) return Infinity;
-  return costs[distillationCount];
+  let cost = costs[distillationCount];
+  if (wisdomUnlocks) {
+    cost = Math.floor(cost * calcWisdomDistillCostMult(wisdomUnlocks, tuning));
+  }
+  return cost;
 }
 
 /**
@@ -373,7 +571,7 @@ export function canDistill(totalWisdomSinceLastDistill, distillationCount, tunin
  *           multiplierCoeffBonus, consumeFloorBonus, allProdMult, wisdomEarnMult,
  *           unlocksFoundationModel }.
  */
-export function calcDistillationBonus(modelVersion, tuning) {
+export function calcDistillationBonus(modelVersion, tuning, wisdomUnlocks) {
   const result = {
     apsMult: 1, clickBaseBonus: 0, guacProdMult: 1, costMult: 1,
     startingWisdom: 0, multiplierCoeffBonus: 0, consumeFloorBonus: 0,
@@ -381,17 +579,18 @@ export function calcDistillationBonus(modelVersion, tuning) {
   };
   if (!tuning.distillation || modelVersion <= 0) return result;
   const bonuses = tuning.distillation.bonuses;
+  const bonusMult = wisdomUnlocks ? calcWisdomDistillBonusMult(wisdomUnlocks, tuning) : 1;
   for (let i = 0; i < Math.min(modelVersion, bonuses.length); i++) {
     const b = bonuses[i];
-    if (b.apsMult) result.apsMult *= b.apsMult;
-    if (b.baseClickBonus) result.clickBaseBonus += b.baseClickBonus;
-    if (b.guacProdMult) result.guacProdMult *= b.guacProdMult;
-    if (b.costMult) result.costMult *= b.costMult;
-    if (b.startingWisdom) result.startingWisdom += b.startingWisdom;
-    if (b.multiplierCoeffBonus) result.multiplierCoeffBonus += b.multiplierCoeffBonus;
-    if (b.consumeFloorBonus) result.consumeFloorBonus += b.consumeFloorBonus;
-    if (b.allProdMult) result.allProdMult *= b.allProdMult;
-    if (b.wisdomEarnMult) result.wisdomEarnMult *= b.wisdomEarnMult;
+    if (b.apsMult) result.apsMult *= 1 + (b.apsMult - 1) * bonusMult;
+    if (b.baseClickBonus) result.clickBaseBonus += b.baseClickBonus * bonusMult;
+    if (b.guacProdMult) result.guacProdMult *= 1 + (b.guacProdMult - 1) * bonusMult;
+    if (b.costMult) result.costMult *= b.costMult; // cost reduction not amplified
+    if (b.startingWisdom) result.startingWisdom += Math.floor(b.startingWisdom * bonusMult);
+    if (b.multiplierCoeffBonus) result.multiplierCoeffBonus += b.multiplierCoeffBonus * bonusMult;
+    if (b.consumeFloorBonus) result.consumeFloorBonus += b.consumeFloorBonus; // not amplified
+    if (b.allProdMult) result.allProdMult *= 1 + (b.allProdMult - 1) * bonusMult;
+    if (b.wisdomEarnMult) result.wisdomEarnMult *= 1 + (b.wisdomEarnMult - 1) * bonusMult;
     if (b.unlocksFoundationModel) result.unlocksFoundationModel = true;
   }
   return result;

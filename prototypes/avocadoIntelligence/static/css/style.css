@@ -817,6 +817,84 @@ h1 {
   .bonuses-section:nth-child(2) { margin-top: 12px; }
 }
 
+/* Wisdom tree branch headers */
+.wisdom-branch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 0 4px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  user-select: none;
+}
+.wisdom-branch-header:first-child { margin-top: 0; }
+.wisdom-branch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* Wisdom tree nodes */
+.wisdom-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0 6px 10px;
+  border-bottom: 1px solid var(--divider);
+}
+.wisdom-node:last-child { border-bottom: 0; }
+.wisdom-node.depth-0 { padding-left: 10px; }
+.wisdom-node.depth-1 { padding-left: 30px; }
+.wisdom-node.depth-2 { padding-left: 50px; }
+.wisdom-node.depth-3 { padding-left: 70px; }
+.wisdom-node.owned { opacity: 0.5; }
+.wisdom-node.locked { opacity: 0.4; }
+.wisdom-node-info { min-width: 0; flex: 1; }
+.wisdom-node-title { font-size: 13px; font-weight: 600; }
+.wisdom-node-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.wisdom-node-lock { font-size: 11px; color: var(--muted); font-style: italic; }
+
+/* Regimen toggles */
+.regimen-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+.regimen-toggle.active {
+  background: rgba(74,124,63,0.15);
+  border-left: 3px solid var(--primary);
+}
+.regimen-toggle:hover { background: rgba(255,255,255,0.04); }
+.regimen-toggle-info { flex: 1; min-width: 0; }
+.regimen-toggle-title { font-size: 13px; font-weight: 600; }
+.regimen-toggle-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Persistent memory checkboxes */
+.persistent-upgrade-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 12px;
+}
+.persistent-upgrade-row:last-child { border-bottom: 0; }
+.persistent-upgrade-row input[type="checkbox"] { flex-shrink: 0; }
+
 @media (max-width: 900px) {
   .analyzer-overview {
     grid-template-columns: 1fr;

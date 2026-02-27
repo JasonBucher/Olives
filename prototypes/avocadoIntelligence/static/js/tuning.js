@@ -56,8 +56,8 @@ export const TUNING = {
     lab_coats:          { cost: 500000,  unlockAt: 5,  producerId: "guac_lab",    prodMult: 2, title: "Lab Coats",              desc: "Guac Labs produce 2x", requiresWisdomUnlock: "unlock_lab_coats" },
     global_boost_1:     { cost: 10000,   unlockAt: 0,  globalMult: 1.5, title: "Orchard-as-a-Service", desc: "All production +50%" },
     global_boost_2:     { cost: 500000,  unlockAt: 0,  globalMult: 2,   title: "Pit-to-Cloud Pipeline", desc: "All production 2x" },
-    guac_unlock:        { cost: 25000,   unlockAt: 0,  unlocksGuac: true, title: "Guacamole Protocol",  desc: "Unlocks guac processing" },
-    wisdom_boost:       { cost: 1e6,     unlockAt: 0,  wisdomMult: 0.05,  minPrestigeCount: 1, title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective" },
+    guac_unlock:        { cost: 25000,   unlockAt: 0,  unlocksGuac: true, title: "Guacamole Protocol",  desc: "Unlocks guac processing", deprecated: true },
+    wisdom_boost:       { cost: 1e6,     unlockAt: 0,  wisdomMult: 0.05,  minPrestigeCount: 1, title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective", deprecated: true },
     // Guac tuning upgrades
     guac_recycler:      { cost: 120000,  unlockAt: 5,  producerId: "guac_lab", consumeExpDelta: -0.05, title: "Guac Recycler",          desc: "Lab consumption scaling -0.05", requiresWisdomUnlock: "unlock_guac_recycler" },
     bulk_fermentation:  { cost: 200000,  unlockAt: 10, producerId: "guac_lab", consumeExpDelta: -0.05, title: "Bulk Fermentation",       desc: "Lab consumption scaling -0.05 more", requiresWisdomUnlock: "unlock_bulk_fermentation" },
@@ -179,19 +179,87 @@ export const TUNING = {
   },
 
   wisdomUnlocks: {
-    guac_memory_1:            { wisdomCost: 3,  title: "Guac Memory I",           desc: "produceExponent +0.02 per prestige completed" },
-    guac_memory_2:            { wisdomCost: 10, title: "Guac Memory II",          desc: "consumeExponent -0.01 per prestige completed" },
-    infinite_guac:            { wisdomCost: 25, title: "Infinite Guac Theory",    desc: "consumeExponent floor lowered from 0.70 to 0.55" },
-    unlock_guac_recycler:     { wisdomCost: 2,  title: "Guac Recycler Theory",    desc: "Unlocks a research upgrade that reduces guac lab consumption scaling by 0.05" },
-    unlock_refinery:          { wisdomCost: 2,  title: "Refinery Blueprints",     desc: "Unlocks the Guac Refinery building — each refinery lowers consumption scaling by 0.01" },
-    unlock_bulk_fermentation: { wisdomCost: 3,  title: "Fermentation Science",    desc: "Unlocks a research upgrade that reduces guac lab consumption scaling by another 0.05" },
-    unlock_concentrate_proto: { wisdomCost: 3,  title: "Concentrate Theory",      desc: "Unlocks a research upgrade that multiplies base guac output by 1.5x" },
-    unlock_superlinear_synth: { wisdomCost: 4,  title: "Superlinear Theory",      desc: "Unlocks a research upgrade that boosts guac output scaling exponent by +0.05" },
-    unlock_lab_coats:         { wisdomCost: 4,  title: "Lab Safety Standards",    desc: "Unlocks a research upgrade that doubles Guac Lab production (2x)" },
-    unlock_catalytic_convert: { wisdomCost: 4,  title: "Catalysis Research",      desc: "Unlocks a research upgrade that reduces refinery consumption scaling by 0.05" },
-    unlock_centrifuge:        { wisdomCost: 5,  title: "Centrifuge Engineering",  desc: "Unlocks the Guac Centrifuge building — each centrifuge boosts guac output scaling by +0.05" },
-    unlock_ultracentrifuge:   { wisdomCost: 5,  title: "Ultra Spin Theory",       desc: "Unlocks a research upgrade that boosts centrifuge guac output scaling by +0.05" },
-    unlock_exponential_ripen: { wisdomCost: 6,  title: "Exponential Growth Lab",  desc: "Unlocks a research upgrade that boosts guac output scaling exponent by +0.10" },
+    // ── Branch 1: Orchard Roots (8 nodes, 48w) ──
+    starter_seedlings:   { wisdomCost: 1,  requires: null,                branch: "orchard_roots",     title: "Starter Seedlings",      desc: "Start each run with 3 saplings", effect: { startingProducers: { sapling: 3 } } },
+    quick_sprout:        { wisdomCost: 2,  requires: "starter_seedlings", branch: "orchard_roots",     title: "Quick Sprout",           desc: "Start each run with 50 avocados", effect: { startingAvocados: 50 } },
+    fertile_soil:        { wisdomCost: 3,  requires: "starter_seedlings", branch: "orchard_roots",     title: "Fertile Soil",           desc: "Producer costs -5%", effect: { producerCostMult: 0.95 } },
+    muscle_memory:       { wisdomCost: 4,  requires: "starter_seedlings", branch: "orchard_roots",     title: "Muscle Memory",          desc: "Clicks +50%", effect: { clickMult: 1.5 } },
+    deep_roots:          { wisdomCost: 5,  requires: "quick_sprout",      branch: "orchard_roots",     title: "Deep Roots",             desc: "Start each run with 5 saplings and 2 seed banks", effect: { startingProducers: { sapling: 5, seed_bank: 2 } } },
+    ancient_grove:       { wisdomCost: 15, requires: "deep_roots",        branch: "orchard_roots",     title: "Ancient Grove",          desc: "Start each run with 500 avocados, 8 saplings, 3 seed banks", effect: { startingAvocados: 500, startingProducers: { sapling: 8, seed_bank: 3, orchard_row: 1 } } },
+    rich_compost:        { wisdomCost: 8,  requires: "fertile_soil",      branch: "orchard_roots",     title: "Rich Compost",           desc: "Producer costs -10% (replaces Fertile Soil)", effect: { producerCostMult: 0.90 } },
+    thick_skin:          { wisdomCost: 10, requires: "muscle_memory",     branch: "orchard_roots",     title: "Thick Skin",             desc: "Clicks +100% (replaces Muscle Memory)", effect: { clickMult: 2.0 } },
+
+    // ── Branch 2: Guac Economy (13 nodes, 71w) ──
+    guac_protocol:           { wisdomCost: 2,  requires: null,                    branch: "guac_economy",      title: "Guacamole Protocol",     desc: "Unlocks guac processing", effect: { unlocksGuac: true } },
+    unlock_guac_recycler:    { wisdomCost: 2,  requires: "guac_protocol",         branch: "guac_economy",      title: "Guac Recycler Theory",   desc: "Unlocks research: guac lab consumption -0.05" },
+    unlock_bulk_fermentation:{ wisdomCost: 3,  requires: "unlock_guac_recycler",  branch: "guac_economy",      title: "Fermentation Science",   desc: "Unlocks research: guac lab consumption -0.05 more" },
+    unlock_catalytic_convert:{ wisdomCost: 4,  requires: "unlock_bulk_fermentation", branch: "guac_economy",   title: "Catalysis Research",     desc: "Unlocks research: refinery consumption -0.05" },
+    unlock_refinery:         { wisdomCost: 2,  requires: "guac_protocol",         branch: "guac_economy",      title: "Refinery Blueprints",    desc: "Unlocks Guac Refinery building" },
+    unlock_centrifuge:       { wisdomCost: 5,  requires: "unlock_refinery",       branch: "guac_economy",      title: "Centrifuge Engineering", desc: "Unlocks Guac Centrifuge building" },
+    unlock_ultracentrifuge:  { wisdomCost: 5,  requires: "unlock_centrifuge",     branch: "guac_economy",      title: "Ultra Spin Theory",      desc: "Unlocks research: centrifuge output +0.05" },
+    unlock_concentrate_proto:{ wisdomCost: 3,  requires: "guac_protocol",         branch: "guac_economy",      title: "Concentrate Theory",     desc: "Unlocks research: base guac output x1.5" },
+    unlock_superlinear_synth:{ wisdomCost: 4,  requires: "unlock_concentrate_proto", branch: "guac_economy",   title: "Superlinear Theory",     desc: "Unlocks research: guac output +0.05" },
+    unlock_exponential_ripen:{ wisdomCost: 6,  requires: "unlock_superlinear_synth", branch: "guac_economy",   title: "Exponential Growth Lab", desc: "Unlocks research: guac output +0.10" },
+    unlock_lab_coats:        { wisdomCost: 4,  requires: "guac_protocol",         branch: "guac_economy",      title: "Lab Safety Standards",   desc: "Unlocks research: Guac Labs 2x" },
+    guac_sommelier:          { wisdomCost: 8,  requires: "guac_protocol",         branch: "guac_economy",      title: "Guac Sommelier",         desc: "Guac multiplier coefficient +0.005", effect: { guacCoeffBonus: 0.005 } },
+    guac_singularity:        { wisdomCost: 20, requires: "guac_sommelier",        branch: "guac_economy",      title: "Guac Singularity",       desc: "Guac multiplier coefficient +0.01 more", effect: { guacCoeffBonus: 0.01 } },
+
+    // ── Branch 3: Wisdom Amplification (8 nodes, 76w) ──
+    inner_peace:         { wisdomCost: 2,  requires: null,              branch: "wisdom_amp",        title: "Inner Peace",            desc: "Begin the path to deeper wisdom" },
+    wisdom_boost:        { wisdomCost: 3,  requires: "inner_peace",    branch: "wisdom_amp",        title: "AGI (Avocado General Intelligence)", desc: "Wisdom bonus +50% more effective", effect: { wisdomMultBonus: 0.05 } },
+    recursive_insight:   { wisdomCost: 12, requires: "wisdom_boost",   branch: "wisdom_amp",        title: "Recursive Insight",      desc: "Wisdom earn rate +25%", effect: { wisdomEarnMult: 1.25 } },
+    guac_memory_1:       { wisdomCost: 3,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Guac Memory I",          desc: "produceExponent +0.02 per prestige" },
+    guac_memory_2:       { wisdomCost: 10, requires: "guac_memory_1",  branch: "wisdom_amp",        title: "Guac Memory II",         desc: "consumeExponent -0.01 per prestige" },
+    infinite_guac:       { wisdomCost: 25, requires: "guac_memory_2",  branch: "wisdom_amp",        title: "Infinite Guac Theory",   desc: "consumeExponent floor lowered from 0.70 to 0.55" },
+    efficient_composting:{ wisdomCost: 6,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Efficient Composting",   desc: "Prestige threshold lowered to 5M", effect: { prestigeThreshold: 5e6 } },
+    accelerated_decay:   { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp",  title: "Accelerated Decay",      desc: "Prestige threshold lowered to 2M (replaces Efficient Composting)", effect: { prestigeThreshold: 2e6 } },
+
+    // ── Branch 4: Neural Architecture (7 nodes, 89w) ──
+    backpropagation:     { wisdomCost: 2,  requires: null,                  branch: "neural_arch",       title: "Backpropagation",        desc: "Begin optimizing neural pathways" },
+    weight_initialization:{ wisdomCost: 4, requires: "backpropagation",     branch: "neural_arch",       title: "Weight Initialization",  desc: "All production +10%", effect: { globalApsMult: 1.10 } },
+    batch_normalization: { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch",     title: "Batch Normalization",    desc: "All production +20% (stacks)", effect: { globalApsMult: 1.20 } },
+    residual_connections:{ wisdomCost: 25, requires: "batch_normalization", branch: "neural_arch",       title: "Residual Connections",   desc: "All production +50% (stacks)", effect: { globalApsMult: 1.50 } },
+    dropout_prevention:  { wisdomCost: 5,  requires: "backpropagation",     branch: "neural_arch",       title: "Dropout Prevention",     desc: "Benchmark bonuses +25% more effective", effect: { benchmarkBonusMult: 1.25 } },
+    gradient_clipping:   { wisdomCost: 8,  requires: "backpropagation",     branch: "neural_arch",       title: "Gradient Clipping",      desc: "Research costs -10%", effect: { researchCostMult: 0.90 } },
+    adaptive_learning:   { wisdomCost: 20, requires: "gradient_clipping",   branch: "neural_arch",       title: "Adaptive Learning",      desc: "Research costs -20% (replaces Gradient Clipping)", effect: { researchCostMult: 0.80 } },
+
+    // placeholder effect on root nodes without mechanical effects — the node itself is the gate
+
+    // ── Branch 5: Training Data (5 nodes, 32w) ──
+    curriculum_learning: { wisdomCost: 3,  requires: null,                   branch: "training_data",     title: "Curriculum Learning",    desc: "Unlocks Training Regimens — choose a focus for each run" },
+    click_specialization:{ wisdomCost: 4,  requires: "curriculum_learning",  branch: "training_data",     title: "Click Specialization",   desc: "Unlocks Click Focus regimen: clicks 3x, producers -30%" },
+    scale_specialization:{ wisdomCost: 4,  requires: "curriculum_learning",  branch: "training_data",     title: "Scale Specialization",   desc: "Unlocks Scale Focus regimen: producers +50%, clicks -50%" },
+    guac_specialization: { wisdomCost: 6,  requires: "curriculum_learning",  branch: "training_data",     title: "Guac Specialization",    desc: "Unlocks Guac Focus regimen: guac output 2x, production -20%" },
+    dual_curriculum:     { wisdomCost: 15, requires: "curriculum_learning",  branch: "training_data",     title: "Dual Curriculum",        desc: "Equip 2 regimens at once" },
+
+    // ── Branch 6: Persistent Memory (4 nodes, 48w) ──
+    flash_memory:        { wisdomCost: 5,  requires: null,              branch: "persistent_memory", title: "Flash Memory",           desc: "Keep 1 research upgrade through prestige", effect: { persistentSlots: 1 } },
+    l1_cache:            { wisdomCost: 10, requires: "flash_memory",    branch: "persistent_memory", title: "L1 Cache",               desc: "Keep 2 research upgrades through prestige (replaces Flash Memory)", effect: { persistentSlots: 2 } },
+    l2_cache:            { wisdomCost: 25, requires: "l1_cache",        branch: "persistent_memory", title: "L2 Cache",               desc: "Keep 3 research upgrades through prestige (replaces L1 Cache)", effect: { persistentSlots: 3 } },
+    selective_recall:    { wisdomCost: 8,  requires: "flash_memory",    branch: "persistent_memory", title: "Selective Recall",       desc: "Auto-select the most expensive research upgrades for persistent slots" },
+
+    // ── Branch 7: Inference Engine (5 nodes, 68w) ──
+    knowledge_distillation:{ wisdomCost: 5,  requires: null,                      branch: "inference_engine",  title: "Knowledge Distillation", desc: "Distillation costs -10%", effect: { distillCostMult: 0.90 } },
+    pruning_algorithm:     { wisdomCost: 8,  requires: "knowledge_distillation",  branch: "inference_engine",  title: "Pruning Algorithm",      desc: "Distillation costs -25% (replaces Knowledge Distillation)", effect: { distillCostMult: 0.75 } },
+    quantization:          { wisdomCost: 10, requires: "knowledge_distillation",  branch: "inference_engine",  title: "Quantization",           desc: "Distillation bonuses +20% more effective", effect: { distillBonusMult: 1.20 } },
+    model_merging:         { wisdomCost: 15, requires: "knowledge_distillation",  branch: "inference_engine",  title: "Model Merging",          desc: "Distillation bonuses +50% more effective (stacks)", effect: { distillBonusMult: 1.50 } },
+    emergent_capability:   { wisdomCost: 30, requires: "model_merging",           branch: "inference_engine",  title: "Emergent Capability",    desc: "Unlocks Model v6.0 distillation tier" },
+  },
+
+  wisdomBranches: {
+    orchard_roots:     { title: "Orchard Roots",        color: "#7ec87e" },
+    guac_economy:      { title: "Guac Economy",          color: "#4a7c3f" },
+    wisdom_amp:        { title: "Wisdom Amplification",  color: "#c8a2c8" },
+    neural_arch:       { title: "Neural Architecture",   color: "#4a8cc7" },
+    training_data:     { title: "Training Data",         color: "#e8a438" },
+    persistent_memory: { title: "Persistent Memory",     color: "#d4af37" },
+    inference_engine:  { title: "Inference Engine",       color: "#c0392b" },
+  },
+
+  trainingRegimens: {
+    click_focus: { title: "Click Focus",  desc: "Clicks 3x, producers -30%",  clickMult: 3.0, producerMult: 0.70, requiresUnlock: "click_specialization" },
+    scale_focus: { title: "Scale Focus",  desc: "Producers +50%, clicks -50%", clickMult: 0.50, producerMult: 1.50, requiresUnlock: "scale_specialization" },
+    guac_focus:  { title: "Guac Focus",   desc: "Guac 2x, production -20%",   guacOutputMult: 2.0, producerMult: 0.80, requiresUnlock: "guac_specialization" },
   },
 
   benchmarks: {
@@ -242,13 +310,14 @@ export const TUNING = {
   },
 
   distillation: {
-    costs: [100, 250, 500, 1000, 2000], // wisdom cost for each distillation (v1.0 through v5.0)
+    costs: [100, 250, 500, 1000, 2000, 4000], // wisdom cost for each distillation (v1.0 through v6.0)
     bonuses: [
       { apsMult: 1.5, wisdomEarnMult: 1.2, desc: "Base APS x1.5, wisdom earn rate x1.2", flavor: "Knowledge compressed. Inference faster." },
       { baseClickBonus: 1, guacProdMult: 1.3, desc: "+1 base click power, guac production x1.3", flavor: "Attention weights optimized." },
       { costMult: 0.90, startingWisdom: 2, desc: "Producer costs x0.90, +2 starting wisdom on prestige", flavor: "Quantized. Smaller, same performance." },
       { multiplierCoeffBonus: 0.01, consumeFloorBonus: -0.05, desc: "Guac mult coeff +0.01, consume floor -0.05", flavor: "Architecture breakthrough." },
       { allProdMult: 2.0, unlocksFoundationModel: true, desc: "All production x2.0, unlock Foundation Model", flavor: "You have built AGI." },
+      { apsMult: 2.0, wisdomEarnMult: 1.5, allProdMult: 1.5, desc: "APS x2.0, all prod x1.5, wisdom earn x1.5", flavor: "Emergent properties detected. The avocados understand themselves." },
     ],
   },
 };
@@ -265,3 +334,9 @@ export const PRODUCER_ORDER = [
 
 // Guac producers — left column, own section
 export const GUAC_PRODUCER_ORDER = ["guac_lab", "guac_refinery", "guac_centrifuge"];
+
+// Wisdom tree branch render order
+export const WISDOM_BRANCH_ORDER = [
+  "orchard_roots", "guac_economy", "wisdom_amp",
+  "neural_arch", "training_data", "persistent_memory", "inference_engine",
+];

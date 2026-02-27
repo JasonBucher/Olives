@@ -1,6 +1,6 @@
 // Avocado Intelligence — main game loop and state
 
-import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER } from "./tuning.js";
+import { TUNING, PRODUCER_ORDER, GUAC_PRODUCER_ORDER, WISDOM_BRANCH_ORDER } from "./tuning.js";
 import * as Calc from "./gameCalc.js";
 import { INVESTMENTS } from "./investments.js";
 import { checkBenchmarks, BENCHMARK_ORDER } from "./benchmarks.js";
@@ -26,6 +26,8 @@ const PERSISTED_STATE_KEYS = [
   "modelVersion",
   "distillationCount",
   "totalWisdomSinceLastDistill",
+  "activeRegimens",
+  "persistentUpgrades",
   "meta",
 ];
 
@@ -50,6 +52,8 @@ function createDefaultState() {
     modelVersion: 0,
     distillationCount: 0,
     totalWisdomSinceLastDistill: 0,
+    activeRegimens: [],
+    persistentUpgrades: [],
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
@@ -211,8 +215,8 @@ function closeAnalyzer() {
 
 // --- Telemetry helpers ---
 function captureStateSnapshot(reason = "tick") {
-  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
   aps *= distBonus.apsMult * distBonus.allProdMult;
 
   SessionLog.record("state_snapshot", {
@@ -263,8 +267,33 @@ function loadGame() {
       upgrades: { ...(persisted.upgrades || {}) },
       wisdomUnlocks: { ...(persisted.wisdomUnlocks || {}) },
       benchmarks: { ...(persisted.benchmarks || {}) },
+      activeRegimens: persisted.activeRegimens || [],
+      persistentUpgrades: persisted.persistentUpgrades || [],
       meta: { ...defaults.meta, ...(persisted.meta || {}) },
     };
+
+    // --- Migration: guac_unlock → guac_protocol wisdom unlock ---
+    if ((state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock) && !state.wisdomUnlocks.guac_protocol) {
+      state.wisdomUnlocks.guac_protocol = true;
+    }
+
+    // --- Migration: wisdom_boost → wisdom tree ---
+    if (state.upgrades.wisdom_boost && !state.wisdomUnlocks.wisdom_boost) {
+      state.wisdomUnlocks.wisdom_boost = true;
+      state.wisdomUnlocks.inner_peace = true; // grant prerequisite
+    }
+
+    // --- Migration: prerequisite back-fill ---
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
+        if (state.wisdomUnlocks[id] && cfg.requires && !state.wisdomUnlocks[cfg.requires]) {
+          state.wisdomUnlocks[cfg.requires] = true;
+          changed = true;
+        }
+      }
+    }
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state.meta.createdAt = new Date().toISOString();
@@ -450,7 +479,7 @@ function renderDistillation() {
 
   // Compute wisdom that will be available after prestige (including the gain from this compost)
   const wsld = (state.totalWisdomSinceLastDistill || 0) + overlayWisdomGain;
-  const cost = Calc.calcDistillationCost(dc, TUNING);
+  const cost = Calc.calcDistillationCost(dc, TUNING, state.wisdomUnlocks);
   const shouldShow = mv > 0 || wsld >= Math.floor(cost * 0.5);
 
   const blockEl = document.getElementById("prestige-distillation-block");
@@ -588,11 +617,11 @@ function renderBenchmarks() {
 let tickCount = 0;
 
 function updateUI() {
-  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
   aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -606,8 +635,8 @@ function updateUI() {
   apsCountEl.textContent = Calc.formatNumber(aps);
 
 
-  // Guac row — show when guac protocol owned
-  const hasGuac = !!state.upgrades.guac_unlock;
+  // Guac row — show when guac protocol owned (wisdom tree or legacy upgrade)
+  const hasGuac = !!(state.wisdomUnlocks.guac_protocol || (state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock));
   guacRowEl.style.display = hasGuac ? "" : "none";
   const labs = state.producers.guac_lab || 0;
   const refineries = state.producers.guac_refinery || 0;
@@ -622,7 +651,7 @@ function updateUI() {
   if (guacPsRowEl) {
     guacPsRowEl.style.display = (hasGuac && labs > 0) ? "" : "none";
     if (labs > 0 && guacPsEl) {
-      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
+      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
       guacPsEl.textContent = Calc.formatNumber(guacPerSec);
     }
   }
@@ -634,9 +663,9 @@ function updateUI() {
   }
 
   // Total multiplier row — show all APS multipliers combined
-  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
-  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks);
-  const benchBonus = Calc.calcBenchmarkBonus(state.benchmarks, TUNING);
+  const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks);
+  const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks, state.wisdomUnlocks);
+  const benchBonus = Calc.calcBenchmarkBonus(state.benchmarks, TUNING, state.wisdomUnlocks);
   let upgradeGlobalMult = 1;
   for (const [uid, ucfg] of Object.entries(TUNING.upgrades)) {
     if (ucfg.globalMult && state.upgrades[uid]) upgradeGlobalMult *= ucfg.globalMult;
@@ -700,6 +729,7 @@ function updateUI() {
   // Upgrade rows: move between Research / Owned tabs (with lookahead + threshold)
   const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
   const upgradeCostThreshold = TUNING.reveal.costThreshold;
+  const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
   let upgradeLookaheadUsed = 0;
   let firstEligibleUpgradeSeen = false;
 
@@ -754,7 +784,8 @@ function updateUI() {
     upgradeLookaheadUsed++;
 
     // 5. Threshold check: first eligible always visible; others need >= costThreshold
-    const upgradeCost = inv.cost();
+    const baseCost = inv.cost();
+    const upgradeCost = Math.floor(baseCost * researchCostMult);
     if (!firstEligibleUpgradeSeen) {
       firstEligibleUpgradeSeen = true;
       revealedUpgrades.add(inv.id);
@@ -771,7 +802,7 @@ function updateUI() {
     row.style.display = "";
     const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
     if (btn) {
-      btn.disabled = !inv.canPurchase(state);
+      btn.disabled = state.avocadoCount < upgradeCost || state.upgrades[inv.id];
       const costEl = btn.querySelector(`[data-ucost="${inv.id}"]`);
       if (costEl) {
         costEl.textContent = Calc.formatNumber(upgradeCost);
@@ -782,11 +813,11 @@ function updateUI() {
   }
 
   // Prestige section
-  const canPrestigeNow = Calc.canPrestige(state.totalAvocadosThisRun, TUNING);
+  const canPrestigeNow = Calc.canPrestige(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks);
   if (canPrestigeNow) {
     prestigeLockedEl.style.display = "none";
     prestigeUnlockedEl.style.display = "";
-    const wisdomGain = Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING);
+    const wisdomGain = Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks);
     wisdomPreviewEl.textContent = String(wisdomGain);
     totalAvocadosRunEl.textContent = Calc.formatNumber(state.totalAvocadosThisRun);
   } else {
@@ -799,7 +830,8 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
   const refineries = state.producers.guac_refinery || 0;
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
-  const combinedCostMult = distBonus.costMult;
+  const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
+  const combinedCostMult = distBonus.costMult * wisdomCostMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
@@ -860,9 +892,9 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
       if (synergyMult > 1) {
         rateText += ` [synergy x${synergyMult.toFixed(2)}]`;
       }
-      if (id === "guac_lab" && state.upgrades.guac_unlock) {
+      if (id === "guac_lab" && (state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock)) {
         const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
-        const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks);
+        const guacOut = Calc.calcGuacProduction(owned, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
         rateText += ` | Consumes ${Calc.formatRate(consumption)} avo/sec \u2192 ${Calc.formatRate(guacOut)} guac/sec`;
       }
       if (id === "guac_refinery") {
@@ -937,7 +969,7 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
     if (countEl) countEl.textContent = "";
     if (costEl) costEl.textContent = costLabel;
     let rateText = `Each produces ${Calc.formatRate(unitRate)} avocados/sec`;
-    if (id === "guac_lab" && state.upgrades.guac_unlock) {
+    if (id === "guac_lab" && (state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock)) {
       rateText += ` | Also converts avocados \u2192 guac`;
     }
     if (id === "guac_refinery") {
@@ -984,7 +1016,7 @@ function pickAvocado() {
   if (idlePromptShowing) dismissIdlePrompt();
 
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -1032,9 +1064,11 @@ function confirmPrestigeAndDistill() {
   state.totalWisdomSinceLastDistill = 0;
   state.modelVersion = newModelVersion;
   state.distillationCount = newDistillationCount;
+  state.activeRegimens = [];
+  state.persistentUpgrades = []; // clear persistent upgrades on distillation
 
   // Apply starting wisdom from new model version
-  const distBonus = Calc.calcDistillationBonus(newModelVersion, TUNING);
+  const distBonus = Calc.calcDistillationBonus(newModelVersion, TUNING, state.wisdomUnlocks);
   if (distBonus.startingWisdom > 0) {
     state.wisdom += distBonus.startingWisdom;
   }
@@ -1062,6 +1096,7 @@ function confirmPrestigeAndDistill() {
   guacBuyQuantity = 1;
   renderUpgradeList();
   renderBenchmarks();
+  renderRegimenSection();
   updateUI();
 }
 
@@ -1072,7 +1107,7 @@ function buyProducer(id) {
 
   // Guac lab gating — need enough APS to feed the lab
   if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
-    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
     if (currentAps < TUNING.guac.labUnlockAps) return;
   }
 
@@ -1085,8 +1120,9 @@ function buyProducer(id) {
   const cfg = TUNING.producers[id];
   if (cfg.minPrestigeCount && (state.prestigeCount || 0) < cfg.minPrestigeCount) return;
 
-  const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  const combinedCostMult = distBonusBuy.costMult;
+  const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+  const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
+  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult;
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
@@ -1128,9 +1164,14 @@ function buyProducer(id) {
 
 function buyUpgrade(id) {
   const inv = INVESTMENTS.find(i => i.id === id);
-  if (!inv || inv.isOwned(state) || !inv.canPurchase(state)) return;
+  if (!inv || inv.isOwned(state)) return;
 
-  inv.purchase(state);
+  const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
+  const effectiveCost = Math.floor(inv.cost() * researchCostMult);
+  if (state.avocadoCount < effectiveCost) return;
+
+  state.avocadoCount -= effectiveCost;
+  state.upgrades[id] = true;
   const cfg = TUNING.upgrades[id];
   SessionLog.record("purchase", { kind: "upgrade", id, title: cfg.title });
   logLine(`Research complete: ${cfg.title}`);
@@ -1143,10 +1184,10 @@ let overlayWisdomGain = 0;
 let overlayPurchases = {};
 
 function openPrestigeOverlay() {
-  if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING)) return;
+  if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks)) return;
 
-  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-  overlayWisdomGain = Math.floor(Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING) * distBonus.wisdomEarnMult);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+  overlayWisdomGain = Math.floor(Calc.calcWisdomEarned(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks) * distBonus.wisdomEarnMult);
   overlayPurchases = {};
 
   const newPrestigeCount = (state.prestigeCount || 0) + 1;
@@ -1167,8 +1208,13 @@ function openPrestigeOverlay() {
     prestigeSummaryEl.appendChild(row);
   }
 
-  // Build wisdom unlocks
+  // Build wisdom tree
+  collapsedBranches.clear(); // reset collapsed state each time overlay opens
   renderPrestigeWisdomUnlocks(totalWisdom);
+
+  // Build persistent memory section
+  overlayPersistentSelections = [...(state.persistentUpgrades || [])];
+  renderPersistentMemoryBlock();
 
   // Build distillation section
   renderDistillation();
@@ -1176,6 +1222,9 @@ function openPrestigeOverlay() {
   prestigeOverlay.classList.add("active");
   prestigeOverlay.setAttribute("aria-hidden", "false");
 }
+
+// --- Wisdom Tree Overlay ---
+const collapsedBranches = new Set();
 
 function renderPrestigeWisdomUnlocks(availableWisdom) {
   prestigeWisdomUnlocksEl.innerHTML = "";
@@ -1194,7 +1243,6 @@ function renderPrestigeWisdomUnlocks(availableWisdom) {
   prestigeWisdomUnlocksEl.appendChild(descEl);
 
   let remainingWisdom = availableWisdom;
-  // Subtract already-purchased overlayPurchases
   for (const id of Object.keys(overlayPurchases)) {
     remainingWisdom -= TUNING.wisdomUnlocks[id].wisdomCost;
   }
@@ -1205,40 +1253,224 @@ function renderPrestigeWisdomUnlocks(availableWisdom) {
   wisdomLabel.innerHTML = `<div class="label">Remaining Wisdom</div><div class="value">${remainingWisdom}</div>`;
   prestigeWisdomUnlocksEl.appendChild(wisdomLabel);
 
-  for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
-    const alreadyOwned = !!state.wisdomUnlocks[id];
-    const overlayBought = !!overlayPurchases[id];
-    const isOwned = alreadyOwned || overlayBought;
+  // Combined owned check: real state + overlay purchases
+  const effectiveOwned = (id) => !!(state.wisdomUnlocks[id] || overlayPurchases[id]);
 
+  for (const branchKey of WISDOM_BRANCH_ORDER) {
+    const branchMeta = TUNING.wisdomBranches[branchKey];
+    if (!branchMeta) continue;
+
+    // Collect nodes for this branch
+    const branchNodes = [];
+    for (const [id, cfg] of Object.entries(TUNING.wisdomUnlocks)) {
+      if (cfg.branch === branchKey) {
+        branchNodes.push({ id, cfg, depth: Calc.getWisdomNodeDepth(id, TUNING) });
+      }
+    }
+    branchNodes.sort((a, b) => a.depth - b.depth || Object.keys(TUNING.wisdomUnlocks).indexOf(a.id) - Object.keys(TUNING.wisdomUnlocks).indexOf(b.id));
+
+    const ownedCount = branchNodes.filter(n => effectiveOwned(n.id)).length;
+    const totalCount = branchNodes.length;
+    const allOwned = ownedCount === totalCount;
+
+    // Default collapsed state: all-owned branches collapse by default
+    if (allOwned && !collapsedBranches.has(branchKey + "_init")) {
+      collapsedBranches.add(branchKey);
+      collapsedBranches.add(branchKey + "_init");
+    }
+    const isCollapsed = collapsedBranches.has(branchKey);
+
+    // Branch header
+    const header = document.createElement("div");
+    header.className = "wisdom-branch-header";
+    const leftSpan = document.createElement("span");
+    leftSpan.innerHTML = `<span class="wisdom-branch-dot" style="background:${branchMeta.color}"></span>${branchMeta.title}`;
+    const rightSpan = document.createElement("span");
+    rightSpan.className = "muted";
+    rightSpan.textContent = allOwned ? `${ownedCount}/${totalCount} \u2713` : `${ownedCount}/${totalCount}`;
+    header.appendChild(leftSpan);
+    header.appendChild(rightSpan);
+    header.addEventListener("click", () => {
+      if (collapsedBranches.has(branchKey)) {
+        collapsedBranches.delete(branchKey);
+      } else {
+        collapsedBranches.add(branchKey);
+      }
+      renderPrestigeWisdomUnlocks(availableWisdom);
+    });
+    prestigeWisdomUnlocksEl.appendChild(header);
+
+    if (isCollapsed) continue;
+
+    // Render nodes
+    for (const { id, cfg, depth } of branchNodes) {
+      const isOwned = effectiveOwned(id);
+      const prereqMet = Calc.isWisdomUnlockAvailable(id, state.wisdomUnlocks, overlayPurchases, TUNING);
+      const depthClass = `depth-${Math.min(depth, 3)}`;
+
+      const row = document.createElement("div");
+      row.className = `wisdom-node ${depthClass}`;
+
+      if (isOwned) {
+        row.classList.add("owned");
+        row.innerHTML = `
+          <div class="wisdom-node-info">
+            <div class="wisdom-node-title">${cfg.title}</div>
+            <div class="wisdom-node-desc">${cfg.desc}</div>
+          </div>
+          <span class="muted">Owned</span>
+        `;
+      } else if (!prereqMet) {
+        row.classList.add("locked");
+        const parentCfg = TUNING.wisdomUnlocks[cfg.requires];
+        row.innerHTML = `
+          <div class="wisdom-node-info">
+            <div class="wisdom-node-title">${cfg.title}</div>
+            <div class="wisdom-node-lock">Requires: ${parentCfg ? parentCfg.title : cfg.requires}</div>
+          </div>
+        `;
+      } else {
+        const canAfford = remainingWisdom >= cfg.wisdomCost;
+        row.innerHTML = `
+          <div class="wisdom-node-info">
+            <div class="wisdom-node-title">${cfg.title}</div>
+            <div class="wisdom-node-desc">${cfg.desc}</div>
+          </div>
+        `;
+        const btn = document.createElement("button");
+        btn.className = "btn upgrade-buy";
+        btn.type = "button";
+        btn.textContent = `${cfg.wisdomCost} Wisdom`;
+        btn.disabled = !canAfford;
+        btn.addEventListener("click", () => {
+          overlayPurchases[id] = true;
+          renderPrestigeWisdomUnlocks(availableWisdom);
+        });
+        row.appendChild(btn);
+      }
+
+      prestigeWisdomUnlocksEl.appendChild(row);
+    }
+  }
+}
+
+// --- Persistent Memory (prestige overlay) ---
+let overlayPersistentSelections = [];
+
+function renderPersistentMemoryBlock() {
+  const blockEl = document.getElementById("prestige-persistent-block");
+  const listEl = document.getElementById("prestige-persistent-list");
+  if (!blockEl || !listEl) return;
+
+  // Combine real wisdomUnlocks with overlay purchases for slot calculation
+  const effectiveUnlocks = { ...state.wisdomUnlocks };
+  for (const id of Object.keys(overlayPurchases)) effectiveUnlocks[id] = true;
+  const slots = Calc.calcPersistentSlots(effectiveUnlocks, TUNING);
+
+  if (slots <= 0) {
+    blockEl.style.display = "none";
+    return;
+  }
+  blockEl.style.display = "";
+  listEl.innerHTML = "";
+
+  const descEl = document.createElement("div");
+  descEl.className = "muted";
+  descEl.style.marginBottom = "8px";
+  descEl.textContent = `Select up to ${slots} research upgrade${slots > 1 ? "s" : ""} to keep through prestige.`;
+  listEl.appendChild(descEl);
+
+  // Get owned research upgrades (exclude deprecated)
+  const ownedUpgrades = INVESTMENTS.filter(inv => inv.isOwned(state));
+  if (ownedUpgrades.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "muted";
+    emptyEl.textContent = "No research upgrades to keep.";
+    listEl.appendChild(emptyEl);
+    return;
+  }
+
+  // Auto-select if selective_recall is owned
+  if (effectiveUnlocks.selective_recall && overlayPersistentSelections.length === 0) {
+    const sorted = [...ownedUpgrades].sort((a, b) => b.cost() - a.cost());
+    overlayPersistentSelections = sorted.slice(0, slots).map(inv => inv.id);
+  }
+
+  for (const inv of ownedUpgrades) {
+    const cfg = TUNING.upgrades[inv.id];
     const row = document.createElement("div");
-    row.className = `upgrade-row${isOwned ? " owned" : ""}`;
+    row.className = "persistent-upgrade-row";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = overlayPersistentSelections.includes(inv.id);
+    cb.disabled = !cb.checked && overlayPersistentSelections.length >= slots;
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        if (overlayPersistentSelections.length < slots) {
+          overlayPersistentSelections.push(inv.id);
+        }
+      } else {
+        overlayPersistentSelections = overlayPersistentSelections.filter(x => x !== inv.id);
+      }
+      renderPersistentMemoryBlock();
+    });
+    row.appendChild(cb);
+    const label = document.createElement("span");
+    label.textContent = cfg.title;
+    row.appendChild(label);
+    listEl.appendChild(row);
+  }
+}
+
+// --- Training Regimen Section ---
+function renderRegimenSection() {
+  const sectionEl = document.getElementById("regimen-section");
+  const listEl = document.getElementById("regimen-list");
+  if (!sectionEl || !listEl) return;
+
+  const hasRegimens = !!state.wisdomUnlocks.curriculum_learning;
+  sectionEl.style.display = hasRegimens ? "" : "none";
+  if (!hasRegimens) return;
+
+  listEl.innerHTML = "";
+  const available = Calc.calcAvailableRegimens(state.wisdomUnlocks, TUNING);
+  const maxReg = Calc.calcMaxRegimens(state.wisdomUnlocks);
+
+  if (available.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "muted";
+    emptyEl.textContent = "Unlock specialization nodes to gain regimen options.";
+    listEl.appendChild(emptyEl);
+    return;
+  }
+
+  for (const id of available) {
+    const cfg = TUNING.trainingRegimens[id];
+    const isActive = (state.activeRegimens || []).includes(id);
+    const row = document.createElement("div");
+    row.className = `regimen-toggle${isActive ? " active" : ""}`;
     row.innerHTML = `
-      <div class="upgrade-info">
-        <div class="upgrade-title">${cfg.title}</div>
-        <div class="upgrade-desc">${cfg.desc}</div>
+      <div class="regimen-toggle-info">
+        <div class="regimen-toggle-title">${cfg.title}</div>
+        <div class="regimen-toggle-desc">${cfg.desc}</div>
       </div>
     `;
-
-    if (isOwned) {
-      const badge = document.createElement("span");
-      badge.className = "muted";
-      badge.textContent = "Owned";
-      row.appendChild(badge);
-    } else {
-      const btn = document.createElement("button");
-      btn.className = "btn upgrade-buy";
-      btn.type = "button";
-      btn.textContent = `${cfg.wisdomCost} Wisdom`;
-      btn.disabled = remainingWisdom < cfg.wisdomCost;
-      btn.addEventListener("click", () => {
-        overlayPurchases[id] = true;
-        const totalWisdom = state.wisdom + overlayWisdomGain;
-        renderPrestigeWisdomUnlocks(totalWisdom);
-      });
-      row.appendChild(btn);
-    }
-
-    prestigeWisdomUnlocksEl.appendChild(row);
+    row.addEventListener("click", () => {
+      if (isActive) {
+        state.activeRegimens = (state.activeRegimens || []).filter(x => x !== id);
+      } else {
+        if ((state.activeRegimens || []).length >= maxReg) {
+          // Remove oldest to make room
+          state.activeRegimens = [...(state.activeRegimens || []).slice(1), id];
+        } else {
+          state.activeRegimens = [...(state.activeRegimens || []), id];
+        }
+      }
+      saveGame();
+      renderRegimenSection();
+      updateUI();
+    });
+    listEl.appendChild(row);
   }
 }
 
@@ -1248,7 +1480,7 @@ function closePrestigeOverlay() {
 }
 
 function confirmPrestige() {
-  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
+  const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
   const wisdomGain = overlayWisdomGain;
   const allTime = state.totalAvocadosAllTime;
   const newWisdom = state.wisdom + wisdomGain;
@@ -1284,10 +1516,31 @@ function confirmPrestige() {
   state.benchmarks = keptBenchmarks; // benchmarks persist forever
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = newTotalWisdomSinceLastDistill;
+  state.activeRegimens = []; // reset regimens on prestige
   // Distillation state persists through prestige
   // Apply starting wisdom bonus from distillation
   if (distBonus.startingWisdom > 0) {
     state.wisdom += distBonus.startingWisdom;
+  }
+
+  // Apply starting resources from wisdom tree
+  const startingRes = Calc.calcStartingResources(keptWisdomUnlocks, TUNING);
+  if (startingRes.avocados > 0) {
+    state.avocadoCount += startingRes.avocados;
+    state.totalAvocadosThisRun += startingRes.avocados;
+    state.totalAvocadosAllTime += startingRes.avocados;
+  }
+  for (const [pid, count] of Object.entries(startingRes.producers)) {
+    state.producers[pid] = (state.producers[pid] || 0) + count;
+  }
+
+  // Apply persistent upgrades
+  state.persistentUpgrades = overlayPersistentSelections.filter(id => {
+    const cfg = TUNING.upgrades[id];
+    return cfg && !cfg.deprecated;
+  });
+  for (const id of state.persistentUpgrades) {
+    state.upgrades[id] = true;
   }
 
   // Reset milestones
@@ -1313,11 +1566,12 @@ function confirmPrestige() {
   guacBuyQuantity = 1;
   renderUpgradeList();
   renderBenchmarks();
+  renderRegimenSection();
   updateUI();
 }
 
 function prestige() {
-  if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING)) return;
+  if (!Calc.canPrestige(state.totalAvocadosThisRun, TUNING, state.wisdomUnlocks)) return;
   openPrestigeOverlay();
 }
 
@@ -1332,8 +1586,8 @@ function startLoop() {
     last = now;
 
     // Production
-    const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING);
-    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks);
+    const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
     aps *= distBonus.apsMult * distBonus.allProdMult;
     if (aps > 0) {
       const produced = aps * dt;
@@ -1343,7 +1597,7 @@ function startLoop() {
     }
 
     // Guac conversion — sublinear consumption, capped at available surplus
-    if (state.upgrades.guac_unlock && (state.producers.guac_lab || 0) > 0) {
+    if ((state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock) && (state.producers.guac_lab || 0) > 0) {
       const labs = state.producers.guac_lab;
       const refineries = state.producers.guac_refinery || 0;
       const centrifuges = state.producers.guac_centrifuge || 0;
@@ -1356,7 +1610,7 @@ function startLoop() {
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
         // Guac produced proportional to actual vs desired consumption
-        const fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks) * dt;
+        const fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens) * dt;
         state.guacCount += desiredConsumption > 0 ? fullGuac * (actualConsumption / desiredConsumption) : 0;
       }
       // Debug log when underfed (throttled to every ~5s)
@@ -1367,7 +1621,7 @@ function startLoop() {
     }
 
     // Guac multiplier milestones (log every 0.25 increase)
-    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks);
+    const guacMult = Calc.calcGuacMultiplier(state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks);
     const nextMilestone = lastGuacMultMilestone + 0.25;
     if (guacMult >= nextMilestone) {
       lastGuacMultMilestone = Math.floor(guacMult * 4) / 4; // snap to 0.25 grid
@@ -1474,20 +1728,39 @@ function renderBonusesModal() {
     const sec = addSection("Wisdom");
     addRow(sec, "Wisdom Points", String(state.wisdom));
     const perPoint = TUNING.prestige.wisdomMultPerPoint;
-    const hasWisdomBoost = !!state.upgrades.wisdom_boost;
-    const boostExtra = hasWisdomBoost ? TUNING.upgrades.wisdom_boost.wisdomMult : 0;
+    const hasWisdomBoost = !!(state.wisdomUnlocks.wisdom_boost || state.upgrades.wisdom_boost);
+    const boostExtra = hasWisdomBoost ? 0.05 : 0;
     const effectivePerPoint = perPoint + boostExtra;
-    addRow(sec, "Per-Point Bonus", `+${Math.round(effectivePerPoint * 100)}% each${hasWisdomBoost ? " (includes AGI upgrade)" : ""}`);
-    const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks);
+    addRow(sec, "Per-Point Bonus", `+${Math.round(effectivePerPoint * 100)}% each${hasWisdomBoost ? " (includes AGI)" : ""}`);
+    const wisdomMult = Calc.calcWisdomBonus(state.wisdom, state.upgrades, TUNING, state.benchmarks, state.wisdomUnlocks);
     addRow(sec, "Total Wisdom Multiplier", `x${wisdomMult.toFixed(2)}`);
   }
 
-  // 2. Wisdom Unlocks
+  // 2. Wisdom Tree (grouped by branch)
   const ownedUnlocks = Object.entries(TUNING.wisdomUnlocks).filter(([id]) => state.wisdomUnlocks[id]);
   if (ownedUnlocks.length > 0) {
-    const sec = addSection("Wisdom Unlocks");
-    for (const [, cfg] of ownedUnlocks) {
-      addRow(sec, cfg.title, cfg.desc);
+    const sec = addSection("Wisdom Tree");
+    for (const branchKey of WISDOM_BRANCH_ORDER) {
+      const branchMeta = TUNING.wisdomBranches[branchKey];
+      if (!branchMeta) continue;
+      const branchOwned = ownedUnlocks.filter(([id]) => TUNING.wisdomUnlocks[id].branch === branchKey);
+      if (branchOwned.length === 0) continue;
+      const subheader = document.createElement("div");
+      subheader.className = "bonuses-row";
+      subheader.innerHTML = `<span class="bonuses-label" style="color:${branchMeta.color};font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">${branchMeta.title} (${branchOwned.length})</span>`;
+      sec.appendChild(subheader);
+      for (const [, cfg] of branchOwned) {
+        addRow(sec, cfg.title, cfg.desc);
+      }
+    }
+  }
+
+  // 2b. Training Regimens
+  if ((state.activeRegimens || []).length > 0) {
+    const sec = addSection("Training Regimen");
+    for (const id of state.activeRegimens) {
+      const cfg = TUNING.trainingRegimens[id];
+      if (cfg) addRow(sec, cfg.title, cfg.desc);
     }
   }
 
@@ -1552,7 +1825,7 @@ function renderBonusesModal() {
   if (mv > 0) {
     const sec = addSection("Distillation");
     addRow(sec, "Model Version", `v${mv}.0`);
-    const distBonus = Calc.calcDistillationBonus(mv, TUNING);
+    const distBonus = Calc.calcDistillationBonus(mv, TUNING, state.wisdomUnlocks);
     if (distBonus.apsMult !== 1) addRow(sec, "APS Multiplier", `x${distBonus.apsMult.toFixed(1)}`);
     if (distBonus.allProdMult !== 1) addRow(sec, "All Production", `x${distBonus.allProdMult.toFixed(1)}`);
     if (distBonus.clickBaseBonus > 0) addRow(sec, "Base Click Power", `+${distBonus.clickBaseBonus}`);
@@ -1695,6 +1968,7 @@ renderGuacProducerList();
 renderGuacBuyQuantitySelector();
 renderUpgradeList();
 renderBenchmarks();
+renderRegimenSection();
 updateUI();
 captureStateSnapshot("init");
 startLoop();

@@ -17,6 +17,7 @@ import { TUNING } from "./tuning.js";
 
 function makeUpgrade(id) {
   const cfg = TUNING.upgrades[id];
+  if (cfg.deprecated) return null; // skip deprecated upgrades
   return {
     id,
     title: cfg.title,
@@ -173,4 +174,4 @@ export const INVESTMENTS = [
   makeUpgrade("syn_neural_attn"),
   makeUpgrade("syn_synth_sapling"),
   makeUpgrade("syn_transformer_pit"),
-].sort((a, b) => a.cost() - b.cost());
+].filter(Boolean).sort((a, b) => a.cost() - b.cost());

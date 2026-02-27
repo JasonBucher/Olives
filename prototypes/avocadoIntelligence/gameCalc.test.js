@@ -10,6 +10,16 @@ import {
   calcBenchmarkBonus,
   calcDistillationCost, canDistill, calcDistillationBonus,
   calcSynergyMultiplier,
+  // Wisdom tree functions
+  isWisdomUnlockAvailable, getWisdomNodeDepth,
+  calcWisdomEffect, calcWisdomEffectAggregate,
+  calcWisdomProducerCostMult, calcWisdomClickMult, calcWisdomGlobalApsMult,
+  calcWisdomBenchmarkBonusMult, calcWisdomGuacCoeffBonus,
+  calcWisdomDistillCostMult, calcWisdomDistillBonusMult,
+  calcWisdomResearchCostMult,
+  calcPrestigeThreshold, calcStartingResources,
+  calcAvailableRegimens, calcMaxRegimens, calcRegimenModifiers,
+  calcPersistentSlots,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -108,6 +118,66 @@ const tuning = {
     unlockThreshold: 1e7,
     divisor: 1000,
     wisdomMultPerPoint: 0.10,
+  },
+  wisdomUnlocks: {
+    // Orchard Roots branch
+    starter_seedlings: { wisdomCost: 1, requires: null, branch: "orchard_roots", title: "Starter Seedlings", desc: "Start with 3 saplings", effect: { startingProducers: { sapling: 3 } } },
+    quick_sprout:      { wisdomCost: 2, requires: "starter_seedlings", branch: "orchard_roots", title: "Quick Sprout", desc: "Start with 50 avocados", effect: { startingAvocados: 50 } },
+    fertile_soil:      { wisdomCost: 3, requires: "starter_seedlings", branch: "orchard_roots", title: "Fertile Soil", desc: "Producer costs -5%", effect: { producerCostMult: 0.95 } },
+    muscle_memory:     { wisdomCost: 4, requires: "starter_seedlings", branch: "orchard_roots", title: "Muscle Memory", desc: "Clicks +50%", effect: { clickMult: 1.5 } },
+    deep_roots:        { wisdomCost: 5, requires: "quick_sprout", branch: "orchard_roots", title: "Deep Roots", desc: "Start with 5 saplings + 2 seed banks", effect: { startingProducers: { sapling: 5, seed_bank: 2 } } },
+    rich_compost:      { wisdomCost: 8, requires: "fertile_soil", branch: "orchard_roots", title: "Rich Compost", desc: "Producer costs -10%", effect: { producerCostMult: 0.90 } },
+    thick_skin:        { wisdomCost: 10, requires: "muscle_memory", branch: "orchard_roots", title: "Thick Skin", desc: "Clicks +100%", effect: { clickMult: 2.0 } },
+    // Guac Economy
+    guac_protocol:     { wisdomCost: 2, requires: null, branch: "guac_economy", title: "Guacamole Protocol", desc: "Unlocks guac", effect: { unlocksGuac: true } },
+    guac_sommelier:    { wisdomCost: 8, requires: "guac_protocol", branch: "guac_economy", title: "Guac Sommelier", desc: "Guac coeff +0.005", effect: { guacCoeffBonus: 0.005 } },
+    guac_singularity:  { wisdomCost: 20, requires: "guac_sommelier", branch: "guac_economy", title: "Guac Singularity", desc: "Guac coeff +0.01", effect: { guacCoeffBonus: 0.01 } },
+    // Wisdom Amp
+    inner_peace:          { wisdomCost: 2, requires: null, branch: "wisdom_amp", title: "Inner Peace", desc: "Begin" },
+    wisdom_boost:         { wisdomCost: 3, requires: "inner_peace", branch: "wisdom_amp", title: "AGI", desc: "Wisdom +50%", effect: { wisdomMultBonus: 0.05 } },
+    guac_memory_1:        { wisdomCost: 3, requires: "inner_peace", branch: "wisdom_amp", title: "Guac Memory I", desc: "+0.02 per prestige" },
+    guac_memory_2:        { wisdomCost: 10, requires: "guac_memory_1", branch: "wisdom_amp", title: "Guac Memory II", desc: "-0.01 per prestige" },
+    infinite_guac:        { wisdomCost: 25, requires: "guac_memory_2", branch: "wisdom_amp", title: "Infinite Guac", desc: "Floor 0.55" },
+    efficient_composting: { wisdomCost: 6, requires: "inner_peace", branch: "wisdom_amp", title: "Efficient Composting", desc: "Threshold 5M", effect: { prestigeThreshold: 5e6 } },
+    accelerated_decay:    { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp", title: "Accelerated Decay", desc: "Threshold 2M", effect: { prestigeThreshold: 2e6 } },
+    recursive_insight:    { wisdomCost: 12, requires: "wisdom_boost", branch: "wisdom_amp", title: "Recursive Insight", desc: "Wisdom earn +25%", effect: { wisdomEarnMult: 1.25 } },
+    // Neural Architecture
+    backpropagation:      { wisdomCost: 2, requires: null, branch: "neural_arch", title: "Backpropagation", desc: "Begin" },
+    weight_initialization: { wisdomCost: 4, requires: "backpropagation", branch: "neural_arch", title: "Weight Init", desc: "+10%", effect: { globalApsMult: 1.10 } },
+    batch_normalization:  { wisdomCost: 10, requires: "weight_initialization", branch: "neural_arch", title: "Batch Norm", desc: "+20%", effect: { globalApsMult: 1.20 } },
+    dropout_prevention:   { wisdomCost: 5, requires: "backpropagation", branch: "neural_arch", title: "Dropout Prevention", desc: "Bench +25%", effect: { benchmarkBonusMult: 1.25 } },
+    gradient_clipping:    { wisdomCost: 8, requires: "backpropagation", branch: "neural_arch", title: "Gradient Clipping", desc: "Research -10%", effect: { researchCostMult: 0.90 } },
+    adaptive_learning:    { wisdomCost: 20, requires: "gradient_clipping", branch: "neural_arch", title: "Adaptive Learning", desc: "Research -20%", effect: { researchCostMult: 0.80 } },
+    // Training Data
+    curriculum_learning:  { wisdomCost: 3, requires: null, branch: "training_data", title: "Curriculum Learning", desc: "Unlocks regimens" },
+    click_specialization: { wisdomCost: 4, requires: "curriculum_learning", branch: "training_data", title: "Click Spec", desc: "Unlocks click focus" },
+    scale_specialization: { wisdomCost: 4, requires: "curriculum_learning", branch: "training_data", title: "Scale Spec", desc: "Unlocks scale focus" },
+    guac_specialization:  { wisdomCost: 6, requires: "curriculum_learning", branch: "training_data", title: "Guac Spec", desc: "Unlocks guac focus" },
+    dual_curriculum:      { wisdomCost: 15, requires: "curriculum_learning", branch: "training_data", title: "Dual Curriculum", desc: "2 regimens" },
+    // Persistent Memory
+    flash_memory:    { wisdomCost: 5, requires: null, branch: "persistent_memory", title: "Flash Memory", desc: "1 slot", effect: { persistentSlots: 1 } },
+    l1_cache:        { wisdomCost: 10, requires: "flash_memory", branch: "persistent_memory", title: "L1 Cache", desc: "2 slots", effect: { persistentSlots: 2 } },
+    l2_cache:        { wisdomCost: 25, requires: "l1_cache", branch: "persistent_memory", title: "L2 Cache", desc: "3 slots", effect: { persistentSlots: 3 } },
+    selective_recall: { wisdomCost: 8, requires: "flash_memory", branch: "persistent_memory", title: "Selective Recall", desc: "Auto-select" },
+    // Inference Engine
+    knowledge_distillation: { wisdomCost: 5, requires: null, branch: "inference_engine", title: "Knowledge Distillation", desc: "Distill -10%", effect: { distillCostMult: 0.90 } },
+    pruning_algorithm:      { wisdomCost: 8, requires: "knowledge_distillation", branch: "inference_engine", title: "Pruning", desc: "Distill -25%", effect: { distillCostMult: 0.75 } },
+    quantization:           { wisdomCost: 10, requires: "knowledge_distillation", branch: "inference_engine", title: "Quantization", desc: "Distill bonus +20%", effect: { distillBonusMult: 1.20 } },
+    model_merging:          { wisdomCost: 15, requires: "knowledge_distillation", branch: "inference_engine", title: "Model Merging", desc: "Distill bonus +50%", effect: { distillBonusMult: 1.50 } },
+  },
+  wisdomBranches: {
+    orchard_roots: { title: "Orchard Roots", color: "#7ec87e" },
+    guac_economy:  { title: "Guac Economy",  color: "#4a7c3f" },
+    wisdom_amp:    { title: "Wisdom Amp",    color: "#c8a2c8" },
+    neural_arch:   { title: "Neural Arch",   color: "#4a8cc7" },
+    training_data: { title: "Training Data", color: "#e8a438" },
+    persistent_memory: { title: "Persistent Memory", color: "#d4af37" },
+    inference_engine:  { title: "Inference Engine",   color: "#c0392b" },
+  },
+  trainingRegimens: {
+    click_focus: { title: "Click Focus", desc: "Clicks 3x, producers -30%", clickMult: 3.0, producerMult: 0.70, requiresUnlock: "click_specialization" },
+    scale_focus: { title: "Scale Focus", desc: "Producers +50%, clicks -50%", clickMult: 0.50, producerMult: 1.50, requiresUnlock: "scale_specialization" },
+    guac_focus:  { title: "Guac Focus",  desc: "Guac 2x, production -20%",   guacOutputMult: 2.0, producerMult: 0.80, requiresUnlock: "guac_specialization" },
   },
   distillation: {
     costs: [100, 250, 500, 1000, 2000],
@@ -1092,6 +1162,612 @@ describe("calcBaseAps — synergy integration", () => {
     const producers = { sapling: 10, orchard_row: 5 };
     // sapling: 10 * 0.1 = 1, orchard_row: 5 * 8 = 40, total = 41
     expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(41);
+  });
+});
+
+// ========== Wisdom Tree Tests ==========
+
+describe("isWisdomUnlockAvailable", () => {
+  it("root nodes are always available", () => {
+    expect(isWisdomUnlockAvailable("starter_seedlings", {}, {}, tuning)).toBe(true);
+    expect(isWisdomUnlockAvailable("guac_protocol", {}, {}, tuning)).toBe(true);
+    expect(isWisdomUnlockAvailable("backpropagation", {}, {}, tuning)).toBe(true);
+  });
+
+  it("child requires parent to be owned", () => {
+    expect(isWisdomUnlockAvailable("quick_sprout", {}, {}, tuning)).toBe(false);
+    expect(isWisdomUnlockAvailable("quick_sprout", { starter_seedlings: true }, {}, tuning)).toBe(true);
+  });
+
+  it("overlay purchases count as owned", () => {
+    expect(isWisdomUnlockAvailable("quick_sprout", {}, { starter_seedlings: true }, tuning)).toBe(true);
+  });
+
+  it("deep chains require each ancestor", () => {
+    // accelerated_decay requires efficient_composting which requires inner_peace
+    expect(isWisdomUnlockAvailable("accelerated_decay", { inner_peace: true }, {}, tuning)).toBe(false);
+    expect(isWisdomUnlockAvailable("accelerated_decay", { inner_peace: true, efficient_composting: true }, {}, tuning)).toBe(true);
+  });
+
+  it("returns false for unknown node IDs", () => {
+    expect(isWisdomUnlockAvailable("nonexistent_node", {}, {}, tuning)).toBe(false);
+  });
+});
+
+describe("getWisdomNodeDepth", () => {
+  it("root nodes have depth 0", () => {
+    expect(getWisdomNodeDepth("starter_seedlings", tuning)).toBe(0);
+    expect(getWisdomNodeDepth("guac_protocol", tuning)).toBe(0);
+    expect(getWisdomNodeDepth("backpropagation", tuning)).toBe(0);
+    expect(getWisdomNodeDepth("flash_memory", tuning)).toBe(0);
+  });
+
+  it("direct children have depth 1", () => {
+    expect(getWisdomNodeDepth("quick_sprout", tuning)).toBe(1);
+    expect(getWisdomNodeDepth("fertile_soil", tuning)).toBe(1);
+    expect(getWisdomNodeDepth("muscle_memory", tuning)).toBe(1);
+    expect(getWisdomNodeDepth("guac_sommelier", tuning)).toBe(1);
+    expect(getWisdomNodeDepth("weight_initialization", tuning)).toBe(1);
+  });
+
+  it("grandchildren have depth 2", () => {
+    expect(getWisdomNodeDepth("deep_roots", tuning)).toBe(2);
+    expect(getWisdomNodeDepth("rich_compost", tuning)).toBe(2);
+    expect(getWisdomNodeDepth("thick_skin", tuning)).toBe(2);
+    expect(getWisdomNodeDepth("guac_singularity", tuning)).toBe(2);
+    expect(getWisdomNodeDepth("batch_normalization", tuning)).toBe(2);
+  });
+
+  it("depth-3 nodes measured correctly", () => {
+    // accelerated_decay → efficient_composting → inner_peace (ROOT)
+    expect(getWisdomNodeDepth("accelerated_decay", tuning)).toBe(2);
+    // recursive_insight → wisdom_boost → inner_peace (ROOT)
+    expect(getWisdomNodeDepth("recursive_insight", tuning)).toBe(2);
+    // infinite_guac → guac_memory_2 → guac_memory_1 → inner_peace (ROOT)
+    expect(getWisdomNodeDepth("infinite_guac", tuning)).toBe(3);
+    // residual_connections → batch_normalization → weight_initialization → backpropagation (ROOT)
+    // Note: residual_connections not in test tuning, so test what we have
+    // l2_cache → l1_cache → flash_memory (ROOT)
+    expect(getWisdomNodeDepth("l2_cache", tuning)).toBe(2);
+  });
+});
+
+describe("calcWisdomEffect — replaces semantics", () => {
+  it("returns default when no nodes owned", () => {
+    expect(calcWisdomEffect("producerCostMult", {}, tuning, 1)).toBe(1);
+    expect(calcWisdomEffect("clickMult", {}, tuning, 1)).toBe(1);
+    expect(calcWisdomEffect("prestigeThreshold", {}, tuning, 1e7)).toBe(1e7);
+  });
+
+  it("returns single owned node value", () => {
+    expect(calcWisdomEffect("producerCostMult", { starter_seedlings: true, fertile_soil: true }, tuning, 1)).toBe(0.95);
+  });
+
+  it("deepest owned node wins (replaces semantics)", () => {
+    // fertile_soil (depth 1) = 0.95, rich_compost (depth 2) = 0.90
+    const owned = { starter_seedlings: true, fertile_soil: true, rich_compost: true };
+    expect(calcWisdomEffect("producerCostMult", owned, tuning, 1)).toBe(0.90);
+  });
+
+  it("deepest wins for click mult", () => {
+    // muscle_memory (depth 1) = 1.5, thick_skin (depth 2) = 2.0
+    expect(calcWisdomEffect("clickMult", { starter_seedlings: true, muscle_memory: true }, tuning, 1)).toBe(1.5);
+    expect(calcWisdomEffect("clickMult", { starter_seedlings: true, muscle_memory: true, thick_skin: true }, tuning, 1)).toBe(2.0);
+  });
+
+  it("deepest wins for prestige threshold", () => {
+    // efficient_composting (depth 1) = 5e6, accelerated_decay (depth 2) = 2e6
+    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true }, tuning, 1e7)).toBe(5e6);
+    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true, accelerated_decay: true }, tuning, 1e7)).toBe(2e6);
+  });
+
+  it("deepest wins for distill cost mult", () => {
+    // knowledge_distillation (depth 0) = 0.90, pruning_algorithm (depth 1) = 0.75
+    expect(calcWisdomEffect("distillCostMult", { knowledge_distillation: true }, tuning, 1)).toBe(0.90);
+    expect(calcWisdomEffect("distillCostMult", { knowledge_distillation: true, pruning_algorithm: true }, tuning, 1)).toBe(0.75);
+  });
+
+  it("deepest wins for persistent slots", () => {
+    // flash_memory (depth 0) = 1, l1_cache (depth 1) = 2, l2_cache (depth 2) = 3
+    expect(calcWisdomEffect("persistentSlots", { flash_memory: true }, tuning, 0)).toBe(1);
+    expect(calcWisdomEffect("persistentSlots", { flash_memory: true, l1_cache: true }, tuning, 0)).toBe(2);
+    expect(calcWisdomEffect("persistentSlots", { flash_memory: true, l1_cache: true, l2_cache: true }, tuning, 0)).toBe(3);
+  });
+});
+
+describe("calcWisdomEffectAggregate", () => {
+  it("returns identity when no nodes match", () => {
+    expect(calcWisdomEffectAggregate("globalApsMult", {}, tuning, "multiply", 1)).toBe(1);
+    expect(calcWisdomEffectAggregate("guacCoeffBonus", {}, tuning, "sum", 0)).toBe(0);
+  });
+
+  it("multiplies in multiply mode", () => {
+    // weight_initialization: 1.10, batch_normalization: 1.20
+    const owned = { backpropagation: true, weight_initialization: true, batch_normalization: true };
+    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.32);
+  });
+
+  it("sums in sum mode", () => {
+    // guac_sommelier: 0.005, guac_singularity: 0.01
+    const owned = { guac_protocol: true, guac_sommelier: true, guac_singularity: true };
+    expect(calcWisdomEffectAggregate("guacCoeffBonus", owned, tuning, "sum", 0)).toBeCloseTo(0.015);
+  });
+
+  it("single node in multiply mode", () => {
+    const owned = { backpropagation: true, weight_initialization: true };
+    expect(calcWisdomEffectAggregate("globalApsMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.10);
+  });
+
+  it("single node in sum mode", () => {
+    const owned = { guac_protocol: true, guac_sommelier: true };
+    expect(calcWisdomEffectAggregate("guacCoeffBonus", owned, tuning, "sum", 0)).toBeCloseTo(0.005);
+  });
+
+  it("multiplicative stacking for distill bonus mult", () => {
+    // quantization: 1.20, model_merging: 1.50
+    const owned = { knowledge_distillation: true, quantization: true, model_merging: true };
+    expect(calcWisdomEffectAggregate("distillBonusMult", owned, tuning, "multiply", 1)).toBeCloseTo(1.80);
+  });
+});
+
+describe("calcWisdomProducerCostMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomProducerCostMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 0.95 with fertile_soil", () => {
+    expect(calcWisdomProducerCostMult({ starter_seedlings: true, fertile_soil: true }, tuning)).toBe(0.95);
+  });
+
+  it("returns 0.90 with rich_compost (overrides fertile_soil)", () => {
+    expect(calcWisdomProducerCostMult({ starter_seedlings: true, fertile_soil: true, rich_compost: true }, tuning)).toBe(0.90);
+  });
+});
+
+describe("calcWisdomClickMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomClickMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 1.5 with muscle_memory", () => {
+    expect(calcWisdomClickMult({ starter_seedlings: true, muscle_memory: true }, tuning)).toBe(1.5);
+  });
+
+  it("returns 2.0 with thick_skin (overrides muscle_memory)", () => {
+    expect(calcWisdomClickMult({ starter_seedlings: true, muscle_memory: true, thick_skin: true }, tuning)).toBe(2.0);
+  });
+});
+
+describe("calcWisdomGlobalApsMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomGlobalApsMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 1.10 with weight_initialization only", () => {
+    expect(calcWisdomGlobalApsMult({ backpropagation: true, weight_initialization: true }, tuning)).toBeCloseTo(1.10);
+  });
+
+  it("multiplicatively stacks weight_initialization + batch_normalization", () => {
+    const owned = { backpropagation: true, weight_initialization: true, batch_normalization: true };
+    // 1.10 * 1.20 = 1.32
+    expect(calcWisdomGlobalApsMult(owned, tuning)).toBeCloseTo(1.32);
+  });
+});
+
+describe("calcWisdomBenchmarkBonusMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomBenchmarkBonusMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 1.25 with dropout_prevention", () => {
+    expect(calcWisdomBenchmarkBonusMult({ backpropagation: true, dropout_prevention: true }, tuning)).toBe(1.25);
+  });
+});
+
+describe("calcWisdomGuacCoeffBonus", () => {
+  it("returns 0 with no wisdom unlocks", () => {
+    expect(calcWisdomGuacCoeffBonus({}, tuning)).toBe(0);
+  });
+
+  it("returns 0.005 with guac_sommelier", () => {
+    expect(calcWisdomGuacCoeffBonus({ guac_protocol: true, guac_sommelier: true }, tuning)).toBeCloseTo(0.005);
+  });
+
+  it("sums both guac coeff bonuses", () => {
+    const owned = { guac_protocol: true, guac_sommelier: true, guac_singularity: true };
+    // 0.005 + 0.01 = 0.015
+    expect(calcWisdomGuacCoeffBonus(owned, tuning)).toBeCloseTo(0.015);
+  });
+});
+
+describe("calcWisdomDistillCostMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomDistillCostMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 0.90 with knowledge_distillation", () => {
+    expect(calcWisdomDistillCostMult({ knowledge_distillation: true }, tuning)).toBe(0.90);
+  });
+
+  it("returns 0.75 with pruning_algorithm (overrides)", () => {
+    expect(calcWisdomDistillCostMult({ knowledge_distillation: true, pruning_algorithm: true }, tuning)).toBe(0.75);
+  });
+});
+
+describe("calcWisdomDistillBonusMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomDistillBonusMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 1.20 with quantization", () => {
+    expect(calcWisdomDistillBonusMult({ knowledge_distillation: true, quantization: true }, tuning)).toBeCloseTo(1.20);
+  });
+
+  it("returns 1.50 with model_merging", () => {
+    expect(calcWisdomDistillBonusMult({ knowledge_distillation: true, model_merging: true }, tuning)).toBeCloseTo(1.50);
+  });
+
+  it("multiplicatively stacks quantization + model_merging", () => {
+    const owned = { knowledge_distillation: true, quantization: true, model_merging: true };
+    // 1.20 * 1.50 = 1.80
+    expect(calcWisdomDistillBonusMult(owned, tuning)).toBeCloseTo(1.80);
+  });
+});
+
+describe("calcWisdomResearchCostMult", () => {
+  it("returns 1 with no wisdom unlocks", () => {
+    expect(calcWisdomResearchCostMult({}, tuning)).toBe(1);
+  });
+
+  it("returns 0.90 with gradient_clipping", () => {
+    expect(calcWisdomResearchCostMult({ backpropagation: true, gradient_clipping: true }, tuning)).toBe(0.90);
+  });
+
+  it("returns 0.80 with adaptive_learning (overrides)", () => {
+    expect(calcWisdomResearchCostMult({ backpropagation: true, gradient_clipping: true, adaptive_learning: true }, tuning)).toBe(0.80);
+  });
+});
+
+describe("calcPrestigeThreshold", () => {
+  it("returns default threshold with no wisdom unlocks", () => {
+    expect(calcPrestigeThreshold({}, tuning)).toBe(1e7);
+  });
+
+  it("returns 5M with efficient_composting", () => {
+    expect(calcPrestigeThreshold({ inner_peace: true, efficient_composting: true }, tuning)).toBe(5e6);
+  });
+
+  it("returns 2M with accelerated_decay (overrides efficient_composting)", () => {
+    const owned = { inner_peace: true, efficient_composting: true, accelerated_decay: true };
+    expect(calcPrestigeThreshold(owned, tuning)).toBe(2e6);
+  });
+});
+
+describe("calcStartingResources", () => {
+  it("returns zeros with no wisdom unlocks", () => {
+    const r = calcStartingResources({}, tuning);
+    expect(r.avocados).toBe(0);
+    expect(Object.keys(r.producers).length).toBe(0);
+  });
+
+  it("returns starting avocados from quick_sprout", () => {
+    const r = calcStartingResources({ starter_seedlings: true, quick_sprout: true }, tuning);
+    expect(r.avocados).toBe(50);
+  });
+
+  it("returns starting producers from starter_seedlings", () => {
+    const r = calcStartingResources({ starter_seedlings: true }, tuning);
+    expect(r.producers.sapling).toBe(3);
+  });
+
+  it("uses max-per-producer semantics across nodes", () => {
+    // starter_seedlings: { sapling: 3 }, deep_roots: { sapling: 5, seed_bank: 2 }
+    const owned = { starter_seedlings: true, quick_sprout: true, deep_roots: true };
+    const r = calcStartingResources(owned, tuning);
+    expect(r.producers.sapling).toBe(5); // max(3, 5)
+    expect(r.producers.seed_bank).toBe(2);
+  });
+
+  it("takes max avocados across multiple nodes", () => {
+    // quick_sprout: 50 avocados
+    // If there were another node with higher avocados, max would win
+    const r = calcStartingResources({ starter_seedlings: true, quick_sprout: true }, tuning);
+    expect(r.avocados).toBe(50);
+  });
+});
+
+describe("calcAvailableRegimens", () => {
+  it("returns empty array with no wisdom unlocks", () => {
+    expect(calcAvailableRegimens({}, tuning)).toEqual([]);
+  });
+
+  it("returns empty even with curriculum_learning but no specializations", () => {
+    expect(calcAvailableRegimens({ curriculum_learning: true }, tuning)).toEqual([]);
+  });
+
+  it("returns click_focus when click_specialization is owned", () => {
+    const owned = { curriculum_learning: true, click_specialization: true };
+    expect(calcAvailableRegimens(owned, tuning)).toEqual(["click_focus"]);
+  });
+
+  it("returns multiple regimens with multiple specializations", () => {
+    const owned = { curriculum_learning: true, click_specialization: true, scale_specialization: true };
+    const result = calcAvailableRegimens(owned, tuning);
+    expect(result).toContain("click_focus");
+    expect(result).toContain("scale_focus");
+    expect(result.length).toBe(2);
+  });
+
+  it("returns all three regimens with all specializations", () => {
+    const owned = {
+      curriculum_learning: true, click_specialization: true,
+      scale_specialization: true, guac_specialization: true,
+    };
+    const result = calcAvailableRegimens(owned, tuning);
+    expect(result.length).toBe(3);
+  });
+
+  it("handles missing trainingRegimens config gracefully", () => {
+    expect(calcAvailableRegimens({}, {})).toEqual([]);
+  });
+});
+
+describe("calcMaxRegimens", () => {
+  it("returns 1 without dual_curriculum", () => {
+    expect(calcMaxRegimens({})).toBe(1);
+    expect(calcMaxRegimens({ curriculum_learning: true })).toBe(1);
+  });
+
+  it("returns 2 with dual_curriculum", () => {
+    expect(calcMaxRegimens({ dual_curriculum: true })).toBe(2);
+  });
+});
+
+describe("calcRegimenModifiers", () => {
+  it("returns neutral modifiers with no active regimens", () => {
+    const m = calcRegimenModifiers([], tuning);
+    expect(m.clickMult).toBe(1);
+    expect(m.producerMult).toBe(1);
+    expect(m.guacOutputMult).toBe(1);
+  });
+
+  it("applies click_focus modifiers", () => {
+    const m = calcRegimenModifiers(["click_focus"], tuning);
+    expect(m.clickMult).toBe(3.0);
+    expect(m.producerMult).toBe(0.70);
+    expect(m.guacOutputMult).toBe(1);
+  });
+
+  it("applies scale_focus modifiers", () => {
+    const m = calcRegimenModifiers(["scale_focus"], tuning);
+    expect(m.clickMult).toBe(0.50);
+    expect(m.producerMult).toBe(1.50);
+    expect(m.guacOutputMult).toBe(1);
+  });
+
+  it("applies guac_focus modifiers", () => {
+    const m = calcRegimenModifiers(["guac_focus"], tuning);
+    expect(m.clickMult).toBe(1);
+    expect(m.producerMult).toBe(0.80);
+    expect(m.guacOutputMult).toBe(2.0);
+  });
+
+  it("multiplicatively stacks dual regimens", () => {
+    const m = calcRegimenModifiers(["click_focus", "scale_focus"], tuning);
+    // clickMult: 3.0 * 0.50 = 1.50
+    expect(m.clickMult).toBeCloseTo(1.50);
+    // producerMult: 0.70 * 1.50 = 1.05
+    expect(m.producerMult).toBeCloseTo(1.05);
+    expect(m.guacOutputMult).toBe(1);
+  });
+
+  it("handles null/undefined activeRegimens gracefully", () => {
+    const m = calcRegimenModifiers(null, tuning);
+    expect(m.clickMult).toBe(1);
+    expect(m.producerMult).toBe(1);
+    expect(m.guacOutputMult).toBe(1);
+  });
+
+  it("ignores unknown regimen IDs", () => {
+    const m = calcRegimenModifiers(["nonexistent"], tuning);
+    expect(m.clickMult).toBe(1);
+    expect(m.producerMult).toBe(1);
+  });
+});
+
+describe("calcPersistentSlots", () => {
+  it("returns 0 with no wisdom unlocks", () => {
+    expect(calcPersistentSlots({}, tuning)).toBe(0);
+  });
+
+  it("returns 1 with flash_memory", () => {
+    expect(calcPersistentSlots({ flash_memory: true }, tuning)).toBe(1);
+  });
+
+  it("returns 2 with l1_cache (overrides flash_memory)", () => {
+    expect(calcPersistentSlots({ flash_memory: true, l1_cache: true }, tuning)).toBe(2);
+  });
+
+  it("returns 3 with l2_cache (overrides l1_cache)", () => {
+    expect(calcPersistentSlots({ flash_memory: true, l1_cache: true, l2_cache: true }, tuning)).toBe(3);
+  });
+});
+
+// ========== Updated Existing Functions with wisdomUnlocks Param ==========
+
+describe("canPrestige — with wisdom tree", () => {
+  it("uses default threshold with empty wisdomUnlocks", () => {
+    expect(canPrestige(1e7, tuning, {})).toBe(true);
+    expect(canPrestige(9999999, tuning, {})).toBe(false);
+  });
+
+  it("uses lowered threshold with efficient_composting", () => {
+    const wUnlocks = { inner_peace: true, efficient_composting: true };
+    expect(canPrestige(5e6, tuning, wUnlocks)).toBe(true);
+    expect(canPrestige(4999999, tuning, wUnlocks)).toBe(false);
+  });
+
+  it("uses lowest threshold with accelerated_decay", () => {
+    const wUnlocks = { inner_peace: true, efficient_composting: true, accelerated_decay: true };
+    expect(canPrestige(2e6, tuning, wUnlocks)).toBe(true);
+    expect(canPrestige(1999999, tuning, wUnlocks)).toBe(false);
+  });
+});
+
+describe("calcWisdomEarned — with wisdom tree", () => {
+  it("respects lowered threshold", () => {
+    const wUnlocks = { inner_peace: true, efficient_composting: true };
+    // threshold = 5M, sqrt(5e6)/1000 = 2236/1000 = 2
+    expect(calcWisdomEarned(5e6, tuning, wUnlocks)).toBe(2);
+    // Below threshold
+    expect(calcWisdomEarned(4999999, tuning, wUnlocks)).toBe(0);
+  });
+
+  it("applies wisdom earn mult from recursive_insight", () => {
+    const wUnlocks = { inner_peace: true, wisdom_boost: true, recursive_insight: true };
+    // default threshold 1e7, sqrt(1e7)/1000 = 3, * 1.25 = 3.75 → floor = 3
+    expect(calcWisdomEarned(1e7, tuning, wUnlocks)).toBe(3);
+    // At 4e7: sqrt(4e7)/1000 = 6.32, * 1.25 = 7.9 → floor = 7
+    expect(calcWisdomEarned(4e7, tuning, wUnlocks)).toBe(7);
+  });
+
+  it("defaults to no earn mult without wisdomUnlocks param", () => {
+    expect(calcWisdomEarned(1e7, tuning)).toBe(3);
+  });
+});
+
+describe("calcWisdomBonus — with wisdom tree", () => {
+  it("uses wisdom tree wisdom_boost over legacy upgrade", () => {
+    // Wisdom tree wisdom_boost: effect.wisdomMultBonus = 0.05
+    // mult = 0.10 + 0.05 = 0.15, bonus = 1 + 10 * 0.15 = 2.5
+    expect(calcWisdomBonus(10, {}, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.5);
+  });
+
+  it("falls back to legacy upgrade when wisdom tree boost not owned", () => {
+    // Legacy upgrades.wisdom_boost: wisdomMult = 0.05
+    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, {})).toBeCloseTo(2.5);
+  });
+
+  it("prefers wisdom tree over legacy when both present", () => {
+    // Both owned — wisdom tree should take priority
+    expect(calcWisdomBonus(10, { wisdom_boost: true }, tuning, undefined, { inner_peace: true, wisdom_boost: true })).toBeCloseTo(2.5);
+  });
+});
+
+describe("calcGuacMultiplier — with wisdom tree", () => {
+  it("applies guac coeff bonus from wisdom tree", () => {
+    const wUnlocks = { guac_protocol: true, guac_sommelier: true };
+    // coeff = 0.06 + 0.005 = 0.065
+    const withBonus = calcGuacMultiplier(100, tuning, undefined, wUnlocks);
+    const without = calcGuacMultiplier(100, tuning);
+    expect(withBonus).toBeGreaterThan(without);
+  });
+});
+
+describe("calcBenchmarkBonus — with wisdom tree", () => {
+  it("amplifies benchmark bonuses with dropout_prevention", () => {
+    const wUnlocks = { backpropagation: true, dropout_prevention: true };
+    const b = calcBenchmarkBonus({ hello_world: true }, tuning, wUnlocks);
+    // globalMult: 1 + 0.02 * 1.25 = 1.025 (vs 1.02 without)
+    expect(b.globalMult).toBeCloseTo(1.025);
+  });
+
+  it("returns normal bonuses without wisdom tree", () => {
+    const b = calcBenchmarkBonus({ hello_world: true }, tuning);
+    expect(b.globalMult).toBeCloseTo(1.02);
+  });
+});
+
+describe("calcDistillationCost — with wisdom tree", () => {
+  it("reduces cost with knowledge_distillation", () => {
+    const wUnlocks = { knowledge_distillation: true };
+    // floor(100 * 0.90) = 90
+    expect(calcDistillationCost(0, tuning, wUnlocks)).toBe(90);
+  });
+
+  it("reduces cost further with pruning_algorithm", () => {
+    const wUnlocks = { knowledge_distillation: true, pruning_algorithm: true };
+    // floor(100 * 0.75) = 75
+    expect(calcDistillationCost(0, tuning, wUnlocks)).toBe(75);
+  });
+
+  it("returns un-modified cost without wisdom tree", () => {
+    expect(calcDistillationCost(0, tuning)).toBe(100);
+  });
+});
+
+describe("calcDistillationBonus — with wisdom tree", () => {
+  it("amplifies bonuses with quantization", () => {
+    const wUnlocks = { knowledge_distillation: true, quantization: true };
+    const b = calcDistillationBonus(1, tuning, wUnlocks);
+    // v1.0 apsMult: 1 + (1.5-1) * 1.20 = 1 + 0.6 = 1.6 (vs 1.5 without)
+    expect(b.apsMult).toBeCloseTo(1.6);
+  });
+
+  it("amplifies with stacked quantization + model_merging", () => {
+    const wUnlocks = { knowledge_distillation: true, quantization: true, model_merging: true };
+    const b = calcDistillationBonus(1, tuning, wUnlocks);
+    // bonusMult = 1.20 * 1.50 = 1.80
+    // v1.0 apsMult: 1 + (1.5-1) * 1.80 = 1 + 0.9 = 1.9
+    expect(b.apsMult).toBeCloseTo(1.9);
+  });
+});
+
+describe("calcTotalAps — with wisdom tree and regimens", () => {
+  const baseProducers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("applies wisdom tree global APS mult", () => {
+    // base = 1, weight_initialization gives 1.10x
+    const wUnlocks = { backpropagation: true, weight_initialization: true };
+    const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks);
+    expect(result).toBeCloseTo(1.1);
+  });
+
+  it("applies regimen producer mult", () => {
+    // base = 1, scale_focus gives producerMult 1.50
+    const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, undefined, ["scale_focus"]);
+    expect(result).toBeCloseTo(1.5);
+  });
+
+  it("stacks wisdom tree and regimen multipliers", () => {
+    // base = 1, weight_init 1.10, scale_focus 1.50 → 1.65
+    const wUnlocks = { backpropagation: true, weight_initialization: true };
+    const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks, ["scale_focus"]);
+    expect(result).toBeCloseTo(1.65);
+  });
+});
+
+describe("calcClickPower — with wisdom tree and regimens", () => {
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("applies wisdom tree click mult", () => {
+    const wUnlocks = { starter_seedlings: true, muscle_memory: true };
+    const result = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, wUnlocks);
+    expect(result).toBeCloseTo(1.5);
+  });
+
+  it("applies regimen click mult", () => {
+    const result = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, ["click_focus"]);
+    expect(result).toBeCloseTo(3.0);
+  });
+
+  it("stacks wisdom tree click mult and regimen click mult", () => {
+    const wUnlocks = { starter_seedlings: true, muscle_memory: true };
+    const result = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, wUnlocks, ["click_focus"]);
+    // 1 * 1.5 (wisdom) * 3.0 (regimen) = 4.5
+    expect(result).toBeCloseTo(4.5);
+  });
+});
+
+describe("calcGuacProduction — with regimens", () => {
+  it("applies guac_focus regimen", () => {
+    // base = 1 * 10^1 = 10, * 2.0 = 20
+    const result = calcGuacProduction(10, tuning, {}, {}, 0, undefined, ["guac_focus"]);
+    expect(result).toBeCloseTo(20);
+  });
+
+  it("returns normal production without regimens", () => {
+    expect(calcGuacProduction(10, tuning, {}, {}, 0)).toBeCloseTo(10);
   });
 });
 
