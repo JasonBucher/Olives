@@ -20,6 +20,8 @@ import {
   calcPrestigeThreshold, calcStartingResources,
   calcAvailableRegimens, calcMaxRegimens, calcRegimenModifiers,
   calcPersistentSlots,
+  calcActiveGiftBuffs,
+  getGiftEffectPool,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -1896,6 +1898,187 @@ describe("calcWisdomEarned — min-1 floor", () => {
   it("returns formula value when formula gives more than 1", () => {
     // At 1e7 with normal tuning: cbrt(1e7)/30 = 7
     expect(calcWisdomEarned(1e7, tuning)).toBe(7);
+  });
+});
+
+// ── Wrapped Gift Functions ──────────────────────────────────────────
+describe("calcActiveGiftBuffs", () => {
+  const now = 10000;
+
+  it("returns identity multipliers with no buffs", () => {
+    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1 });
+  });
+
+  it("returns identity multipliers with null/undefined", () => {
+    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1 });
+    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1 });
+  });
+
+  it("applies a single APS boost", () => {
+    const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1 });
+  });
+
+  it("applies a single click boost", () => {
+    const buffs = [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0 });
+  });
+
+  it("ignores expired buffs", () => {
+    const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1 });
+  });
+
+  it("stacks multiple APS buffs multiplicatively", () => {
+    const buffs = [
+      { id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 },
+      { id: "aps_drain", field: "aps", multiplier: 0.5, expiresAt: 15000 },
+    ];
+    const result = calcActiveGiftBuffs(buffs, now);
+    expect(result.apsMult).toBeCloseTo(1.0);
+    expect(result.clickMult).toBe(1);
+  });
+
+  it("handles mixed APS and click buffs", () => {
+    const buffs = [
+      { id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 },
+      { id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 },
+    ];
+    const result = calcActiveGiftBuffs(buffs, now);
+    expect(result.apsMult).toBe(2.0);
+    expect(result.clickMult).toBe(3.0);
+  });
+
+  it("only includes non-expired buffs in mix", () => {
+    const buffs = [
+      { id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 },
+      { id: "aps_drain", field: "aps", multiplier: 0.5, expiresAt: 5000 }, // expired
+      { id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 },
+    ];
+    const result = calcActiveGiftBuffs(buffs, now);
+    expect(result.apsMult).toBe(2.0);
+    expect(result.clickMult).toBe(3.0);
+  });
+});
+
+describe("getGiftEffectPool", () => {
+  const effects = {
+    aps_boost:     { weight: 25, text: "APS Boost!",      field: "aps",   mult: 2.0 },
+    click_boost:   { weight: 20, text: "Click Frenzy!",   field: "click", mult: 3.0 },
+    aps_drain:     { weight: 10, text: "Bug Report...",    field: "aps",   mult: 0.5, negative: true },
+    click_drain:   { weight: 8,  text: "Carpal Tunnel!",  field: "click", mult: 0.5, negative: true },
+    free_purchase: { weight: 8,  text: "Free Upgrade!",   requiresWisdomUnlock: "gift_scholarship" },
+    wisdom_grant:  { weight: 5,  text: "Enlightenment!",  wisdomAmount: 1, requiresWisdomUnlock: "gift_of_wisdom" },
+    empty:         { weight: 15, text: "Empty Box..." },
+    avocado_rain:  { weight: 9,  text: "Avocado Rain!" },
+  };
+
+  it("excludes gated effects when wisdom not owned", () => {
+    const pool = getGiftEffectPool(effects, {});
+    const ids = pool.map(([id]) => id);
+    expect(ids).not.toContain("free_purchase");
+    expect(ids).not.toContain("wisdom_grant");
+    expect(ids).toContain("aps_boost");
+    expect(ids).toContain("empty");
+    expect(ids).toContain("avocado_rain");
+  });
+
+  it("includes gated effects when wisdom is owned", () => {
+    const pool = getGiftEffectPool(effects, { gift_scholarship: true, gift_of_wisdom: true });
+    const ids = pool.map(([id]) => id);
+    expect(ids).toContain("free_purchase");
+    expect(ids).toContain("wisdom_grant");
+  });
+
+  it("excludes negative effects when quality_control owned", () => {
+    const pool = getGiftEffectPool(effects, { quality_control: true });
+    const ids = pool.map(([id]) => id);
+    expect(ids).not.toContain("aps_drain");
+    expect(ids).not.toContain("click_drain");
+    expect(ids).toContain("aps_boost");
+    expect(ids).toContain("empty");
+  });
+
+  it("keeps empty box even with quality_control", () => {
+    const pool = getGiftEffectPool(effects, { quality_control: true });
+    const ids = pool.map(([id]) => id);
+    expect(ids).toContain("empty");
+  });
+
+  it("handles null wisdomUnlocks", () => {
+    const pool = getGiftEffectPool(effects, null);
+    const ids = pool.map(([id]) => id);
+    expect(ids).not.toContain("free_purchase");
+    expect(ids).toContain("aps_boost");
+    expect(ids).toContain("aps_drain"); // negative stays without quality_control
+  });
+
+  it("returns all ungated effects with full wisdom", () => {
+    const pool = getGiftEffectPool(effects, {
+      gift_scholarship: true,
+      gift_of_wisdom: true,
+      quality_control: true,
+    });
+    const ids = pool.map(([id]) => id);
+    expect(ids).toContain("aps_boost");
+    expect(ids).toContain("click_boost");
+    expect(ids).toContain("free_purchase");
+    expect(ids).toContain("wisdom_grant");
+    expect(ids).toContain("empty");
+    expect(ids).toContain("avocado_rain");
+    expect(ids).not.toContain("aps_drain");
+    expect(ids).not.toContain("click_drain");
+    expect(ids).toHaveLength(6);
+  });
+});
+
+describe("gift buffs integration with calcTotalAps / calcClickPower", () => {
+  const producers = { sapling: 10 };
+  const upgrades = {};
+  const wisdom = 0;
+  const guacCount = 0;
+  const benchmarks = {};
+  const wisdomUnlocks = {};
+  const activeRegimens = [];
+
+  it("APS doubles with an active ×2 APS buff", () => {
+    const now = 10000;
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
+    const buffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+      [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 20000 }], now);
+    expect(buffedAps).toBeCloseTo(baseAps * 2);
+  });
+
+  it("APS halves with an active ×0.5 APS debuff", () => {
+    const now = 10000;
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
+    const debuffedAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+      [{ id: "aps_drain", field: "aps", multiplier: 0.5, expiresAt: 20000 }], now);
+    expect(debuffedAps).toBeCloseTo(baseAps * 0.5);
+  });
+
+  it("click power triples with an active ×3 click buff", () => {
+    const now = 10000;
+    const baseAps = calcBaseAps(producers, upgrades, tuning);
+    const baseClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens);
+    const buffedClick = calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+      [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 20000 }], now);
+    expect(buffedClick).toBeCloseTo(baseClick * 3);
+  });
+
+  it("expired gift buffs have no effect on APS", () => {
+    const now = 10000;
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
+    const expiredAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens,
+      [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }], now);
+    expect(expiredAps).toBeCloseTo(baseAps);
+  });
+
+  it("empty activeGiftBuffs array has no effect", () => {
+    const now = 10000;
+    const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens);
+    const withEmpty = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens, [], now);
+    expect(withEmpty).toBeCloseTo(baseAps);
   });
 });
 

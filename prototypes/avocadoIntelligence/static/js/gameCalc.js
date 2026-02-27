@@ -219,6 +219,31 @@ export function calcPersistentSlots(wisdomUnlocks, tuning) {
   return calcWisdomEffect("persistentSlots", wisdomUnlocks, tuning, 0);
 }
 
+// ── Wrapped Gift Functions ──────────────────────────────────────────
+
+/** Returns { apsMult, clickMult } from active gift buffs that haven't expired. */
+export function calcActiveGiftBuffs(activeGiftBuffs, now) {
+  let apsMult = 1;
+  let clickMult = 1;
+  if (!activeGiftBuffs) return { apsMult, clickMult };
+  for (const buff of activeGiftBuffs) {
+    if (buff.expiresAt > now) {
+      if (buff.field === "aps") apsMult *= buff.multiplier;
+      if (buff.field === "click") clickMult *= buff.multiplier;
+    }
+  }
+  return { apsMult, clickMult };
+}
+
+/** Returns eligible effect pool based on wisdom unlocks. */
+export function getGiftEffectPool(giftEffects, wisdomUnlocks) {
+  return Object.entries(giftEffects).filter(([id, cfg]) => {
+    if (cfg.requiresWisdomUnlock && !(wisdomUnlocks && wisdomUnlocks[cfg.requiresWisdomUnlock])) return false;
+    if (cfg.negative && wisdomUnlocks && wisdomUnlocks.quality_control) return false;
+    return true;
+  });
+}
+
 /** Calculate the cost of the next producer unit. */
 export function calcProducerCost(id, ownedCount, tuning) {
   const p = tuning.producers[id];
@@ -391,8 +416,9 @@ export function calcBaseAps(producers, upgrades, tuning) {
   return total;
 }
 
-/** Calculate total avocados per second from all producers. */
-export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens) {
+/** Calculate total avocados per second from all producers.
+ *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
+export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, benchmarks, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
   let total = calcBaseAps(producers, upgrades, tuning);
   // Apply global multipliers from upgrades
   let globalMult = 1;
@@ -420,11 +446,17 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ben
     const regMods = calcRegimenModifiers(activeRegimens, tuning);
     total *= regMods.producerMult;
   }
+  // Apply wrapped gift APS buff
+  if (activeGiftBuffs && activeGiftBuffs.length > 0) {
+    const giftBuffs = calcActiveGiftBuffs(activeGiftBuffs, now || Date.now());
+    total *= giftBuffs.apsMult;
+  }
   return total;
 }
 
-/** Calculate click power (avocados per click). baseAps is pre-multiplier APS. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens) {
+/** Calculate click power (avocados per click). baseAps is pre-multiplier APS.
+ *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, benchmarks, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
   let power = tuning.production.baseClickYield;
 
   // Base click bonus from wisdom tree (e.g. curriculum_learning)
@@ -485,6 +517,11 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   if (activeRegimens && activeRegimens.length > 0) {
     const regMods = calcRegimenModifiers(activeRegimens, tuning);
     power *= regMods.clickMult;
+  }
+  // Apply wrapped gift click buff
+  if (activeGiftBuffs && activeGiftBuffs.length > 0) {
+    const giftBuffs = calcActiveGiftBuffs(activeGiftBuffs, now || Date.now());
+    power *= giftBuffs.clickMult;
   }
   return power;
 }

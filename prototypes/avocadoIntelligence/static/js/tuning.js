@@ -238,7 +238,14 @@ export const TUNING = {
     l2_cache:            { wisdomCost: 25, requires: "l1_cache",        branch: "persistent_memory", title: "L2 Cache",               desc: "Keep 3 research upgrades through prestige (replaces L1 Cache)", effect: { persistentSlots: 3 } },
     selective_recall:    { wisdomCost: 8,  requires: "flash_memory",    branch: "persistent_memory", title: "Selective Recall",       desc: "Auto-select the most expensive research upgrades for persistent slots" },
 
-    // ── Branch 7: Inference Engine (5 nodes, 68w) ──
+    // ── Branch 7: Reinforcement Learning (5 nodes, 43w) ──
+    reinforcement_learning:{ wisdomCost: 3,  requires: null,                      branch: "reinforcement_learning", title: "Reward Signal",      desc: "Gift spawn rate ×1.5", effect: { giftSpawnMult: 1.5 } },
+    gift_scholarship:      { wisdomCost: 4,  requires: "reinforcement_learning",  branch: "reinforcement_learning", title: "Exploration Bonus",  desc: "Gifts can grant free research upgrades", effect: { unlocksGiftEffect: "free_purchase" } },
+    gift_of_wisdom:        { wisdomCost: 6,  requires: "reinforcement_learning",  branch: "reinforcement_learning", title: "Reward Shaping",     desc: "Gifts can grant wisdom points", effect: { unlocksGiftEffect: "wisdom_grant" } },
+    quality_control:       { wisdomCost: 20, requires: "reinforcement_learning",  branch: "reinforcement_learning", title: "Quality Control",    desc: "Removes negative gift effects", effect: { removeNegativeGifts: true } },
+    epsilon_greedy:        { wisdomCost: 10, requires: "reinforcement_learning",  branch: "reinforcement_learning", title: "Epsilon-Greedy",     desc: "Gift spawn rate ×2 more. 2 gifts on screen.", effect: { giftSpawnMult: 2.0, giftMaxOnScreen: 2 } },
+
+    // ── Branch 8: Inference Engine (5 nodes, 68w) ──
     knowledge_distillation:{ wisdomCost: 5,  requires: null,                      branch: "inference_engine",  title: "Knowledge Distillation", desc: "Distillation costs -10%", effect: { distillCostMult: 0.90 } },
     pruning_algorithm:     { wisdomCost: 8,  requires: "knowledge_distillation",  branch: "inference_engine",  title: "Pruning Algorithm",      desc: "Distillation costs -25% (replaces Knowledge Distillation)", effect: { distillCostMult: 0.75 } },
     quantization:          { wisdomCost: 10, requires: "knowledge_distillation",  branch: "inference_engine",  title: "Quantization",           desc: "Distillation bonuses +20% more effective", effect: { distillBonusMult: 1.20 } },
@@ -253,6 +260,7 @@ export const TUNING = {
     neural_arch:       { title: "Neural Architecture",   color: "#4a8cc7" },
     training_data:     { title: "Training Data",         color: "#e8a438" },
     persistent_memory: { title: "Persistent Memory",     color: "#d4af37" },
+    reinforcement_learning: { title: "Reinforcement Learning", color: "#e06c75" },
     inference_engine:  { title: "Inference Engine",       color: "#c0392b" },
   },
 
@@ -311,6 +319,29 @@ export const TUNING = {
     upgradeLookahead: 3,          // max unowned research upgrades visible
   },
 
+  wrappedGift: {
+    spawnChancePerTick: 0.002,    // ~1 gift per 90-120s
+    minCooldownMs: 30000,         // 30s min between gifts
+    maxOnScreen: 1,               // base max (epsilon_greedy → 2)
+
+    spawnInDuration: 1500,        // ms
+    breatheDuration: 10000,
+    fadeOutDuration: 3000,
+
+    fontSizes: [32, 48, 64, 80],
+
+    effects: {
+      aps_boost:     { weight: 25, text: "APS Boost!",      field: "aps",   mult: 2.0,  durationMs: 30000 },
+      click_boost:   { weight: 20, text: "Click Frenzy!",   field: "click", mult: 3.0,  durationMs: 15000 },
+      aps_drain:     { weight: 10, text: "Bug Report...",    field: "aps",   mult: 0.5,  durationMs: 20000, negative: true },
+      click_drain:   { weight: 8,  text: "Carpal Tunnel!",  field: "click", mult: 0.5,  durationMs: 15000, negative: true },
+      free_purchase: { weight: 8,  text: "Free Upgrade!",   requiresWisdomUnlock: "gift_scholarship" },
+      wisdom_grant:  { weight: 5,  text: "Enlightenment!",  wisdomAmount: 1, requiresWisdomUnlock: "gift_of_wisdom" },
+      empty:         { weight: 15, text: "Empty Box..." },
+      avocado_rain:  { weight: 9,  text: "Avocado Rain!",   apsSeconds: 60 },
+    },
+  },
+
   distillation: {
     costs: [100, 250, 500, 1000, 2000, 4000], // wisdom cost for each distillation (v1.0 through v6.0)
     bonuses: [
@@ -340,5 +371,5 @@ export const GUAC_PRODUCER_ORDER = ["guac_lab", "guac_refinery", "guac_centrifug
 // Wisdom tree branch render order
 export const WISDOM_BRANCH_ORDER = [
   "orchard_roots", "guac_economy", "wisdom_amp",
-  "neural_arch", "training_data", "persistent_memory", "inference_engine",
+  "neural_arch", "training_data", "persistent_memory", "reinforcement_learning", "inference_engine",
 ];

@@ -28,6 +28,8 @@ const PERSISTED_STATE_KEYS = [
   "totalWisdomSinceLastDistill",
   "activeRegimens",
   "persistentUpgrades",
+  "activeGiftBuffs",
+  "freeNextPurchase",
   "meta",
 ];
 
@@ -54,6 +56,8 @@ function createDefaultState() {
     totalWisdomSinceLastDistill: 0,
     activeRegimens: [],
     persistentUpgrades: [],
+    activeGiftBuffs: [],
+    freeNextPurchase: false,
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
@@ -139,6 +143,10 @@ let lastUnderfedLogTime = 0;
 let lastClickTime = Date.now();
 let idlePromptShowing = false;
 
+// --- Wrapped Gift tracking (session-only, not persisted) ---
+let lastGiftSpawnTime = 0;
+let activeGiftElements = [];
+
 // --- DOM ---
 const gameTitleEl = document.getElementById("game-title");
 const avocadoCountEl = document.getElementById("avocado-count");
@@ -216,7 +224,7 @@ function closeAnalyzer() {
 // --- Telemetry helpers ---
 function captureStateSnapshot(reason = "tick") {
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
   aps *= distBonus.apsMult * distBonus.allProdMult;
 
   SessionLog.record("state_snapshot", {
@@ -269,6 +277,8 @@ function loadGame() {
       benchmarks: { ...(persisted.benchmarks || {}) },
       activeRegimens: persisted.activeRegimens || [],
       persistentUpgrades: persisted.persistentUpgrades || [],
+      activeGiftBuffs: persisted.activeGiftBuffs || [],
+      freeNextPurchase: persisted.freeNextPurchase || false,
       meta: { ...defaults.meta, ...(persisted.meta || {}) },
     };
 
@@ -617,11 +627,12 @@ function renderBenchmarks() {
 let tickCount = 0;
 
 function updateUI() {
+  const now = Date.now();
   const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+  let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -802,12 +813,14 @@ function updateUI() {
     row.style.display = "";
     const btn = row.querySelector(`[data-upgrade="${inv.id}"]`);
     if (btn) {
-      btn.disabled = state.avocadoCount < upgradeCost || state.upgrades[inv.id];
+      const canAffordUpgrade = state.freeNextPurchase || state.avocadoCount >= upgradeCost;
+      btn.disabled = !canAffordUpgrade || state.upgrades[inv.id];
       const costEl = btn.querySelector(`[data-ucost="${inv.id}"]`);
+      const costText = state.freeNextPurchase ? `<span class="free-badge">FREE</span>${Calc.formatNumber(upgradeCost)}` : Calc.formatNumber(upgradeCost);
       if (costEl) {
-        costEl.textContent = Calc.formatNumber(upgradeCost);
+        costEl.innerHTML = costText;
       } else {
-        btn.innerHTML = `<span data-ucost="${inv.id}">${Calc.formatNumber(upgradeCost)}</span>`;
+        btn.innerHTML = `<span data-ucost="${inv.id}">${costText}</span>`;
       }
     }
   }
@@ -1012,11 +1025,12 @@ function dismissIdlePrompt() {
 }
 
 function pickAvocado() {
-  lastClickTime = Date.now();
+  const clickNow = Date.now();
+  lastClickTime = clickNow;
   if (idlePromptShowing) dismissIdlePrompt();
 
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -1066,6 +1080,8 @@ function confirmPrestigeAndDistill() {
   state.distillationCount = newDistillationCount;
   state.activeRegimens = [];
   state.persistentUpgrades = []; // clear persistent upgrades on distillation
+  state.activeGiftBuffs = []; // reset gift buffs on distillation
+  state.freeNextPurchase = false; // reset free purchase on distillation
 
   // Apply starting wisdom from new model version
   const distBonus = Calc.calcDistillationBonus(newModelVersion, TUNING, state.wisdomUnlocks);
@@ -1107,7 +1123,7 @@ function buyProducer(id) {
 
   // Guac lab gating — need enough APS to feed the lab
   if (id === "guac_lab" && (state.producers.guac_lab || 0) === 0) {
-    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+    const currentAps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, Date.now());
     if (currentAps < TUNING.guac.labUnlockAps) return;
   }
 
@@ -1168,9 +1184,15 @@ function buyUpgrade(id) {
 
   const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
   const effectiveCost = Math.floor(inv.cost() * researchCostMult);
-  if (state.avocadoCount < effectiveCost) return;
 
-  state.avocadoCount -= effectiveCost;
+  if (state.freeNextPurchase) {
+    state.freeNextPurchase = false;
+    logLine(`\u{1f381} Free Upgrade used!`);
+  } else {
+    if (state.avocadoCount < effectiveCost) return;
+    state.avocadoCount -= effectiveCost;
+  }
+
   state.upgrades[id] = true;
   const cfg = TUNING.upgrades[id];
   SessionLog.record("purchase", { kind: "upgrade", id, title: cfg.title });
@@ -1541,6 +1563,8 @@ function confirmPrestige() {
   state.totalWisdomEarned = newTotalWisdomEarned;
   state.totalWisdomSinceLastDistill = newTotalWisdomSinceLastDistill;
   state.activeRegimens = []; // reset regimens on prestige
+  state.activeGiftBuffs = []; // reset gift buffs on prestige
+  state.freeNextPurchase = false; // reset free purchase on prestige
   // Distillation state persists through prestige
   // Apply starting wisdom bonus from distillation
   if (distBonus.startingWisdom > 0) {
@@ -1599,6 +1623,205 @@ function prestige() {
   openPrestigeOverlay();
 }
 
+// --- Wrapped Gift System ---
+function getGiftSpawnChance() {
+  let chance = TUNING.wrappedGift.spawnChancePerTick;
+  // Apply wisdom tree gift spawn multiplier (multiplicative stacking)
+  if (state.wisdomUnlocks) {
+    const mult = Calc.calcWisdomEffectAggregate("giftSpawnMult", state.wisdomUnlocks, TUNING, "multiply", 1);
+    chance *= mult;
+  }
+  return chance;
+}
+
+function getGiftMaxOnScreen() {
+  let max = TUNING.wrappedGift.maxOnScreen;
+  if (state.wisdomUnlocks) {
+    const override = Calc.calcWisdomEffect("giftMaxOnScreen", state.wisdomUnlocks, TUNING, max);
+    if (override > max) max = override;
+  }
+  return max;
+}
+
+function maybeSpawnGift(now) {
+  if (activeGiftElements.length >= getGiftMaxOnScreen()) return;
+  if (now - lastGiftSpawnTime < TUNING.wrappedGift.minCooldownMs) return;
+  if (Math.random() >= getGiftSpawnChance()) return;
+
+  lastGiftSpawnTime = now;
+  spawnGift(now);
+}
+
+function spawnGift(now) {
+  const cfg = TUNING.wrappedGift;
+  const el = document.createElement("div");
+  el.className = "wrapped-gift";
+  el.textContent = "\u{1f381}";
+
+  // Random position and size — use pixel values from viewport dimensions
+  const fontSize = cfg.fontSizes[Math.floor(Math.random() * cfg.fontSizes.length)];
+  el.style.fontSize = `${fontSize}px`;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  el.style.left = `${vw * 0.1 + Math.random() * vw * 0.8}px`;
+  el.style.top = `${vh * 0.1 + Math.random() * vh * 0.8}px`;
+
+  const totalLifetime = cfg.spawnInDuration + cfg.breatheDuration + cfg.fadeOutDuration;
+
+  // Transition to breathing after spawn-in
+  const breatheTimer = setTimeout(() => {
+    if (el.parentNode) el.className = "wrapped-gift breathing";
+  }, cfg.spawnInDuration);
+
+  // Transition to fade-out after breathing
+  const fadeTimer = setTimeout(() => {
+    if (el.parentNode) el.className = "wrapped-gift fading";
+  }, cfg.spawnInDuration + cfg.breatheDuration);
+
+  // Remove after total lifetime
+  const removeTimer = setTimeout(() => {
+    removeGiftElement(el);
+  }, totalLifetime);
+
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearTimeout(breatheTimer);
+    clearTimeout(fadeTimer);
+    clearTimeout(removeTimer);
+    onGiftClick(el, now);
+  });
+
+  document.body.appendChild(el);
+  activeGiftElements.push(el);
+}
+
+function removeGiftElement(el) {
+  if (el.parentNode) el.parentNode.removeChild(el);
+  activeGiftElements = activeGiftElements.filter(g => g !== el);
+}
+
+function onGiftClick(giftEl, spawnTime) {
+  const now = Date.now();
+  const pool = Calc.getGiftEffectPool(TUNING.wrappedGift.effects, state.wisdomUnlocks);
+  if (pool.length === 0) {
+    removeGiftElement(giftEl);
+    return;
+  }
+
+  // Weighted random selection
+  const entries = pool.map(([id, cfg]) => ({ id, ...cfg }));
+  const chosen = Calc.rollWeighted(entries);
+  const effectId = chosen.id;
+  const effectCfg = TUNING.wrappedGift.effects[effectId];
+
+  // Get gift position for floating text
+  const rect = giftEl.getBoundingClientRect();
+  const giftX = rect.left + rect.width / 2;
+  const giftY = rect.top;
+
+  // Remove gift element
+  removeGiftElement(giftEl);
+
+  // Apply effect
+  applyGiftEffect(effectId, effectCfg, now, giftX, giftY);
+}
+
+function applyGiftEffect(effectId, cfg, now, x, y) {
+  let arrow = "";
+  let arrowClass = "";
+
+  if (cfg.field && cfg.mult !== undefined && cfg.durationMs) {
+    // Timed buff
+    state.activeGiftBuffs.push({
+      id: effectId,
+      field: cfg.field,
+      multiplier: cfg.mult,
+      expiresAt: now + cfg.durationMs,
+    });
+    if (cfg.mult > 1) { arrow = "\u25b2"; arrowClass = "gift-arrow-up"; }
+    else { arrow = "\u25bc"; arrowClass = "gift-arrow-down"; }
+  } else if (effectId === "free_purchase") {
+    state.freeNextPurchase = true;
+    arrow = "\u25b2"; arrowClass = "gift-arrow-up";
+  } else if (effectId === "wisdom_grant") {
+    const amount = cfg.wisdomAmount || 1;
+    state.wisdom += amount;
+    state.totalWisdomEarned = (state.totalWisdomEarned || 0) + amount;
+    state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + amount;
+    arrow = "\u25b2"; arrowClass = "gift-arrow-up";
+  } else if (effectId === "avocado_rain") {
+    const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+    aps *= distBonus.apsMult * distBonus.allProdMult;
+    const grant = aps * (cfg.apsSeconds || 60);
+    state.avocadoCount += grant;
+    state.totalAvocadosThisRun += grant;
+    state.totalAvocadosAllTime += grant;
+    arrow = "\u25b2"; arrowClass = "gift-arrow-up";
+  }
+  // "empty" — no effect, no arrow
+
+  // Spawn floating text
+  spawnGiftResultText(cfg.text, arrow, arrowClass, x, y);
+
+  // Log it
+  logLine(`\u{1f381} ${cfg.text}`);
+
+  saveGame();
+  updateUI();
+}
+
+function spawnGiftResultText(text, arrow, arrowClass, x, y) {
+  const el = document.createElement("div");
+  el.className = "gift-result-text";
+  if (arrow && arrowClass) {
+    el.innerHTML = `<span class="${arrowClass}">${arrow}</span> ${text}`;
+  } else {
+    el.textContent = text;
+  }
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  document.body.appendChild(el);
+  el.addEventListener("animationend", () => el.remove());
+}
+
+function cleanupExpiredBuffs(now) {
+  if (!state.activeGiftBuffs || state.activeGiftBuffs.length === 0) return;
+  state.activeGiftBuffs = state.activeGiftBuffs.filter(b => b.expiresAt > now);
+}
+
+function renderBuffIndicators(now) {
+  let row = document.getElementById("buff-indicator-row");
+  if (!state.activeGiftBuffs || state.activeGiftBuffs.length === 0) {
+    if (row) row.innerHTML = "";
+    return;
+  }
+
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "buff-indicator-row";
+    row.className = "buff-indicator-row";
+    // Insert after APS row
+    const apsRow = apsCountEl?.closest(".row");
+    if (apsRow && apsRow.parentNode) {
+      apsRow.parentNode.insertBefore(row, apsRow.nextSibling);
+    }
+  }
+
+  row.innerHTML = "";
+  for (const buff of state.activeGiftBuffs) {
+    if (buff.expiresAt <= now) continue;
+    const remaining = Math.ceil((buff.expiresAt - now) / 1000);
+    const isPositive = buff.multiplier > 1;
+    const arrow = isPositive ? "\u25b2" : "\u25bc";
+    const label = buff.field === "aps" ? "APS" : "Click";
+    const el = document.createElement("span");
+    el.className = `buff-indicator ${isPositive ? "buff-positive" : "buff-negative"}`;
+    el.textContent = `${arrow}\u00d7${buff.multiplier} ${label} (${remaining}s)`;
+    row.appendChild(el);
+  }
+}
+
 // --- Main Loop ---
 function startLoop() {
   let last = Date.now();
@@ -1611,7 +1834,7 @@ function startLoop() {
 
     // Production
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
-    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens);
+    let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.benchmarks, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
     aps *= distBonus.apsMult * distBonus.allProdMult;
     if (aps > 0) {
       const produced = aps * dt;
@@ -1675,6 +1898,14 @@ function startLoop() {
         renderBenchmarks();
       }
     }
+
+    // Wrapped gift spawn check + buff cleanup every 5th tick (~1/s)
+    if (tickCount % 5 === 0) {
+      maybeSpawnGift(now);
+      cleanupExpiredBuffs(now);
+    }
+    // Render buff indicators every tick for smooth countdown
+    renderBuffIndicators(now);
 
     // Telemetry snapshot every 5 ticks (~1s)
     tickCount++;
@@ -1971,6 +2202,12 @@ if (debugAdd10bAvocadosBtn) debugAdd10bAvocadosBtn.addEventListener("click", () 
   saveGame();
   updateUI();
   logLine("Debug: +10,000,000,000 avocados");
+});
+
+const debugSpawnGiftBtn = document.getElementById("debug-spawn-gift-btn");
+if (debugSpawnGiftBtn) debugSpawnGiftBtn.addEventListener("click", () => {
+  spawnGift(Date.now());
+  logLine("Debug: spawned gift");
 });
 
 debugModal.addEventListener("click", (e) => {
