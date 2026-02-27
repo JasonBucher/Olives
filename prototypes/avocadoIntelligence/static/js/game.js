@@ -663,7 +663,9 @@ function updateUI() {
   if (guacPsRowEl) {
     guacPsRowEl.style.display = (hasGuac && labs > 0) ? "" : "none";
     if (labs > 0 && guacPsEl) {
-      const guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
+      let guacPerSec = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens);
+      const guacBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+      guacPerSec *= guacBuffs.guacMult;
       guacPsEl.textContent = Calc.formatNumber(guacPerSec);
     }
   }
@@ -1642,6 +1644,32 @@ function getGiftSpawnChance() {
   return chance;
 }
 
+// --- Web Audio API: synthesized pop sound for gift spawns ---
+let audioCtx = null;
+function playGiftPopSound() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+
+    // Short sine "pop" — quick pitch drop
+    const osc = audioCtx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(900, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.24);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.30);
+  } catch (_) {
+    // Audio not available — silently ignore
+  }
+}
+
 function getGiftMaxOnScreen() {
   let max = TUNING.wrappedGift.maxOnScreen;
   if (state.wisdomUnlocks) {
@@ -1678,6 +1706,7 @@ function spawnGift(now) {
   el.dataset.giftId = giftId;
 
   SessionLog.record("gift_spawn", { giftId });
+  playGiftPopSound();
 
   const totalLifetime = cfg.spawnInDuration + cfg.breatheDuration + cfg.fadeOutDuration;
 
@@ -1776,6 +1805,12 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
     state.totalAvocadosThisRun += grant;
     state.totalAvocadosAllTime += grant;
     arrow = "\u25b2"; arrowClass = "gift-arrow-up";
+  } else if (effectId === "guac_rot") {
+    const pct = cfg.guacLossPct || 0.25;
+    const lost = state.guacCount * pct;
+    state.guacCount -= lost;
+    if (state.guacCount < 0) state.guacCount = 0;
+    arrow = "\u25bc"; arrowClass = "gift-arrow-down";
   }
   // "empty" — no effect, no arrow
 
@@ -1785,7 +1820,7 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   // Log it — include mechanical detail
   let logDetail = "";
   if (cfg.field && cfg.mult !== undefined && cfg.durationMs) {
-    const label = cfg.field === "aps" ? "APS" : "Clicks";
+    const label = cfg.field === "aps" ? "APS" : cfg.field === "guac" ? "Guac/sec" : "Clicks";
     logDetail = ` (${label} ×${cfg.mult} for ${cfg.durationMs / 1000}s)`;
   } else if (effectId === "free_purchase") {
     logDetail = " (next research upgrade is free)";
@@ -1793,6 +1828,8 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
     logDetail = ` (+${cfg.wisdomAmount || 1} wisdom)`;
   } else if (effectId === "avocado_rain") {
     logDetail = ` (+${cfg.apsSeconds || 60}s of APS)`;
+  } else if (effectId === "guac_rot") {
+    logDetail = ` (-${Math.round((cfg.guacLossPct || 0.25) * 100)}% guacamole)`;
   }
   logLine(`\u{1f381} ${cfg.text}${logDetail}`);
   SessionLog.record("gift", { giftId, effectId, text: cfg.text, negative: !!cfg.negative });
@@ -1844,7 +1881,7 @@ function renderBuffIndicators(now) {
     const remaining = Math.ceil((buff.expiresAt - now) / 1000);
     const isPositive = buff.multiplier > 1;
     const arrow = isPositive ? "\u25b2" : "\u25bc";
-    const label = buff.field === "aps" ? "APS" : "Click";
+    const label = buff.field === "aps" ? "APS" : buff.field === "guac" ? "Guac" : "Click";
     const el = document.createElement("span");
     el.className = `buff-indicator ${isPositive ? "buff-positive" : "buff-negative"}`;
     el.textContent = `${arrow}\u00d7${buff.multiplier} ${label} (${remaining}s)`;
@@ -1887,7 +1924,10 @@ function startLoop() {
       if (actualConsumption > 0) {
         state.avocadoCount -= actualConsumption;
         // Guac produced proportional to actual vs desired consumption
-        const fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens) * dt;
+        let fullGuac = Calc.calcGuacProduction(labs, TUNING, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.benchmarks, state.activeRegimens) * dt;
+        // Apply gift buff to guac production
+        const guacGiftBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, now);
+        fullGuac *= guacGiftBuffs.guacMult;
         state.guacCount += desiredConsumption > 0 ? fullGuac * (actualConsumption / desiredConsumption) : 0;
       }
       // Debug log when underfed (throttled to every ~5s)

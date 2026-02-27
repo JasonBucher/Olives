@@ -920,8 +920,8 @@ h1 {
 }
 
 @keyframes gift-breathe {
-  0%, 100% { opacity: 0.85; transform: scale(0.95); }
-  50%      { opacity: 1;    transform: scale(1.05); }
+  0%, 100% { opacity: 1; transform: scale(0.95); }
+  50%      { opacity: 1; transform: scale(1.05); }
 }
 
 @keyframes gift-fade-out {

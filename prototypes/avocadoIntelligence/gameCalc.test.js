@@ -1906,27 +1906,37 @@ describe("calcActiveGiftBuffs", () => {
   const now = 10000;
 
   it("returns identity multipliers with no buffs", () => {
-    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1 });
+    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
   });
 
   it("returns identity multipliers with null/undefined", () => {
-    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1 });
-    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1 });
+    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
   });
 
   it("applies a single APS boost", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1, guacMult: 1 });
   });
 
   it("applies a single click boost", () => {
     const buffs = [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0, guacMult: 1 });
+  });
+
+  it("applies a single guac boost", () => {
+    const buffs = [{ id: "guac_boost", field: "guac", multiplier: 2.0, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 2.0 });
+  });
+
+  it("applies a guac drain", () => {
+    const buffs = [{ id: "guac_drain", field: "guac", multiplier: 0.5, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 0.5 });
   });
 
   it("ignores expired buffs", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
   });
 
   it("stacks multiple APS buffs multiplicatively", () => {
@@ -1967,6 +1977,9 @@ describe("getGiftEffectPool", () => {
     click_boost:   { weight: 20, text: "Click Frenzy!",   field: "click", mult: 3.0 },
     aps_drain:     { weight: 10, text: "Bug Report...",    field: "aps",   mult: 0.5, negative: true },
     click_drain:   { weight: 8,  text: "Carpal Tunnel!",  field: "click", mult: 0.5, negative: true },
+    guac_boost:    { weight: 12, text: "Guac Surge!",     field: "guac",  mult: 2.0 },
+    guac_drain:    { weight: 6,  text: "Moldy Batch...",   field: "guac",  mult: 0.5, negative: true },
+    guac_rot:      { weight: 6,  text: "Guac Rot!",       guacLossPct: 0.25, negative: true },
     free_purchase: { weight: 8,  text: "Free Upgrade!",   requiresWisdomUnlock: "gift_scholarship" },
     wisdom_grant:  { weight: 5,  text: "Enlightenment!",  wisdomAmount: 1, requiresWisdomUnlock: "gift_of_wisdom" },
     empty:         { weight: 15, text: "Empty Box..." },
@@ -1995,7 +2008,10 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).not.toContain("aps_drain");
     expect(ids).not.toContain("click_drain");
+    expect(ids).not.toContain("guac_drain");
+    expect(ids).not.toContain("guac_rot");
     expect(ids).toContain("aps_boost");
+    expect(ids).toContain("guac_boost");
     expect(ids).toContain("empty");
   });
 
@@ -2022,13 +2038,16 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).toContain("aps_boost");
     expect(ids).toContain("click_boost");
+    expect(ids).toContain("guac_boost");
     expect(ids).toContain("free_purchase");
     expect(ids).toContain("wisdom_grant");
     expect(ids).toContain("empty");
     expect(ids).toContain("avocado_rain");
     expect(ids).not.toContain("aps_drain");
     expect(ids).not.toContain("click_drain");
-    expect(ids).toHaveLength(6);
+    expect(ids).not.toContain("guac_drain");
+    expect(ids).not.toContain("guac_rot");
+    expect(ids).toHaveLength(7);
   });
 });
 
