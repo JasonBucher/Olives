@@ -1766,6 +1766,7 @@ function applyGiftEffect(effectId, cfg, now, x, y) {
 
   // Log it
   logLine(`\u{1f381} ${cfg.text}`);
+  SessionLog.record("gift", { effectId, text: cfg.text, negative: !!cfg.negative });
 
   saveGame();
   updateUI();

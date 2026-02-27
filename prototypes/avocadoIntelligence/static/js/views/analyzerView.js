@@ -87,6 +87,7 @@ export function computeRunAnalysis(events) {
       summary: {},
       points: [],
       timelineRows: [],
+      giftMarkers: [],
     };
   }
 
@@ -116,11 +117,25 @@ export function computeRunAnalysis(events) {
     });
   }
 
+  // Extract gift event markers for chart overlay
+  const giftMarkers = [];
+  for (const ev of events) {
+    if (ev.type === "gift") {
+      giftMarkers.push({
+        ms: ev.ms,
+        tRelSec: (ev.ms - first.ms) / 1000,
+        effectId: ev.payload.effectId || "",
+        text: ev.payload.text || "",
+        negative: !!ev.payload.negative,
+      });
+    }
+  }
+
   // Build timeline rows for key events
   const timelineRows = [];
   for (const ev of events) {
     const isKey = [
-      "purchase", "prestige", "distill", "state_snapshot",
+      "purchase", "prestige", "distill", "state_snapshot", "gift",
     ].includes(ev.type);
 
     let details = "";
@@ -132,6 +147,8 @@ export function computeRunAnalysis(events) {
       details = `v${ev.payload.modelVersion || "?"}`;
     } else if (ev.type === "state_snapshot") {
       details = ev.payload.reason || "";
+    } else if (ev.type === "gift") {
+      details = `🎁 ${ev.payload.text || ev.payload.effectId || ""}`;
     }
 
     timelineRows.push({
@@ -157,7 +174,7 @@ export function computeRunAnalysis(events) {
       }
     : { totalEvents: events.length, totalSnapshots: 0 };
 
-  return { metadata, summary, points, timelineRows };
+  return { metadata, summary, points, timelineRows, giftMarkers };
 }
 
 // ---------------------------------------------------------------------------
@@ -343,8 +360,18 @@ export function initAnalyzerView({ onBack, captureSnapshot }) {
     grid += `<line x1="${PAD}" y1="${midY}" x2="${W - PAD}" y2="${midY}" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4,4" />`;
     labels += `<text x="${PAD - 4}" y="${midY + 4}" text-anchor="end" fill="${CSS_MUTED}" font-size="10">${fmtCompact(maxY / 2)}</text>`;
 
+    // Gift event vertical lines
+    let giftLines = "";
+    const markers = currentAnalysis.giftMarkers || [];
+    for (const m of markers) {
+      const x = PAD + ((m.tRelSec - t0) / tSpan) * plotW;
+      const color = m.negative ? "#e06c75" : "#e8a438";
+      giftLines += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H - PAD}" stroke="${color}" stroke-width="1" stroke-dasharray="4,2" opacity="0.6" />`;
+      giftLines += `<text x="${x}" y="${PAD - 4}" text-anchor="middle" fill="${color}" font-size="10">🎁</text>`;
+    }
+
     chartSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    chartSvg.innerHTML = `${grid}${paths}${labels}`;
+    chartSvg.innerHTML = `${grid}${giftLines}${paths}${labels}`;
   }
 
   // --- Series controls ---
@@ -381,6 +408,7 @@ export function initAnalyzerView({ onBack, captureSnapshot }) {
     for (const row of rows) {
       if (filter === "key" && !row.isKey) continue;
       if (filter === "purchases" && row.type !== "purchase") continue;
+      if (filter === "gifts" && row.type !== "gift") continue;
       if (filter === "progression" && !["state_snapshot", "prestige", "distill"].includes(row.type)) continue;
 
       const tr = document.createElement("tr");
