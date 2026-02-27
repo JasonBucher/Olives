@@ -213,8 +213,8 @@ export const TUNING = {
     guac_memory_1:       { wisdomCost: 3,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Guac Memory I",          desc: "produceExponent +0.02 per prestige" },
     guac_memory_2:       { wisdomCost: 10, requires: "guac_memory_1",  branch: "wisdom_amp",        title: "Guac Memory II",         desc: "consumeExponent -0.01 per prestige" },
     infinite_guac:       { wisdomCost: 25, requires: "guac_memory_2",  branch: "wisdom_amp",        title: "Infinite Guac Theory",   desc: "consumeExponent floor lowered from 0.70 to 0.55" },
-    efficient_composting:{ wisdomCost: 6,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Efficient Composting",   desc: "Prestige threshold lowered to 5M", effect: { prestigeThreshold: 5e6 } },
-    accelerated_decay:   { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp",  title: "Accelerated Decay",      desc: "Prestige threshold lowered to 2M (replaces Efficient Composting)", effect: { prestigeThreshold: 2e6 } },
+    efficient_composting:{ wisdomCost: 6,  requires: "inner_peace",    branch: "wisdom_amp",        title: "Efficient Composting",   desc: "Prestige threshold lowered to 1.5M", effect: { prestigeThreshold: 1.5e6 } },
+    accelerated_decay:   { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp",  title: "Accelerated Decay",      desc: "Prestige threshold lowered to 750K (replaces Efficient Composting)", effect: { prestigeThreshold: 750000 } },
 
     // ── Branch 4: Neural Architecture (7 nodes, 89w) ──
     backpropagation:     { wisdomCost: 2,  requires: null,                  branch: "neural_arch",       title: "Backpropagation",        desc: "All production +5%", effect: { globalApsMult: 1.05 } },
@@ -377,7 +377,7 @@ export const TUNING = {
   },
 
   prestige: {
-    unlockThreshold: 1e7,         // total avocados this run to unlock prestige
+    unlockThreshold: 3e6,         // total avocados this run to unlock prestige
     divisor: 30,                  // wisdom = floor(cbrt(total) / divisor)
     scalingRoot: 3,               // 3 = cube root, 2 = square root
     wisdomMultPerPoint: 0.10,     // +10% per wisdom point

@@ -121,7 +121,7 @@ const tuning = {
     no_bonus:         { title: "No Bonus" },
   },
   prestige: {
-    unlockThreshold: 1e7,
+    unlockThreshold: 3e6,
     divisor: 30,
     scalingRoot: 3,
     wisdomMultPerPoint: 0.10,
@@ -146,8 +146,8 @@ const tuning = {
     guac_memory_1:        { wisdomCost: 3, requires: "inner_peace", branch: "wisdom_amp", title: "Guac Memory I", desc: "+0.02 per prestige" },
     guac_memory_2:        { wisdomCost: 10, requires: "guac_memory_1", branch: "wisdom_amp", title: "Guac Memory II", desc: "-0.01 per prestige" },
     infinite_guac:        { wisdomCost: 25, requires: "guac_memory_2", branch: "wisdom_amp", title: "Infinite Guac", desc: "Floor 0.55" },
-    efficient_composting: { wisdomCost: 6, requires: "inner_peace", branch: "wisdom_amp", title: "Efficient Composting", desc: "Threshold 5M", effect: { prestigeThreshold: 5e6 } },
-    accelerated_decay:    { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp", title: "Accelerated Decay", desc: "Threshold 2M", effect: { prestigeThreshold: 2e6 } },
+    efficient_composting: { wisdomCost: 6, requires: "inner_peace", branch: "wisdom_amp", title: "Efficient Composting", desc: "Threshold 1.5M", effect: { prestigeThreshold: 1.5e6 } },
+    accelerated_decay:    { wisdomCost: 15, requires: "efficient_composting", branch: "wisdom_amp", title: "Accelerated Decay", desc: "Threshold 750K", effect: { prestigeThreshold: 750000 } },
     recursive_insight:    { wisdomCost: 12, requires: "wisdom_boost", branch: "wisdom_amp", title: "Recursive Insight", desc: "Wisdom earn +25%", effect: { wisdomEarnMult: 1.25 } },
     // Neural Architecture
     backpropagation:      { wisdomCost: 2, requires: null, branch: "neural_arch", title: "Backpropagation", desc: "+5%", effect: { globalApsMult: 1.05 } },
@@ -710,12 +710,12 @@ describe("calcClickPower", () => {
 
 describe("calcWisdomEarned", () => {
   it("returns 0 below threshold", () => {
-    expect(calcWisdomEarned(9999999, tuning)).toBe(0);
+    expect(calcWisdomEarned(2999999, tuning)).toBe(0);
   });
 
-  it("returns 7 at exactly threshold (1e7) with cube root", () => {
-    // floor(cbrt(1e7) / 30) = floor(215.44 / 30) = floor(7.18) = 7
-    expect(calcWisdomEarned(1e7, tuning)).toBe(7);
+  it("returns 4 at exactly threshold (3e6) with cube root", () => {
+    // floor(cbrt(3e6) / 30) = floor(144.22 / 30) = floor(4.81) = 4
+    expect(calcWisdomEarned(3e6, tuning)).toBe(4);
   });
 
   it("returns floor of cube root scaling", () => {
@@ -735,8 +735,8 @@ describe("calcWisdomEarned", () => {
   it("guarantees minimum 1 wisdom above threshold", () => {
     // At threshold with very high divisor that would give 0 from formula
     const stingyTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 99999 } };
-    // floor(cbrt(1e7) / 99999) = floor(215.44 / 99999) = 0, but min floor => 1
-    expect(calcWisdomEarned(1e7, stingyTuning)).toBe(1);
+    // floor(cbrt(3e6) / 99999) = floor(144.22 / 99999) = 0, but min floor => 1
+    expect(calcWisdomEarned(3e6, stingyTuning)).toBe(1);
   });
 
   it("cube root is tighter than sqrt at high values", () => {
@@ -803,11 +803,11 @@ describe("calcWisdomBonus", () => {
 
 describe("canPrestige", () => {
   it("returns false below threshold", () => {
-    expect(canPrestige(9999999, tuning)).toBe(false);
+    expect(canPrestige(2999999, tuning)).toBe(false);
   });
 
   it("returns true at exactly threshold", () => {
-    expect(canPrestige(1e7, tuning)).toBe(true);
+    expect(canPrestige(3e6, tuning)).toBe(true);
   });
 
   it("returns true above threshold", () => {
@@ -1328,9 +1328,9 @@ describe("calcWisdomEffect — replaces semantics", () => {
   });
 
   it("deepest wins for prestige threshold", () => {
-    // efficient_composting (depth 1) = 5e6, accelerated_decay (depth 2) = 2e6
-    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true }, tuning, 1e7)).toBe(5e6);
-    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true, accelerated_decay: true }, tuning, 1e7)).toBe(2e6);
+    // efficient_composting (depth 1) = 1.5e6, accelerated_decay (depth 2) = 750K
+    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true }, tuning, 3e6)).toBe(1.5e6);
+    expect(calcWisdomEffect("prestigeThreshold", { inner_peace: true, efficient_composting: true, accelerated_decay: true }, tuning, 3e6)).toBe(750000);
   });
 
   it("deepest wins for distill cost mult", () => {
@@ -1508,16 +1508,16 @@ describe("calcWisdomResearchCostMult", () => {
 
 describe("calcPrestigeThreshold", () => {
   it("returns default threshold with no wisdom unlocks", () => {
-    expect(calcPrestigeThreshold({}, tuning)).toBe(1e7);
+    expect(calcPrestigeThreshold({}, tuning)).toBe(3e6);
   });
 
-  it("returns 5M with efficient_composting", () => {
-    expect(calcPrestigeThreshold({ inner_peace: true, efficient_composting: true }, tuning)).toBe(5e6);
+  it("returns 1.5M with efficient_composting", () => {
+    expect(calcPrestigeThreshold({ inner_peace: true, efficient_composting: true }, tuning)).toBe(1.5e6);
   });
 
-  it("returns 2M with accelerated_decay (overrides efficient_composting)", () => {
+  it("returns 750K with accelerated_decay (overrides efficient_composting)", () => {
     const owned = { inner_peace: true, efficient_composting: true, accelerated_decay: true };
-    expect(calcPrestigeThreshold(owned, tuning)).toBe(2e6);
+    expect(calcPrestigeThreshold(owned, tuning)).toBe(750000);
   });
 });
 
@@ -1675,41 +1675,42 @@ describe("calcPersistentSlots", () => {
 
 describe("canPrestige — with wisdom tree", () => {
   it("uses default threshold with empty wisdomUnlocks", () => {
-    expect(canPrestige(1e7, tuning, {})).toBe(true);
-    expect(canPrestige(9999999, tuning, {})).toBe(false);
+    expect(canPrestige(3e6, tuning, {})).toBe(true);
+    expect(canPrestige(2999999, tuning, {})).toBe(false);
   });
 
   it("uses lowered threshold with efficient_composting", () => {
     const wUnlocks = { inner_peace: true, efficient_composting: true };
-    expect(canPrestige(5e6, tuning, wUnlocks)).toBe(true);
-    expect(canPrestige(4999999, tuning, wUnlocks)).toBe(false);
+    expect(canPrestige(1.5e6, tuning, wUnlocks)).toBe(true);
+    expect(canPrestige(1499999, tuning, wUnlocks)).toBe(false);
   });
 
   it("uses lowest threshold with accelerated_decay", () => {
     const wUnlocks = { inner_peace: true, efficient_composting: true, accelerated_decay: true };
-    expect(canPrestige(2e6, tuning, wUnlocks)).toBe(true);
-    expect(canPrestige(1999999, tuning, wUnlocks)).toBe(false);
+    expect(canPrestige(750000, tuning, wUnlocks)).toBe(true);
+    expect(canPrestige(749999, tuning, wUnlocks)).toBe(false);
   });
 });
 
 describe("calcWisdomEarned — with wisdom tree", () => {
   it("respects lowered threshold", () => {
     const wUnlocks = { inner_peace: true, efficient_composting: true };
-    // threshold = 5M, cbrt(5e6)/30 = floor(171.0/30) = floor(5.7) = 5
-    expect(calcWisdomEarned(5e6, tuning, wUnlocks)).toBe(5);
+    // threshold = 1.5M, cbrt(1.5e6)/30 = floor(114.47/30) = floor(3.82) = 3
+    expect(calcWisdomEarned(1.5e6, tuning, wUnlocks)).toBe(3);
     // Below threshold
-    expect(calcWisdomEarned(4999999, tuning, wUnlocks)).toBe(0);
+    expect(calcWisdomEarned(1499999, tuning, wUnlocks)).toBe(0);
   });
 
   it("applies wisdom earn mult from recursive_insight", () => {
     const wUnlocks = { inner_peace: true, wisdom_boost: true, recursive_insight: true };
-    // default threshold 1e7, cbrt(1e7)/30 = 7, * 1.25 = 8.75 → floor = 8
-    expect(calcWisdomEarned(1e7, tuning, wUnlocks)).toBe(8);
+    // default threshold 3e6, cbrt(3e6)/30 = 4, * 1.25 = 5.0 → floor = 5
+    expect(calcWisdomEarned(3e6, tuning, wUnlocks)).toBe(5);
     // At 4e7: cbrt(4e7)/30 = floor(341.99/30) = 11, * 1.25 = 13.75 → floor = 13
     expect(calcWisdomEarned(4e7, tuning, wUnlocks)).toBe(13);
   });
 
   it("defaults to no earn mult without wisdomUnlocks param", () => {
+    // cbrt(1e7)/30 = floor(215.44/30) = 7
     expect(calcWisdomEarned(1e7, tuning)).toBe(7);
   });
 });
@@ -1948,21 +1949,21 @@ describe("calcClickPower — throughput tiers IV and V", () => {
 describe("calcWisdomEarned — min-1 floor", () => {
   it("returns at least 1 when above threshold even with high divisor", () => {
     const highDivTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 999999 } };
-    expect(calcWisdomEarned(1e7, highDivTuning)).toBe(1);
+    expect(calcWisdomEarned(3e6, highDivTuning)).toBe(1);
   });
 
   it("returns at least 1 at exactly threshold", () => {
     const highDivTuning = { ...tuning, prestige: { ...tuning.prestige, divisor: 999999 } };
-    expect(calcWisdomEarned(1e7, highDivTuning)).toBe(1);
+    expect(calcWisdomEarned(3e6, highDivTuning)).toBe(1);
   });
 
   it("still returns 0 below threshold", () => {
-    expect(calcWisdomEarned(9999999, tuning)).toBe(0);
+    expect(calcWisdomEarned(2999999, tuning)).toBe(0);
   });
 
   it("returns formula value when formula gives more than 1", () => {
-    // At 1e7 with normal tuning: cbrt(1e7)/30 = 7
-    expect(calcWisdomEarned(1e7, tuning)).toBe(7);
+    // At 3e6 with normal tuning: cbrt(3e6)/30 = 4
+    expect(calcWisdomEarned(3e6, tuning)).toBe(4);
   });
 });
 
