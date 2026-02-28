@@ -275,14 +275,32 @@ export function calcMaxAffordable(id, ownedCount, budget, tuning, costMult = 1) 
   return count;
 }
 
-/** Calculate a single producer's per-unit output rate, applying per-producer upgrade multipliers. */
-export function calcProducerUnitRate(id, upgrades, tuning) {
+/** Calculate the milestone multiplier for a producer at a given owned count. */
+export function calcMilestoneMultiplier(count, tuning) {
+  let mult = 1;
+  for (const ms of tuning.milestones) {
+    if (count >= ms.count) mult *= ms.mult;
+  }
+  return mult;
+}
+
+/** Return the next milestone threshold above the current count, or null if all reached. */
+export function getNextMilestone(count, tuning) {
+  for (const ms of tuning.milestones) {
+    if (count < ms.count) return ms;
+  }
+  return null;
+}
+
+/** Calculate a single producer's per-unit output rate, applying upgrade and milestone multipliers. */
+export function calcProducerUnitRate(id, upgrades, tuning, count) {
   let rate = tuning.producers[id].baseRate;
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {
     if (upgrade.producerId === id && upgrade.prodMult && upgrades[upgradeId]) {
       rate *= upgrade.prodMult;
     }
   }
+  if (count > 0) rate *= calcMilestoneMultiplier(count, tuning);
   return rate;
 }
 
@@ -411,7 +429,7 @@ export function calcBaseAps(producers, upgrades, tuning) {
   let total = 0;
   for (const [id, count] of Object.entries(producers)) {
     if (count <= 0) continue;
-    const unitRate = calcProducerUnitRate(id, upgrades, tuning);
+    const unitRate = calcProducerUnitRate(id, upgrades, tuning, count);
     const synergyMult = calcSynergyMultiplier(id, producers, upgrades, tuning);
     total += unitRate * count * synergyMult;
   }

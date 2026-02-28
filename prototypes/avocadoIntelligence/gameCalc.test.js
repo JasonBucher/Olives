@@ -22,11 +22,23 @@ import {
   calcPersistentSlots,
   calcActiveGiftBuffs,
   getGiftEffectPool,
+  calcMilestoneMultiplier,
+  getNextMilestone,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
 const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
+  milestones: [
+    { count: 10,  mult: 1.5 },
+    { count: 25,  mult: 2 },
+    { count: 50,  mult: 2 },
+    { count: 75,  mult: 2 },
+    { count: 100, mult: 3 },
+    { count: 150, mult: 3 },
+    { count: 200, mult: 4 },
+    { count: 250, mult: 5 },
+  ],
   producers: {
     sapling:         { baseCost: 15,      costGrowth: 1.15, baseRate: 0.1 },
     seed_bank:       { baseCost: 100,     costGrowth: 1.15, baseRate: 0.8 },
@@ -451,6 +463,90 @@ describe("calcProducerUnitRate", () => {
   });
 });
 
+describe("calcMilestoneMultiplier", () => {
+  it("returns 1 below first milestone", () => {
+    expect(calcMilestoneMultiplier(0, tuning)).toBe(1);
+    expect(calcMilestoneMultiplier(9, tuning)).toBe(1);
+  });
+
+  it("applies first milestone at count 10", () => {
+    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
+  });
+
+  it("stacks milestones multiplicatively", () => {
+    // 10: x1.5, 25: x2 → cumulative x3
+    expect(calcMilestoneMultiplier(25, tuning)).toBe(3);
+    // + 50: x2 → cumulative x6
+    expect(calcMilestoneMultiplier(50, tuning)).toBe(6);
+    // + 75: x2 → cumulative x12
+    expect(calcMilestoneMultiplier(75, tuning)).toBe(12);
+    // + 100: x3 → cumulative x36
+    expect(calcMilestoneMultiplier(100, tuning)).toBe(36);
+    // + 150: x3 → cumulative x108
+    expect(calcMilestoneMultiplier(150, tuning)).toBe(108);
+    // + 200: x4 → cumulative x432
+    expect(calcMilestoneMultiplier(200, tuning)).toBe(432);
+    // + 250: x5 → cumulative x2160
+    expect(calcMilestoneMultiplier(250, tuning)).toBe(2160);
+  });
+
+  it("applies milestone at exact threshold", () => {
+    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
+    expect(calcMilestoneMultiplier(11, tuning)).toBe(1.5);
+  });
+
+  it("handles count between milestones", () => {
+    // Between 10 and 25: only first milestone (x1.5)
+    expect(calcMilestoneMultiplier(20, tuning)).toBe(1.5);
+    // Between 25 and 50: first two (x3)
+    expect(calcMilestoneMultiplier(40, tuning)).toBe(3);
+  });
+});
+
+describe("getNextMilestone", () => {
+  it("returns first milestone when count is 0", () => {
+    const next = getNextMilestone(0, tuning);
+    expect(next).toEqual({ count: 10, mult: 1.5 });
+  });
+
+  it("returns next milestone after passing one", () => {
+    const next = getNextMilestone(10, tuning);
+    expect(next).toEqual({ count: 25, mult: 2 });
+  });
+
+  it("returns null when all milestones reached", () => {
+    expect(getNextMilestone(250, tuning)).toBeNull();
+    expect(getNextMilestone(999, tuning)).toBeNull();
+  });
+
+  it("returns correct milestone at each boundary", () => {
+    expect(getNextMilestone(9, tuning).count).toBe(10);
+    expect(getNextMilestone(24, tuning).count).toBe(25);
+    expect(getNextMilestone(49, tuning).count).toBe(50);
+    expect(getNextMilestone(99, tuning).count).toBe(100);
+  });
+});
+
+describe("calcProducerUnitRate — with milestones", () => {
+  it("applies milestone multiplier when count is passed", () => {
+    // sapling base 0.1, milestone at 10 gives x1.5 = 0.15
+    expect(calcProducerUnitRate("sapling", {}, tuning, 10)).toBeCloseTo(0.15);
+  });
+
+  it("no milestone below threshold", () => {
+    expect(calcProducerUnitRate("sapling", {}, tuning, 5)).toBe(0.1);
+  });
+
+  it("stacks milestone with tiered upgrade", () => {
+    // sapling base 0.1, T1 2x = 0.2, milestone at 25 = x3, total = 0.6
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning, 25)).toBeCloseTo(0.6);
+  });
+
+  it("no milestone when count is omitted", () => {
+    expect(calcProducerUnitRate("sapling", {}, tuning)).toBe(0.1);
+  });
+});
+
 describe("calcGuacMultiplier", () => {
   it("returns 1.0 with no guac", () => {
     expect(calcGuacMultiplier(0, tuning)).toBe(1);
@@ -594,14 +690,14 @@ describe("calcBaseAps", () => {
 
   it("applies per-producer upgrades", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 = 2
-    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBe(2);
+    // 10 * 0.2 * 1.5 (milestone) = 3
+    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBeCloseTo(3);
   });
 
   it("does not apply global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 = 1 (global_boost_1 should NOT affect this)
-    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBe(1);
+    // 10 * 0.1 * 1.5 (milestone) = 1.5 (global_boost_1 should NOT affect this)
+    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBeCloseTo(1.5);
   });
 });
 
@@ -619,40 +715,40 @@ describe("calcTotalAps", () => {
 
   it("applies global multiplier upgrade", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 = 1, * 1.5 = 1.5
-    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBe(1.5);
+    // 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.5 (global) = 2.25
+    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBeCloseTo(2.25);
   });
 
   it("stacks global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 = 1, * 1.5 * 2 = 3
-    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBe(3);
+    // 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.5 * 2 = 4.5
+    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBeCloseTo(4.5);
   });
 
   it("applies wisdom bonus", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1, wisdom = 1 + 10 * 0.10 = 2.0, total = 2
-    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(2);
+    // base = 1.5 (milestone), wisdom = 1 + 10 * 0.10 = 2.0, total = 3
+    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(3);
   });
 
   it("applies guac multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1, guac mult at 100 guac
+    // base = 1.5 (milestone), guac mult at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(1 * guacMult);
+    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(1.5 * guacMult);
   });
 
   it("stacks guac and wisdom multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1, wisdom = 2.0, guac at 100 guac
+    // base = 1.5 (milestone), wisdom = 2.0, guac at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(1 * 2.0 * guacMult);
+    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(1.5 * 2.0 * guacMult);
   });
 
   it("applies achievement global multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1, achievement global = 1 + 0.02 = 1.02, total = 1 * 1.02 = 1.02
-    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.02);
+    // base = 1.5 (milestone), achievement global = 1 + 0.02 = 1.02, total = 1.5 * 1.02 = 1.53
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.53);
   });
 });
 
@@ -1224,16 +1320,16 @@ describe("calcBaseAps — synergy integration", () => {
   it("returns boosted APS when synergy upgrade is owned and source has units", () => {
     const producers = { sapling: 10, orchard_row: 5 };
     const upgrades = { syn_orchard_sapling: true };
-    // sapling: 10 * 0.1 * (1 + 0.05*5) = 10 * 0.1 * 1.25 = 1.25
-    // orchard_row: 5 * 8 = 40
-    // total = 41.25
-    expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(41.25);
+    // sapling: 10 * 0.1 * 1.5 (milestone) * (1 + 0.05*5) = 10 * 0.1 * 1.5 * 1.25 = 1.875
+    // orchard_row: 5 * 8 = 40 (no milestone, count < 10)
+    // total = 41.875
+    expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(41.875);
   });
 
   it("returns unboosted APS when synergy upgrade not owned", () => {
     const producers = { sapling: 10, orchard_row: 5 };
-    // sapling: 10 * 0.1 = 1, orchard_row: 5 * 8 = 40, total = 41
-    expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(41);
+    // sapling: 10 * 0.1 * 1.5 (milestone) = 1.5, orchard_row: 5 * 8 = 40, total = 41.5
+    expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(41.5);
   });
 });
 
@@ -1797,23 +1893,26 @@ describe("calcTotalAps — with wisdom tree and regimens", () => {
   const baseProducers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
 
   it("applies wisdom tree global APS mult", () => {
-    // base = 1, backpropagation 1.05x * weight_initialization 1.10x = 1.155
+    // base = 1.5 (milestone), backpropagation 1.05x * weight_initialization 1.10x = 1.155
+    // total = 1.5 * 1.155 = 1.7325
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks);
-    expect(result).toBeCloseTo(1.155);
+    expect(result).toBeCloseTo(1.7325);
   });
 
   it("applies regimen producer mult", () => {
-    // base = 1, scale_focus gives producerMult 1.50
+    // base = 1.5 (milestone), scale_focus gives producerMult 1.50
+    // total = 1.5 * 1.5 = 2.25
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, undefined, ["scale_focus"]);
-    expect(result).toBeCloseTo(1.5);
+    expect(result).toBeCloseTo(2.25);
   });
 
   it("stacks wisdom tree and regimen multipliers", () => {
-    // base = 1, backpropagation 1.05 * weight_init 1.10 = 1.155, scale_focus 1.50 → 1.7325
+    // base = 1.5 (milestone), backpropagation 1.05 * weight_init 1.10 = 1.155, scale_focus 1.50
+    // total = 1.5 * 1.155 * 1.50 = 2.59875
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks, ["scale_focus"]);
-    expect(result).toBeCloseTo(1.7325);
+    expect(result).toBeCloseTo(2.59875);
   });
 });
 
@@ -1881,9 +1980,9 @@ describe("gate node effects — backpropagation globalApsMult", () => {
 
   it("backpropagation effect reflected in calcTotalAps", () => {
     const producers = { sapling: 10 };
-    // base = 10 * 0.1 = 1, * 1.05 = 1.05
+    // base = 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.05 = 1.575
     const wUnlocks = { backpropagation: true };
-    expect(calcTotalAps(producers, {}, 0, 0, tuning, undefined, wUnlocks)).toBeCloseTo(1.05);
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, undefined, wUnlocks)).toBeCloseTo(1.575);
   });
 });
 
