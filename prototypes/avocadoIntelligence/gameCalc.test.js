@@ -24,6 +24,7 @@ import {
   getGiftEffectPool,
   calcMilestoneMultiplier,
   getNextMilestone,
+  calcOfflineProgress,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -2331,3 +2332,45 @@ describe("calcClickPower — singularity (NG+) multiplier", () => {
   });
 });
 
+// ── Offline Progress ─────────────────────────────────────────────
+
+describe("calcOfflineProgress", () => {
+  const offlineTuning = {
+    offlineProgress: {
+      fraction: 0.5,
+      maxElapsedSeconds: 28800,
+      minElapsedSeconds: 60,
+    },
+  };
+
+  it("returns zero grant when elapsed time below minimum", () => {
+    const result = calcOfflineProgress(100, 30_000, offlineTuning); // 30s
+    expect(result.grant).toBe(0);
+    expect(result.capped).toBe(false);
+  });
+
+  it("returns zero grant when savedAps is zero", () => {
+    const result = calcOfflineProgress(0, 3600_000, offlineTuning); // 1hr, 0 APS
+    expect(result.grant).toBe(0);
+  });
+
+  it("calculates normal grant correctly", () => {
+    // 100 APS, 1 hour (3600s), 50% fraction = 100 * 3600 * 0.5 = 180,000
+    const result = calcOfflineProgress(100, 3600_000, offlineTuning);
+    expect(result.grant).toBe(180_000);
+    expect(result.capped).toBe(false);
+    expect(result.elapsedSeconds).toBe(3600);
+  });
+
+  it("caps at maxElapsedSeconds", () => {
+    // 100 APS, 24 hours but capped at 8 hours = 100 * 28800 * 0.5 = 1,440,000
+    const result = calcOfflineProgress(100, 86400_000, offlineTuning);
+    expect(result.grant).toBe(1_440_000);
+    expect(result.capped).toBe(true);
+  });
+
+  it("handles negative elapsed time gracefully", () => {
+    const result = calcOfflineProgress(100, -1000, offlineTuning);
+    expect(result.grant).toBe(0);
+  });
+});

@@ -624,6 +624,19 @@ export function calcAchievementBonus(achievements, tuning, wisdomUnlocks) {
   return result;
 }
 
+/** Calculate offline progress grant from saved APS and elapsed time. */
+export function calcOfflineProgress(savedAps, elapsedMs, tuning) {
+  const cfg = tuning.offlineProgress;
+  const elapsedSeconds = elapsedMs / 1000;
+  if (elapsedSeconds < cfg.minElapsedSeconds || savedAps <= 0) {
+    return { grant: 0, elapsedSeconds, capped: false };
+  }
+  const effectiveSeconds = Math.min(elapsedSeconds, cfg.maxElapsedSeconds);
+  const capped = elapsedSeconds > cfg.maxElapsedSeconds;
+  const grant = savedAps * effectiveSeconds * cfg.fraction;
+  return { grant, elapsedSeconds, capped };
+}
+
 /**
  * Calculate the distillation cost (wisdom required) for the next distillation.
  */

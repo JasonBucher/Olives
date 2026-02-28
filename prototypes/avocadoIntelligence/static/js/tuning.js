@@ -3,6 +3,14 @@
 // value lives here so you can tweak the feel in one place.
 
 export const TUNING = {
+  balanceVersion: 1, // increment on any rebalance patch
+
+  offlineProgress: {
+    fraction: 0.5,            // grant 50% of offline production
+    maxElapsedSeconds: 28800, // cap at 8 hours
+    minElapsedSeconds: 60,    // ignore < 1 minute away
+  },
+
   production: {
     baseClickYield: 1,   // avocados per click
     tickMs: 200,          // main loop interval

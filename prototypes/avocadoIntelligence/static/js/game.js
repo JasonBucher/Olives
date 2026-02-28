@@ -36,6 +36,9 @@ const PERSISTED_STATE_KEYS = [
   "giftEffectsSeen",
   "unlockedThemes",
   "activeTheme",
+  "lastSaveTimestamp",
+  "offlineApsSnapshot",
+  "savedBalanceVersion",
   "meta",
 ];
 
@@ -71,6 +74,10 @@ function createDefaultState() {
     activeTheme: "default",
 
     singularityCount: 0,
+
+    lastSaveTimestamp: 0,
+    offlineApsSnapshot: 0,
+    savedBalanceVersion: TUNING.balanceVersion,
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
@@ -108,6 +115,9 @@ function pickPersistedState(parsed) {
 // --- Reset safety ---
 let isResetting = false;
 let mainLoopInterval = null;
+
+// --- Last computed APS (updated each tick, snapshotted in saveGame) ---
+let lastComputedAps = 0;
 
 // --- Game State ---
 let state = createDefaultState();
@@ -350,6 +360,24 @@ function loadGame() {
         }
       }
     }
+
+    // --- Offline progress ---
+    if (state.lastSaveTimestamp > 0 && state.savedBalanceVersion === TUNING.balanceVersion) {
+      const elapsedMs = Date.now() - state.lastSaveTimestamp;
+      const result = Calc.calcOfflineProgress(state.offlineApsSnapshot, elapsedMs, TUNING);
+      if (result.grant > 0) {
+        state.avocadoCount += result.grant;
+        state.totalAvocadosThisRun += result.grant;
+        state.totalAvocadosAllTime += result.grant;
+        const hours = (result.elapsedSeconds / 3600).toFixed(1);
+        logLine(`Welcome back! You earned ${Calc.formatNumber(result.grant)} avocados while away (${hours}h)`);
+        if (result.capped) {
+          logLine("(Production capped at 8 hours)");
+        }
+      }
+    } else if (state.lastSaveTimestamp > 0 && state.savedBalanceVersion !== TUNING.balanceVersion) {
+      logLine("Game updated since last save \u2014 offline progress skipped.");
+    }
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state.meta.createdAt = new Date().toISOString();
@@ -359,6 +387,9 @@ function loadGame() {
 
 function saveGame() {
   if (isResetting) return;
+  state.lastSaveTimestamp = Date.now();
+  state.offlineApsSnapshot = lastComputedAps;
+  state.savedBalanceVersion = TUNING.balanceVersion;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
   localStorage.setItem("AVO_singularity", state.singularityCount);
 }
@@ -2084,6 +2115,7 @@ function startLoop() {
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
     let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
     aps *= distBonus.apsMult * distBonus.allProdMult;
+    lastComputedAps = aps;
     if (aps > 0) {
       const produced = aps * dt;
       state.avocadoCount += produced;
