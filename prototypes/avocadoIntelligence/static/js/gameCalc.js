@@ -221,20 +221,22 @@ export function calcPersistentSlots(wisdomUnlocks, tuning) {
 
 // ── Wrapped Gift Functions ──────────────────────────────────────────
 
-/** Returns { apsMult, clickMult } from active gift buffs that haven't expired. */
+/** Returns { apsMult, clickMult, guacMult, costMult } from active gift buffs that haven't expired. */
 export function calcActiveGiftBuffs(activeGiftBuffs, now) {
   let apsMult = 1;
   let clickMult = 1;
   let guacMult = 1;
-  if (!activeGiftBuffs) return { apsMult, clickMult, guacMult };
+  let costMult = 1;
+  if (!activeGiftBuffs) return { apsMult, clickMult, guacMult, costMult };
   for (const buff of activeGiftBuffs) {
     if (buff.expiresAt > now) {
       if (buff.field === "aps") apsMult *= buff.multiplier;
       if (buff.field === "click") clickMult *= buff.multiplier;
       if (buff.field === "guac") guacMult *= buff.multiplier;
+      if (buff.field === "cost") costMult *= buff.multiplier;
     }
   }
-  return { apsMult, clickMult, guacMult };
+  return { apsMult, clickMult, guacMult, costMult };
 }
 
 /** Returns eligible effect pool based on wisdom unlocks. */
@@ -475,8 +477,9 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ach
 }
 
 /** Calculate click power (avocados per click). baseAps is pre-multiplier APS.
- *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
+ *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers.
+ *  Optional singularityCount applies NG+ click multiplier (2^singularityCount). */
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now, singularityCount) {
   let power = tuning.production.baseClickYield;
 
   // Base click bonus from wisdom tree (e.g. curriculum_learning)
@@ -549,6 +552,10 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
     const giftBuffs = calcActiveGiftBuffs(activeGiftBuffs, now || Date.now());
     power *= giftBuffs.clickMult;
   }
+  // Apply NG+ singularity click multiplier
+  if (singularityCount > 0) {
+    power *= Math.pow(tuning.singularity.clickMultPerSingularity, singularityCount);
+  }
   return power;
 }
 
@@ -615,6 +622,19 @@ export function calcAchievementBonus(achievements, tuning, wisdomUnlocks) {
     if (cfg.baseClickBonus) result.baseClickBonus += cfg.baseClickBonus * bbMult;
   }
   return result;
+}
+
+/** Calculate offline progress grant from saved APS and elapsed time. */
+export function calcOfflineProgress(savedAps, elapsedMs, tuning) {
+  const cfg = tuning.offlineProgress;
+  const elapsedSeconds = elapsedMs / 1000;
+  if (elapsedSeconds < cfg.minElapsedSeconds || savedAps <= 0) {
+    return { grant: 0, elapsedSeconds, capped: false };
+  }
+  const effectiveSeconds = Math.min(elapsedSeconds, cfg.maxElapsedSeconds);
+  const capped = elapsedSeconds > cfg.maxElapsedSeconds;
+  const grant = savedAps * effectiveSeconds * cfg.fraction;
+  return { grant, elapsedSeconds, capped };
 }
 
 /**

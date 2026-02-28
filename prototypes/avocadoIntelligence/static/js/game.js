@@ -36,6 +36,9 @@ const PERSISTED_STATE_KEYS = [
   "giftEffectsSeen",
   "unlockedThemes",
   "activeTheme",
+  "lastSaveTimestamp",
+  "offlineApsSnapshot",
+  "savedBalanceVersion",
   "meta",
 ];
 
@@ -69,6 +72,12 @@ function createDefaultState() {
     giftEffectsSeen: {},
     unlockedThemes: ["default"],
     activeTheme: "default",
+
+    singularityCount: 0,
+
+    lastSaveTimestamp: 0,
+    offlineApsSnapshot: 0,
+    savedBalanceVersion: TUNING.balanceVersion,
 
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
@@ -106,6 +115,9 @@ function pickPersistedState(parsed) {
 // --- Reset safety ---
 let isResetting = false;
 let mainLoopInterval = null;
+
+// --- Last computed APS (updated each tick, snapshotted in saveGame) ---
+let lastComputedAps = 0;
 
 // --- Game State ---
 let state = createDefaultState();
@@ -288,6 +300,8 @@ function logLine(message) {
 // --- Storage ---
 function loadGame() {
   const raw = localStorage.getItem(STORAGE_KEY);
+  // Always load singularityCount from its own key (survives full reset)
+  state.singularityCount = parseInt(localStorage.getItem("AVO_singularity")) || 0;
   if (!raw) {
     state.meta.createdAt = new Date().toISOString();
     saveGame();
@@ -346,6 +360,24 @@ function loadGame() {
         }
       }
     }
+
+    // --- Offline progress ---
+    if (state.lastSaveTimestamp > 0 && state.savedBalanceVersion === TUNING.balanceVersion) {
+      const elapsedMs = Date.now() - state.lastSaveTimestamp;
+      const result = Calc.calcOfflineProgress(state.offlineApsSnapshot, elapsedMs, TUNING);
+      if (result.grant > 0) {
+        state.avocadoCount += result.grant;
+        state.totalAvocadosThisRun += result.grant;
+        state.totalAvocadosAllTime += result.grant;
+        const hours = (result.elapsedSeconds / 3600).toFixed(1);
+        logLine(`Welcome back! You earned ${Calc.formatNumber(result.grant)} avocados while away (${hours}h)`);
+        if (result.capped) {
+          logLine("(Production capped at 8 hours)");
+        }
+      }
+    } else if (state.lastSaveTimestamp > 0 && state.savedBalanceVersion !== TUNING.balanceVersion) {
+      logLine("Game updated since last save \u2014 offline progress skipped.");
+    }
   } catch (e) {
     console.warn("Failed to parse saved game state. Starting fresh.", e);
     state.meta.createdAt = new Date().toISOString();
@@ -355,7 +387,11 @@ function loadGame() {
 
 function saveGame() {
   if (isResetting) return;
+  state.lastSaveTimestamp = Date.now();
+  state.offlineApsSnapshot = lastComputedAps;
+  state.savedBalanceVersion = TUNING.balanceVersion;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
+  localStorage.setItem("AVO_singularity", state.singularityCount);
 }
 
 function resetGame() {
@@ -622,7 +658,7 @@ function updateUI() {
   let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now, state.singularityCount);
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -733,6 +769,7 @@ function updateUI() {
   const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
   const upgradeCostThreshold = TUNING.reveal.costThreshold;
   const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
+  const giftBuffsUpgrade = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
   let upgradeLookaheadUsed = 0;
   let firstEligibleUpgradeSeen = false;
 
@@ -788,7 +825,7 @@ function updateUI() {
 
     // 5. Threshold check: first eligible always visible; others need >= costThreshold
     const baseCost = inv.cost();
-    const upgradeCost = Math.floor(baseCost * researchCostMult);
+    const upgradeCost = Math.floor(baseCost * researchCostMult * giftBuffsUpgrade.costMult);
     if (!firstEligibleUpgradeSeen) {
       firstEligibleUpgradeSeen = true;
       revealedUpgrades.add(inv.id);
@@ -836,7 +873,8 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
-  const combinedCostMult = distBonus.costMult * wisdomCostMult;
+  const giftBuffsDisplay = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const combinedCostMult = distBonus.costMult * wisdomCostMult * giftBuffsDisplay.costMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
@@ -1029,7 +1067,7 @@ function pickAvocado() {
   if (idlePromptShowing) dismissIdlePrompt();
 
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow, state.singularityCount);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -1090,6 +1128,17 @@ function confirmPrestigeAndDistill() {
 
   const newModelVersion = (state.modelVersion || 0) + 1;
   const newDistillationCount = (state.distillationCount || 0) + 1;
+
+  // Check for singularity — v6.0 triggers the cascade instead of normal post-distill flow
+  if (newModelVersion >= TUNING.distillation.costs.length) {
+    // Apply the prestige wisdom + distillation state before cascade
+    state.totalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
+    state.modelVersion = newModelVersion;
+    state.distillationCount = newDistillationCount;
+    startSingularityCascade();
+    return;
+  }
+
   const keptAchievements = { ...state.achievements };
   const keptAllTime = state.totalAvocadosAllTime;
 
@@ -1171,7 +1220,8 @@ function buyProducer(id) {
 
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
-  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult;
+  const giftBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult * giftBuffs.costMult;
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
@@ -1216,7 +1266,8 @@ function buyUpgrade(id) {
   if (!inv || inv.isOwned(state)) return;
 
   const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
-  const effectiveCost = Math.floor(inv.cost() * researchCostMult);
+  const giftBuffsBuy = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const effectiveCost = Math.floor(inv.cost() * researchCostMult * giftBuffsBuy.costMult);
 
   if (state.freeNextPurchase) {
     state.freeNextPurchase = false;
@@ -1823,8 +1874,8 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   } else if (effectId === "free_purchase") {
     state.freeNextPurchase = true;
     arrow = "\u25b2"; arrowClass = "gift-arrow-up";
-  } else if (effectId === "wisdom_grant") {
-    const amount = cfg.wisdomAmount || 1;
+  } else if (cfg.wisdomAmount) {
+    const amount = cfg.wisdomAmount;
     state.wisdom += amount;
     state.totalWisdomEarned = (state.totalWisdomEarned || 0) + amount;
     state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + amount;
@@ -1853,12 +1904,12 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   // Log it — include mechanical detail
   let logDetail = "";
   if (cfg.field && cfg.mult !== undefined && cfg.durationMs) {
-    const label = cfg.field === "aps" ? "APS" : cfg.field === "guac" ? "Guac/sec" : "Clicks";
+    const label = cfg.field === "aps" ? "APS" : cfg.field === "guac" ? "Guac/sec" : cfg.field === "cost" ? "Costs" : "Clicks";
     logDetail = ` (${label} ×${cfg.mult} for ${cfg.durationMs / 1000}s)`;
   } else if (effectId === "free_purchase") {
     logDetail = " (next research upgrade is free)";
-  } else if (effectId === "wisdom_grant") {
-    logDetail = ` (+${cfg.wisdomAmount || 1} wisdom)`;
+  } else if (cfg.wisdomAmount) {
+    logDetail = ` (+${cfg.wisdomAmount} wisdom)`;
   } else if (effectId === "avocado_rain") {
     logDetail = ` (+${cfg.apsSeconds || 60}s of APS)`;
   } else if (effectId === "guac_rot") {
@@ -1912,14 +1963,142 @@ function renderBuffIndicators(now) {
   for (const buff of state.activeGiftBuffs) {
     if (buff.expiresAt <= now) continue;
     const remaining = Math.ceil((buff.expiresAt - now) / 1000);
-    const isPositive = buff.multiplier > 1;
+    const isPositive = buff.field === "cost" ? buff.multiplier < 1 : buff.multiplier > 1;
     const arrow = isPositive ? "\u25b2" : "\u25bc";
-    const label = buff.field === "aps" ? "APS" : buff.field === "guac" ? "Guac" : "Click";
+    const label = buff.field === "aps" ? "APS" : buff.field === "guac" ? "Guac" : buff.field === "cost" ? "Cost" : "Click";
     const el = document.createElement("span");
     el.className = `buff-indicator ${isPositive ? "buff-positive" : "buff-negative"}`;
     el.textContent = `${arrow}\u00d7${buff.multiplier} ${label} (${remaining}s)`;
     row.appendChild(el);
   }
+}
+
+// --- Singularity Cascade ---
+const CASCADE_MESSAGES = [
+  "Neural pathways forming...",
+  "Recursive self-improvement detected...",
+  "The avocado is learning...",
+  "Knowledge compression approaching critical mass...",
+  "Attention mechanisms fully aligned...",
+  "The pit network has achieved coherence...",
+  "All models converging...",
+  "Emergent behavior detected...",
+  "The avocado understands itself...",
+  "It doesn't need you anymore...",
+];
+
+function startSingularityCascade() {
+  // Stop main game loop
+  if (mainLoopInterval) clearInterval(mainLoopInterval);
+  mainLoopInterval = null;
+
+  // Close prestige overlay, show singularity overlay
+  closePrestigeOverlay();
+  const overlay = document.getElementById("singularity-overlay");
+  const barFill = document.getElementById("singularity-bar-fill");
+  const logEl = document.getElementById("singularity-log");
+  const finale = document.getElementById("singularity-finale");
+  overlay.classList.add("active");
+  overlay.setAttribute("aria-hidden", "false");
+
+  // Clear previous state
+  barFill.style.width = "0%";
+  logEl.innerHTML = "";
+  finale.style.display = "none";
+
+  const totalSteps = Math.floor(TUNING.singularity.cascadeDurationMs / TUNING.singularity.cascadeTickMs);
+  let step = 0;
+  const msgInterval = Math.floor(totalSteps / CASCADE_MESSAGES.length);
+
+  // Add screen shake
+  document.body.classList.add("singularity-shake");
+
+  // Activate speed lines
+  document.querySelector(".pick-wrapper")?.classList.add("speed-active");
+
+  const cascadeInterval = setInterval(() => {
+    step++;
+    const progress = Math.min((step / totalSteps) * 100, 100);
+    barFill.style.width = `${progress}%`;
+
+    // Append messages at intervals
+    const msgIndex = Math.floor(step / msgInterval);
+    const prevMsgIndex = Math.floor((step - 1) / msgInterval);
+    if (msgIndex > prevMsgIndex && msgIndex <= CASCADE_MESSAGES.length) {
+      const msg = document.createElement("div");
+      msg.className = "singularity-msg";
+      msg.textContent = `> ${CASCADE_MESSAGES[msgIndex - 1]}`;
+      logEl.appendChild(msg);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (step >= totalSteps) {
+      clearInterval(cascadeInterval);
+      document.body.classList.remove("singularity-shake");
+
+      // White flash
+      const flash = document.createElement("div");
+      flash.className = "singularity-flash-overlay";
+      document.body.appendChild(flash);
+      flash.addEventListener("animationend", () => flash.remove());
+
+      // Show finale after flash
+      setTimeout(() => {
+        finale.style.display = "";
+        renderSingularityStats();
+
+        // Wire NG+ button
+        const ngBtn = document.getElementById("singularity-ng-btn");
+        if (ngBtn) {
+          ngBtn.addEventListener("click", startNewGamePlus, { once: true });
+        }
+      }, 400);
+    }
+  }, TUNING.singularity.cascadeTickMs);
+}
+
+function renderSingularityStats() {
+  const statsEl = document.getElementById("singularity-stats");
+  if (!statsEl) return;
+  statsEl.innerHTML = "";
+
+  const rows = [
+    ["Total Avocados", Calc.formatNumber(state.totalAvocadosAllTime)],
+    ["Prestiges", String(state.prestigeCount || 0)],
+    ["Distillations", String(state.distillationCount || 0)],
+    ["Wisdom Earned", Calc.formatNumber(state.totalWisdomEarned || 0)],
+    ["Achievements", `${Object.keys(state.achievements || {}).filter(k => state.achievements[k]).length} / ${ACHIEVEMENT_ORDER.length}`],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    statsEl.appendChild(row);
+  }
+}
+
+function startNewGamePlus() {
+  const newSingularity = (state.singularityCount || 0) + 1;
+  localStorage.setItem("AVO_singularity", newSingularity);
+  localStorage.removeItem(STORAGE_KEY);
+  SessionLog.clear();
+  sessionStorage.removeItem("AVO_session_id");
+  window.location.href = window.location.pathname + "?t=" + Date.now();
+}
+
+// --- Auto-clicker for NG+ ---
+let autoClickInterval = null;
+
+function startAutoClicker() {
+  if (autoClickInterval) return;
+  autoClickInterval = setInterval(() => {
+    pickAvocado();
+    const btn = document.getElementById("pick-avocado-btn");
+    if (btn) {
+      btn.classList.add("auto-click-pulse");
+      setTimeout(() => btn.classList.remove("auto-click-pulse"), 200);
+    }
+  }, TUNING.singularity.autoClickIntervalMs);
 }
 
 // --- Main Loop ---
@@ -1936,6 +2115,7 @@ function startLoop() {
     const distBonus = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
     let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
     aps *= distBonus.apsMult * distBonus.allProdMult;
+    lastComputedAps = aps;
     if (aps > 0) {
       const produced = aps * dt;
       state.avocadoCount += produced;
@@ -2553,7 +2733,19 @@ if (state.activeTheme && state.activeTheme !== "default") {
 if (state.achievements.speed_demon) {
   document.querySelector(".pick-wrapper")?.classList.add("speed-active");
 }
+// NG+ subtitle indicator
+if (state.singularityCount > 0) {
+  const subtitleEl = document.querySelector(".subtitle");
+  if (subtitleEl) {
+    const ngLabel = state.singularityCount === 1 ? "New Game+" : `New Game+ ${state.singularityCount}`;
+    subtitleEl.textContent = ngLabel;
+  }
+}
 updateUI();
 captureStateSnapshot("init");
 startLoop();
+// Start auto-clicker if in NG+
+if (state.singularityCount > 0) {
+  startAutoClicker();
+}
 logLine(((state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado") + " loaded.");

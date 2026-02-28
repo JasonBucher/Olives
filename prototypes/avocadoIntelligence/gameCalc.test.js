@@ -24,6 +24,7 @@ import {
   getGiftEffectPool,
   calcMilestoneMultiplier,
   getNextMilestone,
+  calcOfflineProgress,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
@@ -198,6 +199,12 @@ const tuning = {
     click_focus: { title: "Click Focus", desc: "Clicks 3x, producers -30%", clickMult: 3.0, producerMult: 0.70, requiresUnlock: "click_specialization" },
     scale_focus: { title: "Scale Focus", desc: "Producers +50%, clicks -50%", clickMult: 0.50, producerMult: 1.50, requiresUnlock: "scale_specialization" },
     guac_focus:  { title: "Guac Focus",  desc: "Guac 2x, production -20%",   guacOutputMult: 2.0, producerMult: 0.80, requiresUnlock: "guac_specialization" },
+  },
+  singularity: {
+    cascadeDurationMs: 8000,
+    cascadeTickMs: 200,
+    autoClickIntervalMs: 2000,
+    clickMultPerSingularity: 2,
   },
   distillation: {
     costs: [100, 250, 500, 1000, 2000],
@@ -460,6 +467,90 @@ describe("calcProducerUnitRate", () => {
     expect(calcProducerUnitRate("harvest_bot", { harvest_fleet: true }, tuning)).toBe(15600);
     expect(calcProducerUnitRate("data_grove", { data_lake: true }, tuning)).toBe(520000);
     expect(calcProducerUnitRate("gpu_cluster", { gpu_overclock: true }, tuning)).toBe(130e6);
+  });
+});
+
+describe("calcMilestoneMultiplier", () => {
+  it("returns 1 below first milestone", () => {
+    expect(calcMilestoneMultiplier(0, tuning)).toBe(1);
+    expect(calcMilestoneMultiplier(9, tuning)).toBe(1);
+  });
+
+  it("applies first milestone at count 10", () => {
+    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
+  });
+
+  it("stacks milestones multiplicatively", () => {
+    // 10: x1.5, 25: x2 → cumulative x3
+    expect(calcMilestoneMultiplier(25, tuning)).toBe(3);
+    // + 50: x2 → cumulative x6
+    expect(calcMilestoneMultiplier(50, tuning)).toBe(6);
+    // + 75: x2 → cumulative x12
+    expect(calcMilestoneMultiplier(75, tuning)).toBe(12);
+    // + 100: x3 → cumulative x36
+    expect(calcMilestoneMultiplier(100, tuning)).toBe(36);
+    // + 150: x3 → cumulative x108
+    expect(calcMilestoneMultiplier(150, tuning)).toBe(108);
+    // + 200: x4 → cumulative x432
+    expect(calcMilestoneMultiplier(200, tuning)).toBe(432);
+    // + 250: x5 → cumulative x2160
+    expect(calcMilestoneMultiplier(250, tuning)).toBe(2160);
+  });
+
+  it("applies milestone at exact threshold", () => {
+    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
+    expect(calcMilestoneMultiplier(11, tuning)).toBe(1.5);
+  });
+
+  it("handles count between milestones", () => {
+    // Between 10 and 25: only first milestone (x1.5)
+    expect(calcMilestoneMultiplier(20, tuning)).toBe(1.5);
+    // Between 25 and 50: first two (x3)
+    expect(calcMilestoneMultiplier(40, tuning)).toBe(3);
+  });
+});
+
+describe("getNextMilestone", () => {
+  it("returns first milestone when count is 0", () => {
+    const next = getNextMilestone(0, tuning);
+    expect(next).toEqual({ count: 10, mult: 1.5 });
+  });
+
+  it("returns next milestone after passing one", () => {
+    const next = getNextMilestone(10, tuning);
+    expect(next).toEqual({ count: 25, mult: 2 });
+  });
+
+  it("returns null when all milestones reached", () => {
+    expect(getNextMilestone(250, tuning)).toBeNull();
+    expect(getNextMilestone(999, tuning)).toBeNull();
+  });
+
+  it("returns correct milestone at each boundary", () => {
+    expect(getNextMilestone(9, tuning).count).toBe(10);
+    expect(getNextMilestone(24, tuning).count).toBe(25);
+    expect(getNextMilestone(49, tuning).count).toBe(50);
+    expect(getNextMilestone(99, tuning).count).toBe(100);
+  });
+});
+
+describe("calcProducerUnitRate — with milestones", () => {
+  it("applies milestone multiplier when count is passed", () => {
+    // sapling base 0.1, milestone at 10 gives x1.5 = 0.15
+    expect(calcProducerUnitRate("sapling", {}, tuning, 10)).toBeCloseTo(0.15);
+  });
+
+  it("no milestone below threshold", () => {
+    expect(calcProducerUnitRate("sapling", {}, tuning, 5)).toBe(0.1);
+  });
+
+  it("stacks milestone with tiered upgrade", () => {
+    // sapling base 0.1, T1 2x = 0.2, milestone at 25 = x3, total = 0.6
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning, 25)).toBeCloseTo(0.6);
+  });
+
+  it("no milestone when count is omitted", () => {
+    expect(calcProducerUnitRate("sapling", {}, tuning)).toBe(0.1);
   });
 });
 
@@ -1987,37 +2078,37 @@ describe("calcActiveGiftBuffs", () => {
   const now = 10000;
 
   it("returns identity multipliers with no buffs", () => {
-    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("returns identity multipliers with null/undefined", () => {
-    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
-    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
+    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single APS boost", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single click boost", () => {
     const buffs = [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single guac boost", () => {
     const buffs = [{ id: "guac_boost", field: "guac", multiplier: 2.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 2.0 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 2.0, costMult: 1 });
   });
 
   it("applies a guac drain", () => {
     const buffs = [{ id: "guac_drain", field: "guac", multiplier: 0.5, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 0.5 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 0.5, costMult: 1 });
   });
 
   it("ignores expired buffs", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("stacks multiple APS buffs multiplicatively", () => {
@@ -2028,6 +2119,7 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBeCloseTo(1.0);
     expect(result.clickMult).toBe(1);
+    expect(result.costMult).toBe(1);
   });
 
   it("handles mixed APS and click buffs", () => {
@@ -2038,6 +2130,7 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBe(2.0);
     expect(result.clickMult).toBe(3.0);
+    expect(result.costMult).toBe(1);
   });
 
   it("only includes non-expired buffs in mix", () => {
@@ -2049,6 +2142,22 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBe(2.0);
     expect(result.clickMult).toBe(3.0);
+    expect(result.costMult).toBe(1);
+  });
+
+  it("applies a single cost buff", () => {
+    const buffs = [{ id: "cost_collapse", field: "cost", multiplier: 0.5, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 0.5 });
+  });
+
+  it("stacks multiple cost buffs multiplicatively", () => {
+    const buffs = [
+      { id: "cost_1", field: "cost", multiplier: 0.5, expiresAt: 15000 },
+      { id: "cost_2", field: "cost", multiplier: 0.5, expiresAt: 15000 },
+    ];
+    const result = calcActiveGiftBuffs(buffs, now);
+    expect(result.costMult).toBeCloseTo(0.25);
+    expect(result.apsMult).toBe(1);
   });
 });
 
@@ -2063,8 +2172,12 @@ describe("getGiftEffectPool", () => {
     guac_rot:      { weight: 6,  text: "Guac Rot!",       guacLossPct: 0.25, negative: true },
     free_purchase: { weight: 8,  text: "Free Upgrade!",   requiresWisdomUnlock: "gift_scholarship" },
     wisdom_grant:  { weight: 5,  text: "Enlightenment!",  wisdomAmount: 1, requiresWisdomUnlock: "gift_of_wisdom" },
-    empty:         { weight: 15, text: "Empty Box..." },
+    empty:         { weight: 3,  text: "Empty Box..." },
     avocado_rain:  { weight: 9,  text: "Avocado Rain!" },
+    avocado_singularity: { weight: 3, text: "Avocado Singularity!", field: "aps", mult: 10.0 },
+    neural_cascade:      { weight: 5, text: "Neural Cascade!",     field: "click", mult: 5.0 },
+    cost_collapse:       { weight: 4, text: "Cost Collapse!",      field: "cost",  mult: 0.5 },
+    wisdom_burst:        { weight: 2, text: "Wisdom Burst!",       wisdomAmount: 2, requiresWisdomUnlock: "gift_of_wisdom" },
   };
 
   it("excludes gated effects when wisdom not owned", () => {
@@ -2072,9 +2185,13 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).not.toContain("free_purchase");
     expect(ids).not.toContain("wisdom_grant");
+    expect(ids).not.toContain("wisdom_burst");
     expect(ids).toContain("aps_boost");
     expect(ids).toContain("empty");
     expect(ids).toContain("avocado_rain");
+    expect(ids).toContain("avocado_singularity");
+    expect(ids).toContain("neural_cascade");
+    expect(ids).toContain("cost_collapse");
   });
 
   it("includes gated effects when wisdom is owned", () => {
@@ -2082,6 +2199,7 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).toContain("free_purchase");
     expect(ids).toContain("wisdom_grant");
+    expect(ids).toContain("wisdom_burst");
   });
 
   it("excludes negative effects when quality_control owned", () => {
@@ -2124,11 +2242,15 @@ describe("getGiftEffectPool", () => {
     expect(ids).toContain("wisdom_grant");
     expect(ids).toContain("empty");
     expect(ids).toContain("avocado_rain");
+    expect(ids).toContain("avocado_singularity");
+    expect(ids).toContain("neural_cascade");
+    expect(ids).toContain("cost_collapse");
+    expect(ids).toContain("wisdom_burst");
     expect(ids).not.toContain("aps_drain");
     expect(ids).not.toContain("click_drain");
     expect(ids).not.toContain("guac_drain");
     expect(ids).not.toContain("guac_rot");
-    expect(ids).toHaveLength(7);
+    expect(ids).toHaveLength(11);
   });
 });
 
@@ -2182,3 +2304,73 @@ describe("gift buffs integration with calcTotalAps / calcClickPower", () => {
   });
 });
 
+describe("calcClickPower — singularity (NG+) multiplier", () => {
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("singularityCount=0 does not change click power (backward compatible)", () => {
+    const without = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const withZero = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 0);
+    expect(withZero).toBe(without);
+  });
+
+  it("singularityCount=1 applies 2x multiplier", () => {
+    const base = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const ng1 = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 1);
+    expect(ng1).toBe(base * 2);
+  });
+
+  it("singularityCount=2 applies 4x multiplier", () => {
+    const base = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const ng2 = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 2);
+    expect(ng2).toBe(base * 4);
+  });
+
+  it("singularity multiplier stacks with other click multipliers", () => {
+    const base = calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning);
+    const ng1 = calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 1);
+    expect(ng1).toBe(base * 2);
+  });
+});
+
+// ── Offline Progress ─────────────────────────────────────────────
+
+describe("calcOfflineProgress", () => {
+  const offlineTuning = {
+    offlineProgress: {
+      fraction: 0.5,
+      maxElapsedSeconds: 28800,
+      minElapsedSeconds: 60,
+    },
+  };
+
+  it("returns zero grant when elapsed time below minimum", () => {
+    const result = calcOfflineProgress(100, 30_000, offlineTuning); // 30s
+    expect(result.grant).toBe(0);
+    expect(result.capped).toBe(false);
+  });
+
+  it("returns zero grant when savedAps is zero", () => {
+    const result = calcOfflineProgress(0, 3600_000, offlineTuning); // 1hr, 0 APS
+    expect(result.grant).toBe(0);
+  });
+
+  it("calculates normal grant correctly", () => {
+    // 100 APS, 1 hour (3600s), 50% fraction = 100 * 3600 * 0.5 = 180,000
+    const result = calcOfflineProgress(100, 3600_000, offlineTuning);
+    expect(result.grant).toBe(180_000);
+    expect(result.capped).toBe(false);
+    expect(result.elapsedSeconds).toBe(3600);
+  });
+
+  it("caps at maxElapsedSeconds", () => {
+    // 100 APS, 24 hours but capped at 8 hours = 100 * 28800 * 0.5 = 1,440,000
+    const result = calcOfflineProgress(100, 86400_000, offlineTuning);
+    expect(result.grant).toBe(1_440_000);
+    expect(result.capped).toBe(true);
+  });
+
+  it("handles negative elapsed time gracefully", () => {
+    const result = calcOfflineProgress(100, -1000, offlineTuning);
+    expect(result.grant).toBe(0);
+  });
+});

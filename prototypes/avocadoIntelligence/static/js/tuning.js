@@ -3,10 +3,31 @@
 // value lives here so you can tweak the feel in one place.
 
 export const TUNING = {
+  balanceVersion: 1, // increment on any rebalance patch
+
+  offlineProgress: {
+    fraction: 0.5,            // grant 50% of offline production
+    maxElapsedSeconds: 28800, // cap at 8 hours
+    minElapsedSeconds: 60,    // ignore < 1 minute away
+  },
+
   production: {
     baseClickYield: 1,   // avocados per click
     tickMs: 200,          // main loop interval
   },
+
+  // Global producer milestones — free multipliers at owned-count thresholds.
+  // Layered on top of tiered upgrade multipliers (which cost avocados).
+  milestones: [
+    { count: 10,  mult: 1.5 },
+    { count: 25,  mult: 2 },
+    { count: 50,  mult: 2 },
+    { count: 75,  mult: 2 },
+    { count: 100, mult: 3 },
+    { count: 150, mult: 3 },
+    { count: 200, mult: 4 },
+    { count: 250, mult: 5 },
+  ],
 
   producers: {
     sapling:          { baseCost: 15,       costGrowth: 1.15, baseRate: 0.1,      title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
@@ -405,7 +426,7 @@ export const TUNING = {
   },
 
   wrappedGift: {
-    spawnChancePerTick: 0.002,    // ~1 gift per 90-120s
+    spawnChancePerTick: 0.004,    // ~1 gift per 50s
     minCooldownMs: 30000,         // 30s min between gifts
     maxOnScreen: 1,               // base max (epsilon_greedy → 2)
 
@@ -425,9 +446,20 @@ export const TUNING = {
       guac_boost:    { weight: 12, text: "Guac Surge!",      field: "guac",  mult: 2.0,  durationMs: 30000 },
       guac_drain:    { weight: 6,  text: "Moldy Batch...",   field: "guac",  mult: 0.5,  durationMs: 20000, negative: true },
       guac_rot:      { weight: 6,  text: "Guac Rot!",       guacLossPct: 0.25, negative: true },
-      empty:         { weight: 15, text: "Empty Box..." },
+      empty:         { weight: 3,  text: "Empty Box..." },
       avocado_rain:  { weight: 9,  text: "Avocado Rain!",   apsSeconds: 60 },
+      avocado_singularity: { weight: 3, text: "Avocado Singularity!", field: "aps",   mult: 10.0, durationMs: 15000 },
+      neural_cascade:      { weight: 5, text: "Neural Cascade!",     field: "click", mult: 5.0,  durationMs: 30000 },
+      cost_collapse:       { weight: 4, text: "Cost Collapse!",      field: "cost",  mult: 0.5,  durationMs: 20000 },
+      wisdom_burst:        { weight: 2, text: "Wisdom Burst!",       wisdomAmount: 2, requiresWisdomUnlock: "gift_of_wisdom" },
     },
+  },
+
+  singularity: {
+    cascadeDurationMs: 8000,
+    cascadeTickMs: 200,
+    autoClickIntervalMs: 2000,
+    clickMultPerSingularity: 2,
   },
 
   distillation: {
