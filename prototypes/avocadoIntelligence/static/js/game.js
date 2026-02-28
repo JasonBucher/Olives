@@ -590,7 +590,10 @@ function renderDistillation() {
   prestigeDistillationEl.appendChild(headerEl);
 
   // Progress to next
-  if (dc < maxDistills) {
+  // v6.0 requires emergent_capability wisdom unlock
+  const needsEmergent = dc >= maxDistills - 1;
+  const hasEmergent = !!(state.wisdomUnlocks && state.wisdomUnlocks.emergent_capability);
+  if (dc < maxDistills && (!needsEmergent || hasEmergent)) {
     const progressEl = document.createElement("div");
     progressEl.className = "row";
     progressEl.innerHTML = `<div class="label">Wisdom This Cycle (after compost)</div><div class="value">${wsld} / ${cost}</div>`;
@@ -616,6 +619,11 @@ function renderDistillation() {
       warnEl.textContent = "Warning: This will compost AND distill, resetting wisdom, producers, upgrades, and prestige count. Wisdom unlocks are kept.";
       prestigeDistillationEl.appendChild(warnEl);
     }
+  } else if (needsEmergent && !hasEmergent) {
+    const lockEl = document.createElement("div");
+    lockEl.className = "muted";
+    lockEl.textContent = "Requires Emergent Capability (Inference Engine branch) to unlock v6.0 distillation.";
+    prestigeDistillationEl.appendChild(lockEl);
   } else {
     const doneEl = document.createElement("div");
     doneEl.className = "muted";
@@ -1138,7 +1146,10 @@ function confirmPrestigeAndDistill() {
     state.totalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
     state.modelVersion = newModelVersion;
     state.distillationCount = newDistillationCount;
-    startSingularityCascade();
+    saveGame();
+    closePrestigeOverlay();
+    // Small delay to let prestige overlay close before singularity overlay opens
+    setTimeout(() => startSingularityCascade(), 100);
     return;
   }
 
@@ -1995,7 +2006,7 @@ function startSingularityCascade() {
   if (mainLoopInterval) clearInterval(mainLoopInterval);
   mainLoopInterval = null;
 
-  // Close prestige overlay, show singularity overlay
+  // Show singularity overlay (prestige overlay should already be closed)
   closePrestigeOverlay();
   const overlay = document.getElementById("singularity-overlay");
   const barFill = document.getElementById("singularity-bar-fill");
@@ -2751,4 +2762,11 @@ startLoop();
 if (state.singularityCount > 0) {
   startAutoClicker();
 }
-logLine(((state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado") + " loaded.");
+// Recovery: if modelVersion reached singularity threshold but cascade never completed,
+// re-trigger the cascade on load
+if ((state.modelVersion || 0) >= TUNING.distillation.costs.length) {
+  logLine("Singularity detected — resuming cascade...");
+  setTimeout(() => startSingularityCascade(), 500);
+} else {
+  logLine(((state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado") + " loaded.");
+}
