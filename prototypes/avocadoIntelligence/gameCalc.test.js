@@ -22,49 +22,79 @@ import {
   calcPersistentSlots,
   calcActiveGiftBuffs,
   getGiftEffectPool,
+  getProducerMilestoneSchedule,
   calcMilestoneMultiplier,
   getNextMilestone,
+  calcAllProducerMilestone,
   calcOfflineProgress,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
 const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
-  milestones: [
-    { count: 10,  mult: 1.5 },
-    { count: 25,  mult: 2 },
-    { count: 50,  mult: 2 },
-    { count: 75,  mult: 2 },
-    { count: 100, mult: 3 },
-    { count: 150, mult: 3 },
-    { count: 200, mult: 4 },
-    { count: 250, mult: 5 },
+  milestoneTiers: {
+    aggressive: [
+      { count: 10,  mult: 2 },
+      { count: 25,  mult: 2 },
+      { count: 50,  mult: 3 },
+      { count: 75,  mult: 3 },
+      { count: 100, mult: 4 },
+      { count: 150, mult: 4 },
+      { count: 200, mult: 5 },
+      { count: 250, mult: 8 },
+      { count: 300, mult: 10 },
+      { count: 400, mult: 10 },
+      { count: 500, mult: 10 },
+    ],
+    moderate: [
+      { count: 10,  mult: 1.5 },
+      { count: 25,  mult: 2 },
+      { count: 50,  mult: 2 },
+      { count: 75,  mult: 2 },
+      { count: 100, mult: 3 },
+      { count: 150, mult: 3 },
+      { count: 200, mult: 4 },
+      { count: 250, mult: 5 },
+    ],
+    modest: [
+      { count: 10,  mult: 1.5 },
+      { count: 25,  mult: 1.5 },
+      { count: 50,  mult: 2 },
+      { count: 100, mult: 2 },
+      { count: 200, mult: 3 },
+    ],
+  },
+  allProducerMilestones: [
+    { count: 10,  mult: 2 },
+    { count: 25,  mult: 3 },
+    { count: 50,  mult: 5 },
+    { count: 100, mult: 10 },
   ],
   producers: {
-    sapling:         { baseCost: 15,      costGrowth: 1.15, baseRate: 0.1 },
-    seed_bank:       { baseCost: 100,     costGrowth: 1.15, baseRate: 0.8 },
-    orchard_row:     { baseCost: 1100,    costGrowth: 1.15, baseRate: 8 },
-    compost_bin:     { baseCost: 12000,   costGrowth: 1.15, baseRate: 47 },
-    drone:           { baseCost: 130000,  costGrowth: 1.15, baseRate: 260 },
-    greenhouse:      { baseCost: 1.4e6,   costGrowth: 1.15, baseRate: 1400 },
-    harvest_bot:     { baseCost: 20e6,    costGrowth: 1.15, baseRate: 7800 },
+    sapling:         { baseCost: 15,      costGrowth: 1.15, baseRate: 0.1,    milestoneTier: "aggressive" },
+    seed_bank:       { baseCost: 100,     costGrowth: 1.15, baseRate: 0.8,    milestoneTier: "aggressive" },
+    orchard_row:     { baseCost: 1100,    costGrowth: 1.15, baseRate: 8,      milestoneTier: "aggressive" },
+    compost_bin:     { baseCost: 12000,   costGrowth: 1.15, baseRate: 47,     milestoneTier: "aggressive" },
+    drone:           { baseCost: 130000,  costGrowth: 1.15, baseRate: 260,    milestoneTier: "aggressive" },
+    greenhouse:      { baseCost: 1.4e6,   costGrowth: 1.15, baseRate: 1400,   milestoneTier: "aggressive" },
+    harvest_bot:     { baseCost: 20e6,    costGrowth: 1.15, baseRate: 7800,   milestoneTier: "aggressive" },
     guac_lab:        { baseCost: 50000,   costGrowth: 1.15, baseRate: 47 },
     guac_refinery:   { baseCost: 150000,  costGrowth: 1.15, baseRate: 0 },
     guac_centrifuge: { baseCost: 500000,  costGrowth: 1.15, baseRate: 0 },
-    exchange:        { baseCost: 280e6,   costGrowth: 1.15, baseRate: 44000 },
-    data_grove:      { baseCost: 3.9e9,   costGrowth: 1.15, baseRate: 260000 },
-    attention_head:  { baseCost: 55e9,    costGrowth: 1.15, baseRate: 1.6e6 },
-    pit_miner:       { baseCost: 830e9,   costGrowth: 1.15, baseRate: 10e6 },
-    gpu_cluster:     { baseCost: 12e12,   costGrowth: 1.15, baseRate: 65e6 },
-    neural_pit:      { baseCost: 180e12,  costGrowth: 1.15, baseRate: 430e6 },
-    synth_orchard:   { baseCost: 2.9e15,  costGrowth: 1.15, baseRate: 2.9e9 },
-    transformer:     { baseCost: 46e15,   costGrowth: 1.15, baseRate: 21e9 },
-    orchard_cloud:   { baseCost: 780e15,  costGrowth: 1.15, baseRate: 150e9 },
-    quantum_grove:   { baseCost: 14e18,   costGrowth: 1.15, baseRate: 1.1e12 },
-    agi_nexus:       { baseCost: 290e18,  costGrowth: 1.15, baseRate: 8.3e12 },
-    dyson_orchard:   { baseCost: 7.3e21,  costGrowth: 1.15, baseRate: 64e12 },
-    omega_harvest:   { baseCost: 210e21,  costGrowth: 1.15, baseRate: 510e12 },
-    foundation_model:{ baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12 },
+    exchange:        { baseCost: 280e6,   costGrowth: 1.15, baseRate: 44000,  milestoneTier: "moderate" },
+    data_grove:      { baseCost: 3.9e9,   costGrowth: 1.15, baseRate: 260000, milestoneTier: "moderate" },
+    attention_head:  { baseCost: 55e9,    costGrowth: 1.15, baseRate: 1.6e6,  milestoneTier: "moderate" },
+    pit_miner:       { baseCost: 830e9,   costGrowth: 1.15, baseRate: 10e6,   milestoneTier: "moderate" },
+    gpu_cluster:     { baseCost: 12e12,   costGrowth: 1.15, baseRate: 65e6,   milestoneTier: "moderate" },
+    neural_pit:      { baseCost: 180e12,  costGrowth: 1.15, baseRate: 430e6,  milestoneTier: "moderate" },
+    synth_orchard:   { baseCost: 2.9e15,  costGrowth: 1.15, baseRate: 2.9e9,  milestoneTier: "moderate" },
+    transformer:     { baseCost: 46e15,   costGrowth: 1.15, baseRate: 21e9,   milestoneTier: "modest" },
+    orchard_cloud:   { baseCost: 780e15,  costGrowth: 1.15, baseRate: 150e9,  milestoneTier: "modest" },
+    quantum_grove:   { baseCost: 14e18,   costGrowth: 1.15, baseRate: 1.1e12, milestoneTier: "modest" },
+    agi_nexus:       { baseCost: 290e18,  costGrowth: 1.15, baseRate: 8.3e12, milestoneTier: "modest" },
+    dyson_orchard:   { baseCost: 7.3e21,  costGrowth: 1.15, baseRate: 64e12,  milestoneTier: "modest" },
+    omega_harvest:   { baseCost: 210e21,  costGrowth: 1.15, baseRate: 510e12, milestoneTier: "modest" },
+    foundation_model:{ baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12, milestoneTier: "modest" },
   },
   guac: {
     baseConsumption: 200,
@@ -471,86 +501,113 @@ describe("calcProducerUnitRate", () => {
 });
 
 describe("calcMilestoneMultiplier", () => {
+  const moderate = tuning.milestoneTiers.moderate;
+
   it("returns 1 below first milestone", () => {
-    expect(calcMilestoneMultiplier(0, tuning)).toBe(1);
-    expect(calcMilestoneMultiplier(9, tuning)).toBe(1);
+    expect(calcMilestoneMultiplier(0, moderate)).toBe(1);
+    expect(calcMilestoneMultiplier(9, moderate)).toBe(1);
   });
 
   it("applies first milestone at count 10", () => {
-    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
+    expect(calcMilestoneMultiplier(10, moderate)).toBe(1.5);
   });
 
-  it("stacks milestones multiplicatively", () => {
+  it("stacks milestones multiplicatively (moderate)", () => {
     // 10: x1.5, 25: x2 → cumulative x3
-    expect(calcMilestoneMultiplier(25, tuning)).toBe(3);
+    expect(calcMilestoneMultiplier(25, moderate)).toBe(3);
     // + 50: x2 → cumulative x6
-    expect(calcMilestoneMultiplier(50, tuning)).toBe(6);
+    expect(calcMilestoneMultiplier(50, moderate)).toBe(6);
     // + 75: x2 → cumulative x12
-    expect(calcMilestoneMultiplier(75, tuning)).toBe(12);
+    expect(calcMilestoneMultiplier(75, moderate)).toBe(12);
     // + 100: x3 → cumulative x36
-    expect(calcMilestoneMultiplier(100, tuning)).toBe(36);
+    expect(calcMilestoneMultiplier(100, moderate)).toBe(36);
     // + 150: x3 → cumulative x108
-    expect(calcMilestoneMultiplier(150, tuning)).toBe(108);
+    expect(calcMilestoneMultiplier(150, moderate)).toBe(108);
     // + 200: x4 → cumulative x432
-    expect(calcMilestoneMultiplier(200, tuning)).toBe(432);
+    expect(calcMilestoneMultiplier(200, moderate)).toBe(432);
     // + 250: x5 → cumulative x2160
-    expect(calcMilestoneMultiplier(250, tuning)).toBe(2160);
+    expect(calcMilestoneMultiplier(250, moderate)).toBe(2160);
   });
 
   it("applies milestone at exact threshold", () => {
-    expect(calcMilestoneMultiplier(10, tuning)).toBe(1.5);
-    expect(calcMilestoneMultiplier(11, tuning)).toBe(1.5);
+    expect(calcMilestoneMultiplier(10, moderate)).toBe(1.5);
+    expect(calcMilestoneMultiplier(11, moderate)).toBe(1.5);
   });
 
   it("handles count between milestones", () => {
     // Between 10 and 25: only first milestone (x1.5)
-    expect(calcMilestoneMultiplier(20, tuning)).toBe(1.5);
+    expect(calcMilestoneMultiplier(20, moderate)).toBe(1.5);
     // Between 25 and 50: first two (x3)
-    expect(calcMilestoneMultiplier(40, tuning)).toBe(3);
+    expect(calcMilestoneMultiplier(40, moderate)).toBe(3);
+  });
+
+  it("returns 1 for empty schedule", () => {
+    expect(calcMilestoneMultiplier(100, [])).toBe(1);
   });
 });
 
 describe("getNextMilestone", () => {
+  const moderate = tuning.milestoneTiers.moderate;
+
   it("returns first milestone when count is 0", () => {
-    const next = getNextMilestone(0, tuning);
+    const next = getNextMilestone(0, moderate);
     expect(next).toEqual({ count: 10, mult: 1.5 });
   });
 
   it("returns next milestone after passing one", () => {
-    const next = getNextMilestone(10, tuning);
+    const next = getNextMilestone(10, moderate);
     expect(next).toEqual({ count: 25, mult: 2 });
   });
 
   it("returns null when all milestones reached", () => {
-    expect(getNextMilestone(250, tuning)).toBeNull();
-    expect(getNextMilestone(999, tuning)).toBeNull();
+    expect(getNextMilestone(250, moderate)).toBeNull();
+    expect(getNextMilestone(999, moderate)).toBeNull();
   });
 
   it("returns correct milestone at each boundary", () => {
-    expect(getNextMilestone(9, tuning).count).toBe(10);
-    expect(getNextMilestone(24, tuning).count).toBe(25);
-    expect(getNextMilestone(49, tuning).count).toBe(50);
-    expect(getNextMilestone(99, tuning).count).toBe(100);
+    expect(getNextMilestone(9, moderate).count).toBe(10);
+    expect(getNextMilestone(24, moderate).count).toBe(25);
+    expect(getNextMilestone(49, moderate).count).toBe(50);
+    expect(getNextMilestone(99, moderate).count).toBe(100);
+  });
+
+  it("returns null for empty schedule", () => {
+    expect(getNextMilestone(0, [])).toBeNull();
   });
 });
 
 describe("calcProducerUnitRate — with milestones", () => {
-  it("applies milestone multiplier when count is passed", () => {
-    // sapling base 0.1, milestone at 10 gives x1.5 = 0.15
-    expect(calcProducerUnitRate("sapling", {}, tuning, 10)).toBeCloseTo(0.15);
+  it("applies aggressive milestone at count 10 (sapling)", () => {
+    // sapling base 0.1, aggressive milestone at 10 gives x2 = 0.2
+    expect(calcProducerUnitRate("sapling", {}, tuning, 10)).toBeCloseTo(0.2);
   });
 
   it("no milestone below threshold", () => {
     expect(calcProducerUnitRate("sapling", {}, tuning, 5)).toBe(0.1);
   });
 
-  it("stacks milestone with tiered upgrade", () => {
-    // sapling base 0.1, T1 2x = 0.2, milestone at 25 = x3, total = 0.6
-    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning, 25)).toBeCloseTo(0.6);
+  it("stacks milestone with tiered upgrade (aggressive)", () => {
+    // sapling base 0.1, T1 2x = 0.2, aggressive milestones at 25 = x2*x2 = x4, total = 0.8
+    expect(calcProducerUnitRate("sapling", { efficient_saplings: true }, tuning, 25)).toBeCloseTo(0.8);
   });
 
   it("no milestone when count is omitted", () => {
     expect(calcProducerUnitRate("sapling", {}, tuning)).toBe(0.1);
+  });
+
+  it("applies moderate milestone at count 10 (exchange)", () => {
+    // exchange base 44000, moderate milestone at 10 gives x1.5 = 66000
+    expect(calcProducerUnitRate("exchange", {}, tuning, 10)).toBeCloseTo(66000);
+  });
+
+  it("applies modest milestone at count 10 (transformer)", () => {
+    // transformer base 21e9, modest milestone at 10 gives x1.5 = 31.5e9
+    expect(calcProducerUnitRate("transformer", {}, tuning, 10)).toBeCloseTo(31.5e9);
+  });
+
+  it("no milestone for guac producers", () => {
+    // guac_lab has no milestoneTier, so no milestone
+    expect(calcProducerUnitRate("guac_lab", {}, tuning, 10)).toBeCloseTo(47);
   });
 });
 
@@ -697,14 +754,14 @@ describe("calcBaseAps", () => {
 
   it("applies per-producer upgrades", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.2 * 1.5 (milestone) = 3
-    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBeCloseTo(3);
+    // 10 * 0.2 * 2 (aggressive milestone) = 4
+    expect(calcBaseAps(producers, { efficient_saplings: true }, tuning)).toBeCloseTo(4);
   });
 
   it("does not apply global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 * 1.5 (milestone) = 1.5 (global_boost_1 should NOT affect this)
-    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBeCloseTo(1.5);
+    // 10 * 0.1 * 2 (aggressive milestone) = 2 (global_boost_1 should NOT affect this)
+    expect(calcBaseAps(producers, { global_boost_1: true }, tuning)).toBeCloseTo(2);
   });
 });
 
@@ -722,40 +779,40 @@ describe("calcTotalAps", () => {
 
   it("applies global multiplier upgrade", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.5 (global) = 2.25
-    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBeCloseTo(2.25);
+    // 10 * 0.1 * 2 (aggressive milestone) = 2, * 1.5 (global) = 3
+    expect(calcTotalAps(producers, { global_boost_1: true }, 0, 0, tuning)).toBeCloseTo(3);
   });
 
   it("stacks global multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.5 * 2 = 4.5
-    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBeCloseTo(4.5);
+    // 10 * 0.1 * 2 (aggressive milestone) = 2, * 1.5 * 2 = 6
+    expect(calcTotalAps(producers, { global_boost_1: true, global_boost_2: true }, 0, 0, tuning)).toBeCloseTo(6);
   });
 
   it("applies wisdom bonus", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1.5 (milestone), wisdom = 1 + 10 * 0.10 = 2.0, total = 3
-    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(3);
+    // base = 2 (aggressive milestone), wisdom = 1 + 10 * 0.10 = 2.0, total = 4
+    expect(calcTotalAps(producers, {}, 10, 0, tuning)).toBeCloseTo(4);
   });
 
   it("applies guac multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1.5 (milestone), guac mult at 100 guac
+    // base = 2 (aggressive milestone), guac mult at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(1.5 * guacMult);
+    expect(calcTotalAps(producers, {}, 0, 100, tuning)).toBeCloseTo(2 * guacMult);
   });
 
   it("stacks guac and wisdom multipliers", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1.5 (milestone), wisdom = 2.0, guac at 100 guac
+    // base = 2 (aggressive milestone), wisdom = 2.0, guac at 100 guac
     const guacMult = calcGuacMultiplier(100, tuning);
-    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(1.5 * 2.0 * guacMult);
+    expect(calcTotalAps(producers, {}, 10, 100, tuning)).toBeCloseTo(2 * 2.0 * guacMult);
   });
 
   it("applies achievement global multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1.5 (milestone), achievement global = 1.02, total = 1.5 * 1.02 = 1.53
-    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.53);
+    // base = 2 (aggressive milestone), achievement global = 1.02, total = 2 * 1.02 = 2.04
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(2.04);
   });
 });
 
@@ -1327,16 +1384,16 @@ describe("calcBaseAps — synergy integration", () => {
   it("returns boosted APS when synergy upgrade is owned and source has units", () => {
     const producers = { sapling: 10, orchard_row: 5 };
     const upgrades = { syn_orchard_sapling: true };
-    // sapling: 10 * 0.1 * 1.5 (milestone@10) * (1 + 0.05*5) = 10 * 0.15 * 1.25 = 1.875
+    // sapling: 10 * 0.1 * 2 (aggressive milestone@10) * (1 + 0.05*5) = 10 * 0.2 * 1.25 = 2.5
     // orchard_row: 5 * 8 = 40
-    // total = 41.875
-    expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(41.875);
+    // total = 42.5
+    expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(42.5);
   });
 
   it("returns unboosted APS when synergy upgrade not owned", () => {
     const producers = { sapling: 10, orchard_row: 5 };
-    // sapling: 10 * 0.1 * 1.5 (milestone) = 1.5, orchard_row: 5 * 8 = 40, total = 41.5
-    expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(41.5);
+    // sapling: 10 * 0.1 * 2 (aggressive milestone) = 2, orchard_row: 5 * 8 = 40, total = 42
+    expect(calcBaseAps(producers, {}, tuning)).toBeCloseTo(42);
   });
 });
 
@@ -1900,26 +1957,26 @@ describe("calcTotalAps — with wisdom tree and regimens", () => {
   const baseProducers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
 
   it("applies wisdom tree global APS mult", () => {
-    // base = 1.5 (milestone), backpropagation 1.05x * weight_initialization 1.10x = 1.155
-    // total = 1.5 * 1.155 = 1.7325
+    // base = 2 (aggressive milestone), backpropagation 1.05x * weight_initialization 1.10x = 1.155
+    // total = 2 * 1.155 = 2.31
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks);
-    expect(result).toBeCloseTo(1.7325);
+    expect(result).toBeCloseTo(2.31);
   });
 
   it("applies regimen producer mult", () => {
-    // base = 1.5 (milestone), scale_focus gives producerMult 1.50
-    // total = 1.5 * 1.5 = 2.25
+    // base = 2 (aggressive milestone), scale_focus gives producerMult 1.50
+    // total = 2 * 1.5 = 3
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, undefined, ["scale_focus"]);
-    expect(result).toBeCloseTo(2.25);
+    expect(result).toBeCloseTo(3);
   });
 
   it("stacks wisdom tree and regimen multipliers", () => {
-    // base = 1.5 (milestone), backpropagation 1.05 * weight_init 1.10 = 1.155, scale_focus 1.50
-    // total = 1.5 * 1.155 * 1.50 = 2.59875
+    // base = 2 (aggressive milestone), backpropagation 1.05 * weight_init 1.10 = 1.155, scale_focus 1.50
+    // total = 2 * 1.155 * 1.50 = 3.465
     const wUnlocks = { backpropagation: true, weight_initialization: true };
     const result = calcTotalAps(baseProducers, {}, 0, 0, tuning, undefined, wUnlocks, ["scale_focus"]);
-    expect(result).toBeCloseTo(2.59875);
+    expect(result).toBeCloseTo(3.465);
   });
 });
 
@@ -1987,9 +2044,9 @@ describe("gate node effects — backpropagation globalApsMult", () => {
 
   it("backpropagation effect reflected in calcTotalAps", () => {
     const producers = { sapling: 10 };
-    // base = 10 * 0.1 * 1.5 (milestone) = 1.5, * 1.05 = 1.575
+    // base = 10 * 0.1 * 2 (aggressive milestone) = 2, * 1.05 = 2.1
     const wUnlocks = { backpropagation: true };
-    expect(calcTotalAps(producers, {}, 0, 0, tuning, undefined, wUnlocks)).toBeCloseTo(1.575);
+    expect(calcTotalAps(producers, {}, 0, 0, tuning, undefined, wUnlocks)).toBeCloseTo(2.1);
   });
 });
 
@@ -2372,5 +2429,219 @@ describe("calcOfflineProgress", () => {
   it("handles negative elapsed time gracefully", () => {
     const result = calcOfflineProgress(100, -1000, offlineTuning);
     expect(result.grant).toBe(0);
+  });
+});
+
+// ── Per-Producer Milestone Tiers + All-at-X Milestones ──────────────
+
+describe("getProducerMilestoneSchedule", () => {
+  it("returns aggressive schedule for early producers", () => {
+    const schedule = getProducerMilestoneSchedule("sapling", tuning);
+    expect(schedule).toBe(tuning.milestoneTiers.aggressive);
+  });
+
+  it("returns moderate schedule for mid producers", () => {
+    const schedule = getProducerMilestoneSchedule("exchange", tuning);
+    expect(schedule).toBe(tuning.milestoneTiers.moderate);
+  });
+
+  it("returns modest schedule for late producers", () => {
+    const schedule = getProducerMilestoneSchedule("transformer", tuning);
+    expect(schedule).toBe(tuning.milestoneTiers.modest);
+  });
+
+  it("returns empty array for guac producers (no milestoneTier)", () => {
+    expect(getProducerMilestoneSchedule("guac_lab", tuning)).toEqual([]);
+    expect(getProducerMilestoneSchedule("guac_refinery", tuning)).toEqual([]);
+    expect(getProducerMilestoneSchedule("guac_centrifuge", tuning)).toEqual([]);
+  });
+
+  it("returns empty array for unknown producer", () => {
+    expect(getProducerMilestoneSchedule("nonexistent", tuning)).toEqual([]);
+  });
+
+  it("aggressive tier is assigned to all 7 early producers", () => {
+    const earlyProducers = ["sapling", "seed_bank", "orchard_row", "compost_bin", "drone", "greenhouse", "harvest_bot"];
+    for (const id of earlyProducers) {
+      expect(getProducerMilestoneSchedule(id, tuning)).toBe(tuning.milestoneTiers.aggressive);
+    }
+  });
+
+  it("moderate tier is assigned to all 7 mid producers", () => {
+    const midProducers = ["exchange", "data_grove", "attention_head", "pit_miner", "gpu_cluster", "neural_pit", "synth_orchard"];
+    for (const id of midProducers) {
+      expect(getProducerMilestoneSchedule(id, tuning)).toBe(tuning.milestoneTiers.moderate);
+    }
+  });
+
+  it("modest tier is assigned to all 7 late producers", () => {
+    const lateProducers = ["transformer", "orchard_cloud", "quantum_grove", "agi_nexus", "dyson_orchard", "omega_harvest", "foundation_model"];
+    for (const id of lateProducers) {
+      expect(getProducerMilestoneSchedule(id, tuning)).toBe(tuning.milestoneTiers.modest);
+    }
+  });
+});
+
+describe("calcMilestoneMultiplier — aggressive schedule", () => {
+  const aggressive = tuning.milestoneTiers.aggressive;
+
+  it("x2 at count 10", () => {
+    expect(calcMilestoneMultiplier(10, aggressive)).toBe(2);
+  });
+
+  it("x4 at count 25 (2*2)", () => {
+    expect(calcMilestoneMultiplier(25, aggressive)).toBe(4);
+  });
+
+  it("x12 at count 50 (2*2*3)", () => {
+    expect(calcMilestoneMultiplier(50, aggressive)).toBe(12);
+  });
+
+  it("x36 at count 75 (2*2*3*3)", () => {
+    expect(calcMilestoneMultiplier(75, aggressive)).toBe(36);
+  });
+
+  it("x144 at count 100 (2*2*3*3*4)", () => {
+    expect(calcMilestoneMultiplier(100, aggressive)).toBe(144);
+  });
+
+  it("x576 at count 150 (2*2*3*3*4*4)", () => {
+    expect(calcMilestoneMultiplier(150, aggressive)).toBe(576);
+  });
+
+  it("x2880 at count 200 (2*2*3*3*4*4*5)", () => {
+    expect(calcMilestoneMultiplier(200, aggressive)).toBe(2880);
+  });
+
+  it("x23040 at count 250 (2*2*3*3*4*4*5*8)", () => {
+    expect(calcMilestoneMultiplier(250, aggressive)).toBe(23040);
+  });
+
+  it("full aggressive at 500 = 2*2*3*3*4*4*5*8*10*10*10 = 23040000", () => {
+    expect(calcMilestoneMultiplier(500, aggressive)).toBe(23_040_000);
+  });
+});
+
+describe("calcMilestoneMultiplier — modest schedule", () => {
+  const modest = tuning.milestoneTiers.modest;
+
+  it("x1.5 at count 10", () => {
+    expect(calcMilestoneMultiplier(10, modest)).toBe(1.5);
+  });
+
+  it("x2.25 at count 25 (1.5*1.5)", () => {
+    expect(calcMilestoneMultiplier(25, modest)).toBe(2.25);
+  });
+
+  it("x4.5 at count 50 (1.5*1.5*2)", () => {
+    expect(calcMilestoneMultiplier(50, modest)).toBe(4.5);
+  });
+
+  it("x9 at count 100 (1.5*1.5*2*2)", () => {
+    expect(calcMilestoneMultiplier(100, modest)).toBe(9);
+  });
+
+  it("x27 at count 200 (1.5*1.5*2*2*3)", () => {
+    expect(calcMilestoneMultiplier(200, modest)).toBe(27);
+  });
+
+  it("same at 999 — no milestones above 200 for modest", () => {
+    expect(calcMilestoneMultiplier(999, modest)).toBe(27);
+  });
+});
+
+describe("calcAllProducerMilestone", () => {
+  it("returns 1 when no producers exist", () => {
+    expect(calcAllProducerMilestone({}, tuning)).toBe(1);
+  });
+
+  it("returns 1 when all producers have 0 units", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 0;
+    }
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(1);
+  });
+
+  it("returns 1 when one producer has 9 (below first threshold)", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 100;
+    }
+    producers.sapling = 9; // bottleneck
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(1);
+  });
+
+  it("returns x2 when all standard producers have at least 10", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 10;
+    }
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(2);
+  });
+
+  it("returns x6 when all at 25 (2*3)", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 25;
+    }
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(6);
+  });
+
+  it("returns x30 when all at 50 (2*3*5)", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 50;
+    }
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(30);
+  });
+
+  it("returns x300 when all at 100 (2*3*5*10)", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 100;
+    }
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(300);
+  });
+
+  it("bottleneck: one producer at 9 prevents all milestones", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 50;
+    }
+    producers.foundation_model = 9;
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(1);
+  });
+
+  it("ignores guac producers (no milestoneTier)", () => {
+    const producers = { guac_lab: 0, guac_refinery: 0, guac_centrifuge: 0 };
+    // Only guac producers with 0 count — but they're ignored because no milestoneTier
+    // Since no producers with milestoneTier are present, returns 1
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(1);
+  });
+
+  it("uses minimum count across all standard producers", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 200;
+    }
+    producers.omega_harvest = 15; // bottleneck at 15 — passes 10 threshold only
+    expect(calcAllProducerMilestone(producers, tuning)).toBe(2);
+  });
+});
+
+describe("calcTotalAps — allProducerMilestone integration", () => {
+  it("applies allProducerMilestone when all producers at 10", () => {
+    const producers = {};
+    for (const id of Object.keys(tuning.producers)) {
+      if (tuning.producers[id].milestoneTier) producers[id] = 10;
+    }
+    const withAllMs = calcTotalAps(producers, {}, 0, 0, tuning);
+    // The allProducerMilestone should be x2
+    const allProdMs = calcAllProducerMilestone(producers, tuning);
+    expect(allProdMs).toBe(2);
+    // Verify total includes this factor (compare base * allProdMs)
+    const baseAps = calcBaseAps(producers, {}, tuning);
+    expect(withAllMs).toBeCloseTo(baseAps * allProdMs);
   });
 });

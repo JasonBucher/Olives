@@ -16,58 +16,76 @@ export const TUNING = {
     tickMs: 200,          // main loop interval
   },
 
-  // Global producer milestones — free multipliers at owned-count thresholds.
-  // Layered on top of tiered upgrade multipliers (which cost avocados).
-  milestones: [
-    { count: 10,  mult: 1.5 },
-    { count: 25,  mult: 2 },
-    { count: 50,  mult: 2 },
-    { count: 75,  mult: 2 },
-    { count: 100, mult: 3 },
-    { count: 150, mult: 3 },
-    { count: 200, mult: 4 },
-    { count: 250, mult: 5 },
+  // Per-producer milestone tiers — early producers get aggressive curves,
+  // late producers get modest ones. Creates exciting inversion moments.
+  milestoneTiers: {
+    aggressive: [
+      { count: 10,  mult: 2 },
+      { count: 25,  mult: 2 },
+      { count: 50,  mult: 3 },
+      { count: 75,  mult: 3 },
+      { count: 100, mult: 4 },
+      { count: 150, mult: 4 },
+      { count: 200, mult: 5 },
+      { count: 250, mult: 8 },
+      { count: 300, mult: 10 },
+      { count: 400, mult: 10 },
+      { count: 500, mult: 10 },
+    ],
+    moderate: [
+      { count: 10,  mult: 1.5 },
+      { count: 25,  mult: 2 },
+      { count: 50,  mult: 2 },
+      { count: 75,  mult: 2 },
+      { count: 100, mult: 3 },
+      { count: 150, mult: 3 },
+      { count: 200, mult: 4 },
+      { count: 250, mult: 5 },
+    ],
+    modest: [
+      { count: 10,  mult: 1.5 },
+      { count: 25,  mult: 1.5 },
+      { count: 50,  mult: 2 },
+      { count: 100, mult: 2 },
+      { count: 200, mult: 3 },
+    ],
+  },
+
+  // All-producer milestones — reward breadth when every standard producer
+  // (those with a milestoneTier) reaches the threshold.
+  allProducerMilestones: [
+    { count: 10,  mult: 2 },
+    { count: 25,  mult: 3 },
+    { count: 50,  mult: 5 },
+    { count: 100, mult: 10 },
   ],
 
   producers: {
-    sapling:          { baseCost: 15,       costGrowth: 1.15, baseRate: 0.1,      title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
-    seed_bank:        { baseCost: 100,      costGrowth: 1.15, baseRate: 0.8,      title: "Seed Bank",          desc: "Stores genetic potential. Grows interest." },
-    orchard_row:      { baseCost: 1100,     costGrowth: 1.15, baseRate: 8,        title: "Orchard Row",        desc: "Now we're farming." },
-    compost_bin:      { baseCost: 12000,    costGrowth: 1.15, baseRate: 47,       title: "Compost Bin",        desc: "Garbage in, fertilizer out. Nature's neural net." },
-    drone:            { baseCost: 130000,   costGrowth: 1.15, baseRate: 260,      title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
-    greenhouse:       { baseCost: 1.4e6,    costGrowth: 1.15, baseRate: 1400,     title: "Greenhouse",         desc: "Controlled environment. Uncontrolled ambitions." },
-    harvest_bot:      { baseCost: 20e6,     costGrowth: 1.15, baseRate: 7800,     title: "Harvest Bot",        desc: "Picks faster than you. Doesn't need lunch." },
+    sapling:          { baseCost: 15,       costGrowth: 1.15, baseRate: 0.1,      milestoneTier: "aggressive", title: "Avocado Sapling",    desc: "A tiny tree. Dreams of guac." },
+    seed_bank:        { baseCost: 100,      costGrowth: 1.15, baseRate: 0.8,      milestoneTier: "aggressive", title: "Seed Bank",          desc: "Stores genetic potential. Grows interest." },
+    orchard_row:      { baseCost: 1100,     costGrowth: 1.15, baseRate: 8,        milestoneTier: "aggressive", title: "Orchard Row",        desc: "Now we're farming." },
+    compost_bin:      { baseCost: 12000,    costGrowth: 1.15, baseRate: 47,       milestoneTier: "aggressive", title: "Compost Bin",        desc: "Garbage in, fertilizer out. Nature's neural net." },
+    drone:            { baseCost: 130000,   costGrowth: 1.15, baseRate: 260,      milestoneTier: "aggressive", title: "Irrigation Drone",   desc: "Flies over. Waters things. Judges you." },
+    greenhouse:       { baseCost: 1.4e6,    costGrowth: 1.15, baseRate: 1400,     milestoneTier: "aggressive", title: "Greenhouse",         desc: "Controlled environment. Uncontrolled ambitions." },
+    harvest_bot:      { baseCost: 20e6,     costGrowth: 1.15, baseRate: 7800,     milestoneTier: "aggressive", title: "Harvest Bot",        desc: "Picks faster than you. Doesn't need lunch." },
     guac_lab:         { baseCost: 50000,  costGrowth: 1.15, baseRate: 50,     title: "Guacamole Lab",      desc: "Peer-reviewed guac recipes. Consumes avocados to produce guac." },
     guac_refinery:    { baseCost: 150000, costGrowth: 1.15, baseRate: 0,      title: "Guac Refinery",      desc: "Optimizes lab throughput. Each refinery lowers consumption scaling.", requiresWisdomUnlock: "unlock_refinery" },
     guac_centrifuge:  { baseCost: 500000, costGrowth: 1.15, baseRate: 0,      title: "Guac Centrifuge",    desc: "Spins faster. Separates more. Consumes less.", requiresWisdomUnlock: "unlock_centrifuge" },
-    exchange:         { baseCost: 280e6,   costGrowth: 1.15, baseRate: 44000,    title: "Avocado Exchange",   desc: "Publicly traded pits." },
-    data_grove:       { baseCost: 3.9e9,   costGrowth: 1.15, baseRate: 260000,  title: "Data Grove",         desc: "Every tree is a data point. The forest is the model." },
-    attention_head:   { baseCost: 55e9,    costGrowth: 1.15, baseRate: 1.6e6,   title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
-    pit_miner:        { baseCost: 830e9,   costGrowth: 1.15, baseRate: 10e6,    title: "Pit Miner",          desc: "Extracting data from pits." },
-    gpu_cluster:      { baseCost: 12e12,   costGrowth: 1.15, baseRate: 65e6,    title: "GPU Cluster",        desc: "Training on avocado data. 8xH100s. Still not enough.", minPrestigeCount: 2 },
-    neural_pit:       { baseCost: 180e12,  costGrowth: 1.15, baseRate: 430e6,   title: "Neural Pit Network", desc: "The pits are thinking." },
-    synth_orchard:    { baseCost: 2.9e15,  costGrowth: 1.15, baseRate: 2.9e9,   title: "Synthetic Orchard",  desc: "Lab-grown trees. Real avocados. Nobody can tell.", minPrestigeCount: 4 },
-    transformer:      { baseCost: 46e15,   costGrowth: 1.15, baseRate: 21e9,    title: "Transformer Core",   desc: "Self-attention over the entire orchard. Context window: unlimited avocados." },
-    orchard_cloud:    { baseCost: 780e15,  costGrowth: 1.15, baseRate: 150e9,   title: "Orchard Cloud",      desc: "Avocados-as-a-Service. AaaS." },
-    quantum_grove:    { baseCost: 14e18,   costGrowth: 1.15, baseRate: 1.1e12,  title: "Quantum Grove",      desc: "The avocados exist in superposition until picked.", minPrestigeCount: 7 },
-    agi_nexus:        { baseCost: 290e18,  costGrowth: 1.15, baseRate: 8.3e12,  title: "AGI Nexus",          desc: "It understands avocados. Truly understands them.", minPrestigeCount: 10 },
-    dyson_orchard:    { baseCost: 7.3e21,  costGrowth: 1.15, baseRate: 64e12,   title: "Dyson Orchard",      desc: "Harvesting the energy of a star. For avocados.", minPrestigeCount: 14 },
-    omega_harvest:    { baseCost: 210e21,  costGrowth: 1.15, baseRate: 510e12,  title: "Omega Harvest",      desc: "The final harvest. Or is it?", minPrestigeCount: 18 },
-    foundation_model: { baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12,  title: "Foundation Model",   desc: "It learned everything. From avocados. Somehow that was enough." },
+    exchange:         { baseCost: 280e6,   costGrowth: 1.15, baseRate: 44000,    milestoneTier: "moderate",   title: "Avocado Exchange",   desc: "Publicly traded pits." },
+    data_grove:       { baseCost: 3.9e9,   costGrowth: 1.15, baseRate: 260000,  milestoneTier: "moderate",   title: "Data Grove",         desc: "Every tree is a data point. The forest is the model." },
+    attention_head:   { baseCost: 55e9,    costGrowth: 1.15, baseRate: 1.6e6,   milestoneTier: "moderate",   title: "Attention Head",     desc: "Focuses on the ripe ones. All others are masked." },
+    pit_miner:        { baseCost: 830e9,   costGrowth: 1.15, baseRate: 10e6,    milestoneTier: "moderate",   title: "Pit Miner",          desc: "Extracting data from pits." },
+    gpu_cluster:      { baseCost: 12e12,   costGrowth: 1.15, baseRate: 65e6,    milestoneTier: "moderate",   title: "GPU Cluster",        desc: "Training on avocado data. 8xH100s. Still not enough.", minPrestigeCount: 2 },
+    neural_pit:       { baseCost: 180e12,  costGrowth: 1.15, baseRate: 430e6,   milestoneTier: "moderate",   title: "Neural Pit Network", desc: "The pits are thinking." },
+    synth_orchard:    { baseCost: 2.9e15,  costGrowth: 1.15, baseRate: 2.9e9,   milestoneTier: "moderate",   title: "Synthetic Orchard",  desc: "Lab-grown trees. Real avocados. Nobody can tell.", minPrestigeCount: 4 },
+    transformer:      { baseCost: 46e15,   costGrowth: 1.15, baseRate: 21e9,    milestoneTier: "modest",     title: "Transformer Core",   desc: "Self-attention over the entire orchard. Context window: unlimited avocados." },
+    orchard_cloud:    { baseCost: 780e15,  costGrowth: 1.15, baseRate: 150e9,   milestoneTier: "modest",     title: "Orchard Cloud",      desc: "Avocados-as-a-Service. AaaS." },
+    quantum_grove:    { baseCost: 14e18,   costGrowth: 1.15, baseRate: 1.1e12,  milestoneTier: "modest",     title: "Quantum Grove",      desc: "The avocados exist in superposition until picked.", minPrestigeCount: 7 },
+    agi_nexus:        { baseCost: 290e18,  costGrowth: 1.15, baseRate: 8.3e12,  milestoneTier: "modest",     title: "AGI Nexus",          desc: "It understands avocados. Truly understands them.", minPrestigeCount: 10 },
+    dyson_orchard:    { baseCost: 7.3e21,  costGrowth: 1.15, baseRate: 64e12,   milestoneTier: "modest",     title: "Dyson Orchard",      desc: "Harvesting the energy of a star. For avocados.", minPrestigeCount: 14 },
+    omega_harvest:    { baseCost: 210e21,  costGrowth: 1.15, baseRate: 510e12,  milestoneTier: "modest",     title: "Omega Harvest",      desc: "The final harvest. Or is it?", minPrestigeCount: 18 },
+    foundation_model: { baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12,  milestoneTier: "modest",     title: "Foundation Model",   desc: "It learned everything. From avocados. Somehow that was enough." },
   },
-
-  // Global producer milestones — free multipliers at owned-count thresholds.
-  // Layered on top of tiered upgrade multipliers (which cost avocados).
-  milestones: [
-    { count: 10,  mult: 1.5 },
-    { count: 25,  mult: 2 },
-    { count: 50,  mult: 2 },
-    { count: 75,  mult: 2 },
-    { count: 100, mult: 3 },
-    { count: 150, mult: 3 },
-    { count: 200, mult: 4 },
-    { count: 250, mult: 5 },
-  ],
 
   guac: {
     baseConsumption: 200,       // base avocado consumption rate per lab

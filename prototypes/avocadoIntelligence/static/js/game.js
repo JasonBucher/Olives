@@ -709,7 +709,8 @@ function updateUI() {
   for (const [uid, ucfg] of Object.entries(TUNING.upgrades)) {
     if (ucfg.globalMult && state.upgrades[uid]) upgradeGlobalMult *= ucfg.globalMult;
   }
-  const totalMult = guacMult * wisdomMult * achBonus.globalMult * upgradeGlobalMult * distBonus.apsMult * distBonus.allProdMult;
+  const allProdMs = Calc.calcAllProducerMilestone(state.producers, TUNING);
+  const totalMult = guacMult * wisdomMult * achBonus.globalMult * upgradeGlobalMult * distBonus.apsMult * distBonus.allProdMult * allProdMs;
   totalMultRowEl.style.display = totalMult > 1 ? "" : "none";
   if (totalMult > 1) {
     totalMultEl.textContent = `x${totalMult.toFixed(2)}`;
@@ -721,6 +722,7 @@ function updateUI() {
     if (achBonus.globalMult > 1) lines.push(`Achievements x${achBonus.globalMult.toFixed(2)}`);
     if (distBonus.apsMult > 1) lines.push(`Distillation APS x${distBonus.apsMult.toFixed(1)}`);
     if (distBonus.allProdMult > 1) lines.push(`Distillation Prod x${distBonus.allProdMult.toFixed(1)}`);
+    if (allProdMs > 1) lines.push(`All-Producer x${allProdMs.toFixed(1)}`);
     if (totalMultTooltipEl) totalMultTooltipEl.textContent = lines.join("  ·  ");
   }
 
@@ -935,7 +937,8 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
       if (synergyMult > 1) {
         rateText += ` [synergy x${synergyMult.toFixed(2)}]`;
       }
-      const nextMs = Calc.getNextMilestone(owned, TUNING);
+      const schedule = Calc.getProducerMilestoneSchedule(id, TUNING);
+      const nextMs = Calc.getNextMilestone(owned, schedule);
       if (nextMs) {
         rateText += ` | Next milestone: ${nextMs.count} (x${nextMs.mult})`;
       }

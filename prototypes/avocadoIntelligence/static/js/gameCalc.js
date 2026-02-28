@@ -277,21 +277,41 @@ export function calcMaxAffordable(id, ownedCount, budget, tuning, costMult = 1) 
   return count;
 }
 
-/** Calculate the milestone multiplier for a producer at a given owned count. */
-export function calcMilestoneMultiplier(count, tuning) {
+/** Return the milestone schedule array for a producer based on its milestoneTier. */
+export function getProducerMilestoneSchedule(id, tuning) {
+  const tier = tuning.producers[id]?.milestoneTier;
+  if (!tier) return [];
+  return tuning.milestoneTiers[tier] || [];
+}
+
+/** Calculate the milestone multiplier for a given owned count and schedule. */
+export function calcMilestoneMultiplier(count, schedule) {
   let mult = 1;
-  for (const ms of tuning.milestones) {
+  for (const ms of schedule) {
     if (count >= ms.count) mult *= ms.mult;
   }
   return mult;
 }
 
 /** Return the next milestone threshold above the current count, or null if all reached. */
-export function getNextMilestone(count, tuning) {
-  for (const ms of tuning.milestones) {
+export function getNextMilestone(count, schedule) {
+  for (const ms of schedule) {
     if (count < ms.count) return ms;
   }
   return null;
+}
+
+/** Calculate cumulative all-producer milestone multiplier.
+ *  Applies when every standard producer (those with a milestoneTier) has at least `count` units. */
+export function calcAllProducerMilestone(producers, tuning) {
+  const producerIds = Object.keys(tuning.producers).filter(id => tuning.producers[id].milestoneTier);
+  if (producerIds.length === 0) return 1;
+  const minCount = Math.min(...producerIds.map(id => producers[id] || 0));
+  let mult = 1;
+  for (const ms of (tuning.allProducerMilestones || [])) {
+    if (minCount >= ms.count) mult *= ms.mult;
+  }
+  return mult;
 }
 
 /** Calculate a single producer's per-unit output rate, applying per-producer upgrade multipliers and milestones. */
@@ -302,7 +322,10 @@ export function calcProducerUnitRate(id, upgrades, tuning, count) {
       rate *= upgrade.prodMult;
     }
   }
-  if (count > 0) rate *= calcMilestoneMultiplier(count, tuning);
+  if (count > 0) {
+    const schedule = getProducerMilestoneSchedule(id, tuning);
+    rate *= calcMilestoneMultiplier(count, schedule);
+  }
   return rate;
 }
 
@@ -450,6 +473,8 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ach
     }
   }
   total *= globalMult;
+  // Apply all-producer milestone
+  total *= calcAllProducerMilestone(producers, tuning);
   // Apply wisdom bonus
   total *= calcWisdomBonus(wisdom, upgrades, tuning, achievements, wisdomUnlocks);
   // Apply guac multiplier
