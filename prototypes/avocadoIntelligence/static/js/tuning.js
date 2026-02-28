@@ -476,8 +476,9 @@ export const TUNING = {
   singularity: {
     cascadeDurationMs: 8000,
     cascadeTickMs: 200,
-    autoClickIntervalMs: 2000,
-    clickMultPerSingularity: 2,
+    autoClickIntervalMs: 500,
+    clickMultPerSingularity: 10,
+    costMultSchedule: [0.85, 0.75, 0.50, 0.25],
   },
 
   distillation: {

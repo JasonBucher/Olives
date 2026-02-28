@@ -584,6 +584,16 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   return power;
 }
 
+/** Calculate NG+ producer cost multiplier from singularity count.
+ *  Returns a value <= 1 (discount) based on the costMultSchedule. */
+export function calcSingularityCostMult(singularityCount, tuning) {
+  if (!singularityCount || singularityCount <= 0) return 1;
+  const schedule = tuning.singularity.costMultSchedule || [];
+  const idx = Math.min(singularityCount, schedule.length) - 1;
+  if (idx < 0) return 1;
+  return schedule[idx];
+}
+
 /** Calculate wisdom points earned from total avocados this run. */
 export function calcWisdomEarned(totalAvocadosThisRun, tuning, wisdomUnlocks) {
   const threshold = wisdomUnlocks ? calcPrestigeThreshold(wisdomUnlocks, tuning) : tuning.prestige.unlockThreshold;

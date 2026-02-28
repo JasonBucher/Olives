@@ -228,6 +228,8 @@ const debugAddBigAvocadosBtn = document.getElementById("debug-add-big-avocados-b
 const debugAdd100kAvocadosBtn = document.getElementById("debug-add-100k-avocados-btn");
 const debugAdd1mAvocadosBtn = document.getElementById("debug-add-1m-avocados-btn");
 const debugAddWisdomBtn = document.getElementById("debug-add-wisdom-btn");
+const debugAdd100WisdomBtn = document.getElementById("debug-add-100-wisdom-btn");
+const debugAdd1000WisdomBtn = document.getElementById("debug-add-1000-wisdom-btn");
 
 // --- View switching (game vs analyzer vs achievements) ---
 const gameRootEl = document.getElementById("game-root");
@@ -884,7 +886,8 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
   const costThreshold = TUNING.reveal.costThreshold;
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
   const giftBuffsDisplay = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
-  const combinedCostMult = distBonus.costMult * wisdomCostMult * giftBuffsDisplay.costMult;
+  const singCostMult = Calc.calcSingularityCostMult(state.singularityCount, TUNING);
+  const combinedCostMult = distBonus.costMult * wisdomCostMult * giftBuffsDisplay.costMult * singCostMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
@@ -1235,7 +1238,8 @@ function buyProducer(id) {
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
   const giftBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
-  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult * giftBuffs.costMult;
+  const singCostMult = Calc.calcSingularityCostMult(state.singularityCount, TUNING);
+  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult * giftBuffs.costMult * singCostMult;
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
@@ -2688,14 +2692,17 @@ debugAdd1mAvocadosBtn.addEventListener("click", () => {
   logLine("Debug: +1,000,000 avocados");
 });
 
-debugAddWisdomBtn.addEventListener("click", () => {
-  state.wisdom += 10;
-  state.totalWisdomEarned = (state.totalWisdomEarned || 0) + 10;
-  state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + 10;
+function debugAddWisdom(amount) {
+  state.wisdom += amount;
+  state.totalWisdomEarned = (state.totalWisdomEarned || 0) + amount;
+  state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + amount;
   saveGame();
   updateUI();
-  logLine("Debug: +10 wisdom");
-});
+  logLine(`Debug: +${amount.toLocaleString()} wisdom`);
+}
+debugAddWisdomBtn.addEventListener("click", () => debugAddWisdom(10));
+debugAdd100WisdomBtn.addEventListener("click", () => debugAddWisdom(100));
+debugAdd1000WisdomBtn.addEventListener("click", () => debugAddWisdom(1000));
 
 const debugAdd10bAvocadosBtn = document.getElementById("debug-add-10b-avocados-btn");
 if (debugAdd10bAvocadosBtn) debugAdd10bAvocadosBtn.addEventListener("click", () => {
