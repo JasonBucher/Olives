@@ -22,11 +22,23 @@ import {
   calcPersistentSlots,
   calcActiveGiftBuffs,
   getGiftEffectPool,
+  calcMilestoneMultiplier,
+  getNextMilestone,
 } from "./static/js/gameCalc.js";
 
 // --- Shared test tuning (mirrors real TUNING shape, pinned values) ---
 const tuning = {
   production: { baseClickYield: 1, tickMs: 200 },
+  milestones: [
+    { count: 10,  mult: 1.5 },
+    { count: 25,  mult: 2 },
+    { count: 50,  mult: 2 },
+    { count: 75,  mult: 2 },
+    { count: 100, mult: 3 },
+    { count: 150, mult: 3 },
+    { count: 200, mult: 4 },
+    { count: 250, mult: 5 },
+  ],
   producers: {
     sapling:         { baseCost: 15,      costGrowth: 1.15, baseRate: 0.1 },
     seed_bank:       { baseCost: 100,     costGrowth: 1.15, baseRate: 0.8 },

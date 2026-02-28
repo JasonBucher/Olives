@@ -843,7 +843,7 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
   for (const id of order) {
     const owned = state.producers[id] || 0;
     const singleCost = Math.floor(Calc.calcProducerCost(id, owned, TUNING) * combinedCostMult);
-    const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING);
+    const unitRate = Calc.calcProducerUnitRate(id, state.upgrades, TUNING, owned);
 
     // Compute display cost and effective quantity based on qty
     let effectiveQty;
@@ -896,6 +896,10 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
       let rateText = `Producing ${Calc.formatRate(effectiveUnitRate * owned)} avocados/sec (${Calc.formatRate(effectiveUnitRate)} each)`;
       if (synergyMult > 1) {
         rateText += ` [synergy x${synergyMult.toFixed(2)}]`;
+      }
+      const nextMs = Calc.getNextMilestone(owned, TUNING);
+      if (nextMs) {
+        rateText += ` | Next milestone: ${nextMs.count} (x${nextMs.mult})`;
       }
       if (id === "guac_lab" && (state.wisdomUnlocks.guac_protocol || state.upgrades.guac_unlock)) {
         const consumption = Calc.calcGuacConsumption(owned, TUNING, refineries, state.upgrades, state.wisdomUnlocks, state.prestigeCount, state.guacCount);
