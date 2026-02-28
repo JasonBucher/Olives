@@ -46,6 +46,7 @@ __MACOSX/
 
 # Node
 node_modules/
+.vite/
 
 # Claude Code
 .claude/
