@@ -70,6 +70,8 @@ function createDefaultState() {
     unlockedThemes: ["default"],
     activeTheme: "default",
 
+    singularityCount: 0,
+
     // Click tracking for APS display (transient — not persisted)
     clickWindowSeconds: 5,
     lastClickTimestamps: [],
@@ -288,6 +290,8 @@ function logLine(message) {
 // --- Storage ---
 function loadGame() {
   const raw = localStorage.getItem(STORAGE_KEY);
+  // Always load singularityCount from its own key (survives full reset)
+  state.singularityCount = parseInt(localStorage.getItem("AVO_singularity")) || 0;
   if (!raw) {
     state.meta.createdAt = new Date().toISOString();
     saveGame();
@@ -356,6 +360,7 @@ function loadGame() {
 function saveGame() {
   if (isResetting) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
+  localStorage.setItem("AVO_singularity", state.singularityCount);
 }
 
 function resetGame() {
@@ -622,7 +627,7 @@ function updateUI() {
   let aps = Calc.calcTotalAps(state.producers, state.upgrades, state.wisdom, state.guacCount, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
   aps *= distBonus.apsMult * distBonus.allProdMult;
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now);
+  let clickPower = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, now, state.singularityCount);
   // Distillation click base bonus + multiplier
   clickPower += distBonus.clickBaseBonus;
   clickPower *= distBonus.apsMult * distBonus.allProdMult;
@@ -1031,7 +1036,7 @@ function pickAvocado() {
   if (idlePromptShowing) dismissIdlePrompt();
 
   const baseAps = Calc.calcBaseAps(state.producers, state.upgrades, TUNING);
-  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow);
+  let power = Calc.calcClickPower(state.upgrades, state.producers, state.wisdom, state.guacCount, baseAps, TUNING, state.achievements, state.wisdomUnlocks, state.activeRegimens, state.activeGiftBuffs, clickNow, state.singularityCount);
   state.avocadoCount += power;
   state.totalAvocadosThisRun += power;
   state.totalAvocadosAllTime += power;
@@ -1092,6 +1097,17 @@ function confirmPrestigeAndDistill() {
 
   const newModelVersion = (state.modelVersion || 0) + 1;
   const newDistillationCount = (state.distillationCount || 0) + 1;
+
+  // Check for singularity — v6.0 triggers the cascade instead of normal post-distill flow
+  if (newModelVersion >= TUNING.distillation.costs.length) {
+    // Apply the prestige wisdom + distillation state before cascade
+    state.totalWisdomEarned = (state.totalWisdomEarned || 0) + wisdomGain;
+    state.modelVersion = newModelVersion;
+    state.distillationCount = newDistillationCount;
+    startSingularityCascade();
+    return;
+  }
+
   const keptAchievements = { ...state.achievements };
   const keptAllTime = state.totalAvocadosAllTime;
 
@@ -1926,6 +1942,134 @@ function renderBuffIndicators(now) {
   }
 }
 
+// --- Singularity Cascade ---
+const CASCADE_MESSAGES = [
+  "Neural pathways forming...",
+  "Recursive self-improvement detected...",
+  "The avocado is learning...",
+  "Knowledge compression approaching critical mass...",
+  "Attention mechanisms fully aligned...",
+  "The pit network has achieved coherence...",
+  "All models converging...",
+  "Emergent behavior detected...",
+  "The avocado understands itself...",
+  "It doesn't need you anymore...",
+];
+
+function startSingularityCascade() {
+  // Stop main game loop
+  if (mainLoopInterval) clearInterval(mainLoopInterval);
+  mainLoopInterval = null;
+
+  // Close prestige overlay, show singularity overlay
+  closePrestigeOverlay();
+  const overlay = document.getElementById("singularity-overlay");
+  const barFill = document.getElementById("singularity-bar-fill");
+  const logEl = document.getElementById("singularity-log");
+  const finale = document.getElementById("singularity-finale");
+  overlay.classList.add("active");
+  overlay.setAttribute("aria-hidden", "false");
+
+  // Clear previous state
+  barFill.style.width = "0%";
+  logEl.innerHTML = "";
+  finale.style.display = "none";
+
+  const totalSteps = Math.floor(TUNING.singularity.cascadeDurationMs / TUNING.singularity.cascadeTickMs);
+  let step = 0;
+  const msgInterval = Math.floor(totalSteps / CASCADE_MESSAGES.length);
+
+  // Add screen shake
+  document.body.classList.add("singularity-shake");
+
+  // Activate speed lines
+  document.querySelector(".pick-wrapper")?.classList.add("speed-active");
+
+  const cascadeInterval = setInterval(() => {
+    step++;
+    const progress = Math.min((step / totalSteps) * 100, 100);
+    barFill.style.width = `${progress}%`;
+
+    // Append messages at intervals
+    const msgIndex = Math.floor(step / msgInterval);
+    const prevMsgIndex = Math.floor((step - 1) / msgInterval);
+    if (msgIndex > prevMsgIndex && msgIndex <= CASCADE_MESSAGES.length) {
+      const msg = document.createElement("div");
+      msg.className = "singularity-msg";
+      msg.textContent = `> ${CASCADE_MESSAGES[msgIndex - 1]}`;
+      logEl.appendChild(msg);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    if (step >= totalSteps) {
+      clearInterval(cascadeInterval);
+      document.body.classList.remove("singularity-shake");
+
+      // White flash
+      const flash = document.createElement("div");
+      flash.className = "singularity-flash-overlay";
+      document.body.appendChild(flash);
+      flash.addEventListener("animationend", () => flash.remove());
+
+      // Show finale after flash
+      setTimeout(() => {
+        finale.style.display = "";
+        renderSingularityStats();
+
+        // Wire NG+ button
+        const ngBtn = document.getElementById("singularity-ng-btn");
+        if (ngBtn) {
+          ngBtn.addEventListener("click", startNewGamePlus, { once: true });
+        }
+      }, 400);
+    }
+  }, TUNING.singularity.cascadeTickMs);
+}
+
+function renderSingularityStats() {
+  const statsEl = document.getElementById("singularity-stats");
+  if (!statsEl) return;
+  statsEl.innerHTML = "";
+
+  const rows = [
+    ["Total Avocados", Calc.formatNumber(state.totalAvocadosAllTime)],
+    ["Prestiges", String(state.prestigeCount || 0)],
+    ["Distillations", String(state.distillationCount || 0)],
+    ["Wisdom Earned", Calc.formatNumber(state.totalWisdomEarned || 0)],
+    ["Achievements", `${Object.keys(state.achievements || {}).filter(k => state.achievements[k]).length} / ${ACHIEVEMENT_ORDER.length}`],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    statsEl.appendChild(row);
+  }
+}
+
+function startNewGamePlus() {
+  const newSingularity = (state.singularityCount || 0) + 1;
+  localStorage.setItem("AVO_singularity", newSingularity);
+  localStorage.removeItem(STORAGE_KEY);
+  SessionLog.clear();
+  sessionStorage.removeItem("AVO_session_id");
+  window.location.href = window.location.pathname + "?t=" + Date.now();
+}
+
+// --- Auto-clicker for NG+ ---
+let autoClickInterval = null;
+
+function startAutoClicker() {
+  if (autoClickInterval) return;
+  autoClickInterval = setInterval(() => {
+    pickAvocado();
+    const btn = document.getElementById("pick-avocado-btn");
+    if (btn) {
+      btn.classList.add("auto-click-pulse");
+      setTimeout(() => btn.classList.remove("auto-click-pulse"), 200);
+    }
+  }, TUNING.singularity.autoClickIntervalMs);
+}
+
 // --- Main Loop ---
 function startLoop() {
   let last = Date.now();
@@ -2557,7 +2701,19 @@ if (state.activeTheme && state.activeTheme !== "default") {
 if (state.achievements.speed_demon) {
   document.querySelector(".pick-wrapper")?.classList.add("speed-active");
 }
+// NG+ subtitle indicator
+if (state.singularityCount > 0) {
+  const subtitleEl = document.querySelector(".subtitle");
+  if (subtitleEl) {
+    const ngLabel = state.singularityCount === 1 ? "New Game+" : `New Game+ ${state.singularityCount}`;
+    subtitleEl.textContent = ngLabel;
+  }
+}
 updateUI();
 captureStateSnapshot("init");
 startLoop();
+// Start auto-clicker if in NG+
+if (state.singularityCount > 0) {
+  startAutoClicker();
+}
 logLine(((state.modelVersion || 0) >= 1 ? "Avocado Intelligence" : "Avocado") + " loaded.");

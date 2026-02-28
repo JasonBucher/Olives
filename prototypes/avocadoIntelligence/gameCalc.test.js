@@ -199,6 +199,12 @@ const tuning = {
     scale_focus: { title: "Scale Focus", desc: "Producers +50%, clicks -50%", clickMult: 0.50, producerMult: 1.50, requiresUnlock: "scale_specialization" },
     guac_focus:  { title: "Guac Focus",  desc: "Guac 2x, production -20%",   guacOutputMult: 2.0, producerMult: 0.80, requiresUnlock: "guac_specialization" },
   },
+  singularity: {
+    cascadeDurationMs: 8000,
+    cascadeTickMs: 200,
+    autoClickIntervalMs: 2000,
+    clickMultPerSingularity: 2,
+  },
   distillation: {
     costs: [100, 250, 500, 1000, 2000],
     bonuses: [
@@ -2294,6 +2300,34 @@ describe("gift buffs integration with calcTotalAps / calcClickPower", () => {
     const baseAps = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens);
     const withEmpty = calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, achievements, wisdomUnlocks, activeRegimens, [], now);
     expect(withEmpty).toBeCloseTo(baseAps);
+  });
+});
+
+describe("calcClickPower — singularity (NG+) multiplier", () => {
+  const noProducers = { sapling: 0, orchard_row: 0, drone: 0, guac_lab: 0 };
+
+  it("singularityCount=0 does not change click power (backward compatible)", () => {
+    const without = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const withZero = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 0);
+    expect(withZero).toBe(without);
+  });
+
+  it("singularityCount=1 applies 2x multiplier", () => {
+    const base = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const ng1 = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 1);
+    expect(ng1).toBe(base * 2);
+  });
+
+  it("singularityCount=2 applies 4x multiplier", () => {
+    const base = calcClickPower({}, noProducers, 0, 0, 0, tuning);
+    const ng2 = calcClickPower({}, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 2);
+    expect(ng2).toBe(base * 4);
+  });
+
+  it("singularity multiplier stacks with other click multipliers", () => {
+    const base = calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning);
+    const ng1 = calcClickPower({ strong_thumb: true }, noProducers, 0, 0, 0, tuning, undefined, undefined, undefined, undefined, undefined, 1);
+    expect(ng1).toBe(base * 2);
   });
 });
 

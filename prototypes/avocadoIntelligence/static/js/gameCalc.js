@@ -477,8 +477,9 @@ export function calcTotalAps(producers, upgrades, wisdom, guacCount, tuning, ach
 }
 
 /** Calculate click power (avocados per click). baseAps is pre-multiplier APS.
- *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers. */
-export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now) {
+ *  Optional activeGiftBuffs/now params apply wrapped gift buff multipliers.
+ *  Optional singularityCount applies NG+ click multiplier (2^singularityCount). */
+export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, tuning, achievements, wisdomUnlocks, activeRegimens, activeGiftBuffs, now, singularityCount) {
   let power = tuning.production.baseClickYield;
 
   // Base click bonus from wisdom tree (e.g. curriculum_learning)
@@ -550,6 +551,10 @@ export function calcClickPower(upgrades, producers, wisdom, guacCount, baseAps, 
   if (activeGiftBuffs && activeGiftBuffs.length > 0) {
     const giftBuffs = calcActiveGiftBuffs(activeGiftBuffs, now || Date.now());
     power *= giftBuffs.clickMult;
+  }
+  // Apply NG+ singularity click multiplier
+  if (singularityCount > 0) {
+    power *= Math.pow(tuning.singularity.clickMultPerSingularity, singularityCount);
   }
   return power;
 }

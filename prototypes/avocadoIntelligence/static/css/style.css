@@ -1136,3 +1136,144 @@ h1 {
     grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
   }
 }
+
+/* Singularity overlay */
+.singularity-container {
+  width: min(640px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  box-shadow: 0 0 60px rgba(74, 124, 63, 0.3), 0 16px 48px rgba(0,0,0,0.6);
+  text-align: center;
+}
+
+.singularity-progress-wrap {
+  margin-bottom: 20px;
+}
+
+.singularity-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.singularity-bar {
+  width: 100%;
+  height: 18px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.singularity-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), #7ec87e, #c8e6c8);
+  border-radius: 9px;
+  transition: width 0.15s ease-out;
+  box-shadow: 0 0 10px rgba(74, 124, 63, 0.5);
+}
+
+.singularity-log {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  min-height: 80px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.singularity-log .singularity-msg {
+  padding: 2px 0;
+  opacity: 0;
+  animation: singularity-msg-in 0.3s ease-out forwards;
+}
+
+@keyframes singularity-msg-in {
+  0%   { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.singularity-finale {
+  animation: singularity-fade-in 1.5s ease-out forwards;
+}
+
+@keyframes singularity-fade-in {
+  0%   { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.singularity-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #c8e6c8;
+  margin-bottom: 8px;
+  text-shadow: 0 0 20px rgba(74, 124, 63, 0.6);
+}
+
+.singularity-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 20px;
+  font-style: italic;
+}
+
+.singularity-stats {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+}
+
+.singularity-stats .row {
+  padding: 4px 0;
+}
+
+@keyframes singularity-flash {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.singularity-flash-overlay {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 10000;
+  animation: singularity-flash 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+.singularity-shake {
+  animation: shake 0.1s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(-3px, 2px); }
+  50%      { transform: translate(3px, -2px); }
+  75%      { transform: translate(-2px, -1px); }
+}
+
+/* Auto-click pulse for NG+ */
+.auto-click-pulse {
+  animation: auto-click-scale 0.2s ease-out;
+}
+
+@keyframes auto-click-scale {
+  0%   { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}

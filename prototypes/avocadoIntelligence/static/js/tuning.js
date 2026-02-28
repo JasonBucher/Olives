@@ -434,6 +434,13 @@ export const TUNING = {
     },
   },
 
+  singularity: {
+    cascadeDurationMs: 8000,
+    cascadeTickMs: 200,
+    autoClickIntervalMs: 2000,
+    clickMultPerSingularity: 2,
+  },
+
   distillation: {
     costs: [100, 250, 500, 1000, 2000, 4000], // wisdom cost for each distillation (v1.0 through v6.0)
     bonuses: [
