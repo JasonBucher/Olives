@@ -733,6 +733,7 @@ function updateUI() {
   const upgradeLookaheadLimit = TUNING.reveal.upgradeLookahead;
   const upgradeCostThreshold = TUNING.reveal.costThreshold;
   const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
+  const giftBuffsUpgrade = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
   let upgradeLookaheadUsed = 0;
   let firstEligibleUpgradeSeen = false;
 
@@ -788,7 +789,7 @@ function updateUI() {
 
     // 5. Threshold check: first eligible always visible; others need >= costThreshold
     const baseCost = inv.cost();
-    const upgradeCost = Math.floor(baseCost * researchCostMult);
+    const upgradeCost = Math.floor(baseCost * researchCostMult * giftBuffsUpgrade.costMult);
     if (!firstEligibleUpgradeSeen) {
       firstEligibleUpgradeSeen = true;
       revealedUpgrades.add(inv.id);
@@ -836,7 +837,8 @@ function updateProducerRows(listEl, order, distBonus, currentAps, guacLabUnlocke
   const centrifuges = state.producers.guac_centrifuge || 0;
   const costThreshold = TUNING.reveal.costThreshold;
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
-  const combinedCostMult = distBonus.costMult * wisdomCostMult;
+  const giftBuffsDisplay = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const combinedCostMult = distBonus.costMult * wisdomCostMult * giftBuffsDisplay.costMult;
   let lookaheadUsed = 0;
   let firstEligibleSeen = false;
 
@@ -1171,7 +1173,8 @@ function buyProducer(id) {
 
   const distBonusBuy = Calc.calcDistillationBonus(state.modelVersion || 0, TUNING, state.wisdomUnlocks);
   const wisdomCostMult = Calc.calcWisdomProducerCostMult(state.wisdomUnlocks, TUNING);
-  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult;
+  const giftBuffs = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const combinedCostMult = distBonusBuy.costMult * wisdomCostMult * giftBuffs.costMult;
 
   // Determine how many to buy
   const startOwned = state.producers[id] || 0;
@@ -1216,7 +1219,8 @@ function buyUpgrade(id) {
   if (!inv || inv.isOwned(state)) return;
 
   const researchCostMult = Calc.calcWisdomResearchCostMult(state.wisdomUnlocks, TUNING);
-  const effectiveCost = Math.floor(inv.cost() * researchCostMult);
+  const giftBuffsBuy = Calc.calcActiveGiftBuffs(state.activeGiftBuffs, Date.now());
+  const effectiveCost = Math.floor(inv.cost() * researchCostMult * giftBuffsBuy.costMult);
 
   if (state.freeNextPurchase) {
     state.freeNextPurchase = false;
@@ -1823,8 +1827,8 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   } else if (effectId === "free_purchase") {
     state.freeNextPurchase = true;
     arrow = "\u25b2"; arrowClass = "gift-arrow-up";
-  } else if (effectId === "wisdom_grant") {
-    const amount = cfg.wisdomAmount || 1;
+  } else if (cfg.wisdomAmount) {
+    const amount = cfg.wisdomAmount;
     state.wisdom += amount;
     state.totalWisdomEarned = (state.totalWisdomEarned || 0) + amount;
     state.totalWisdomSinceLastDistill = (state.totalWisdomSinceLastDistill || 0) + amount;
@@ -1853,12 +1857,12 @@ function applyGiftEffect(effectId, cfg, now, x, y, giftId) {
   // Log it — include mechanical detail
   let logDetail = "";
   if (cfg.field && cfg.mult !== undefined && cfg.durationMs) {
-    const label = cfg.field === "aps" ? "APS" : cfg.field === "guac" ? "Guac/sec" : "Clicks";
+    const label = cfg.field === "aps" ? "APS" : cfg.field === "guac" ? "Guac/sec" : cfg.field === "cost" ? "Costs" : "Clicks";
     logDetail = ` (${label} ×${cfg.mult} for ${cfg.durationMs / 1000}s)`;
   } else if (effectId === "free_purchase") {
     logDetail = " (next research upgrade is free)";
-  } else if (effectId === "wisdom_grant") {
-    logDetail = ` (+${cfg.wisdomAmount || 1} wisdom)`;
+  } else if (cfg.wisdomAmount) {
+    logDetail = ` (+${cfg.wisdomAmount} wisdom)`;
   } else if (effectId === "avocado_rain") {
     logDetail = ` (+${cfg.apsSeconds || 60}s of APS)`;
   } else if (effectId === "guac_rot") {
@@ -1912,9 +1916,9 @@ function renderBuffIndicators(now) {
   for (const buff of state.activeGiftBuffs) {
     if (buff.expiresAt <= now) continue;
     const remaining = Math.ceil((buff.expiresAt - now) / 1000);
-    const isPositive = buff.multiplier > 1;
+    const isPositive = buff.field === "cost" ? buff.multiplier < 1 : buff.multiplier > 1;
     const arrow = isPositive ? "\u25b2" : "\u25bc";
-    const label = buff.field === "aps" ? "APS" : buff.field === "guac" ? "Guac" : "Click";
+    const label = buff.field === "aps" ? "APS" : buff.field === "guac" ? "Guac" : buff.field === "cost" ? "Cost" : "Click";
     const el = document.createElement("span");
     el.className = `buff-indicator ${isPositive ? "buff-positive" : "buff-negative"}`;
     el.textContent = `${arrow}\u00d7${buff.multiplier} ${label} (${remaining}s)`;

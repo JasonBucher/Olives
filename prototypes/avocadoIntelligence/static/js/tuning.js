@@ -405,7 +405,7 @@ export const TUNING = {
   },
 
   wrappedGift: {
-    spawnChancePerTick: 0.002,    // ~1 gift per 90-120s
+    spawnChancePerTick: 0.004,    // ~1 gift per 50s
     minCooldownMs: 30000,         // 30s min between gifts
     maxOnScreen: 1,               // base max (epsilon_greedy → 2)
 
@@ -425,8 +425,12 @@ export const TUNING = {
       guac_boost:    { weight: 12, text: "Guac Surge!",      field: "guac",  mult: 2.0,  durationMs: 30000 },
       guac_drain:    { weight: 6,  text: "Moldy Batch...",   field: "guac",  mult: 0.5,  durationMs: 20000, negative: true },
       guac_rot:      { weight: 6,  text: "Guac Rot!",       guacLossPct: 0.25, negative: true },
-      empty:         { weight: 15, text: "Empty Box..." },
+      empty:         { weight: 3,  text: "Empty Box..." },
       avocado_rain:  { weight: 9,  text: "Avocado Rain!",   apsSeconds: 60 },
+      avocado_singularity: { weight: 3, text: "Avocado Singularity!", field: "aps",   mult: 10.0, durationMs: 15000 },
+      neural_cascade:      { weight: 5, text: "Neural Cascade!",     field: "click", mult: 5.0,  durationMs: 30000 },
+      cost_collapse:       { weight: 4, text: "Cost Collapse!",      field: "cost",  mult: 0.5,  durationMs: 20000 },
+      wisdom_burst:        { weight: 2, text: "Wisdom Burst!",       wisdomAmount: 2, requiresWisdomUnlock: "gift_of_wisdom" },
     },
   },
 

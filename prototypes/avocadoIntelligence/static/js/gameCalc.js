@@ -221,20 +221,22 @@ export function calcPersistentSlots(wisdomUnlocks, tuning) {
 
 // ── Wrapped Gift Functions ──────────────────────────────────────────
 
-/** Returns { apsMult, clickMult } from active gift buffs that haven't expired. */
+/** Returns { apsMult, clickMult, guacMult, costMult } from active gift buffs that haven't expired. */
 export function calcActiveGiftBuffs(activeGiftBuffs, now) {
   let apsMult = 1;
   let clickMult = 1;
   let guacMult = 1;
-  if (!activeGiftBuffs) return { apsMult, clickMult, guacMult };
+  let costMult = 1;
+  if (!activeGiftBuffs) return { apsMult, clickMult, guacMult, costMult };
   for (const buff of activeGiftBuffs) {
     if (buff.expiresAt > now) {
       if (buff.field === "aps") apsMult *= buff.multiplier;
       if (buff.field === "click") clickMult *= buff.multiplier;
       if (buff.field === "guac") guacMult *= buff.multiplier;
+      if (buff.field === "cost") costMult *= buff.multiplier;
     }
   }
-  return { apsMult, clickMult, guacMult };
+  return { apsMult, clickMult, guacMult, costMult };
 }
 
 /** Returns eligible effect pool based on wisdom unlocks. */

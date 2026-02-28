@@ -2071,37 +2071,37 @@ describe("calcActiveGiftBuffs", () => {
   const now = 10000;
 
   it("returns identity multipliers with no buffs", () => {
-    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs([], now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("returns identity multipliers with null/undefined", () => {
-    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
-    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(null, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
+    expect(calcActiveGiftBuffs(undefined, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single APS boost", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 2.0, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single click boost", () => {
     const buffs = [{ id: "click_boost", field: "click", multiplier: 3.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 3.0, guacMult: 1, costMult: 1 });
   });
 
   it("applies a single guac boost", () => {
     const buffs = [{ id: "guac_boost", field: "guac", multiplier: 2.0, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 2.0 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 2.0, costMult: 1 });
   });
 
   it("applies a guac drain", () => {
     const buffs = [{ id: "guac_drain", field: "guac", multiplier: 0.5, expiresAt: 15000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 0.5 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 0.5, costMult: 1 });
   });
 
   it("ignores expired buffs", () => {
     const buffs = [{ id: "aps_boost", field: "aps", multiplier: 2.0, expiresAt: 5000 }];
-    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1 });
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 1 });
   });
 
   it("stacks multiple APS buffs multiplicatively", () => {
@@ -2112,6 +2112,7 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBeCloseTo(1.0);
     expect(result.clickMult).toBe(1);
+    expect(result.costMult).toBe(1);
   });
 
   it("handles mixed APS and click buffs", () => {
@@ -2122,6 +2123,7 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBe(2.0);
     expect(result.clickMult).toBe(3.0);
+    expect(result.costMult).toBe(1);
   });
 
   it("only includes non-expired buffs in mix", () => {
@@ -2133,6 +2135,22 @@ describe("calcActiveGiftBuffs", () => {
     const result = calcActiveGiftBuffs(buffs, now);
     expect(result.apsMult).toBe(2.0);
     expect(result.clickMult).toBe(3.0);
+    expect(result.costMult).toBe(1);
+  });
+
+  it("applies a single cost buff", () => {
+    const buffs = [{ id: "cost_collapse", field: "cost", multiplier: 0.5, expiresAt: 15000 }];
+    expect(calcActiveGiftBuffs(buffs, now)).toEqual({ apsMult: 1, clickMult: 1, guacMult: 1, costMult: 0.5 });
+  });
+
+  it("stacks multiple cost buffs multiplicatively", () => {
+    const buffs = [
+      { id: "cost_1", field: "cost", multiplier: 0.5, expiresAt: 15000 },
+      { id: "cost_2", field: "cost", multiplier: 0.5, expiresAt: 15000 },
+    ];
+    const result = calcActiveGiftBuffs(buffs, now);
+    expect(result.costMult).toBeCloseTo(0.25);
+    expect(result.apsMult).toBe(1);
   });
 });
 
@@ -2147,8 +2165,12 @@ describe("getGiftEffectPool", () => {
     guac_rot:      { weight: 6,  text: "Guac Rot!",       guacLossPct: 0.25, negative: true },
     free_purchase: { weight: 8,  text: "Free Upgrade!",   requiresWisdomUnlock: "gift_scholarship" },
     wisdom_grant:  { weight: 5,  text: "Enlightenment!",  wisdomAmount: 1, requiresWisdomUnlock: "gift_of_wisdom" },
-    empty:         { weight: 15, text: "Empty Box..." },
+    empty:         { weight: 3,  text: "Empty Box..." },
     avocado_rain:  { weight: 9,  text: "Avocado Rain!" },
+    avocado_singularity: { weight: 3, text: "Avocado Singularity!", field: "aps", mult: 10.0 },
+    neural_cascade:      { weight: 5, text: "Neural Cascade!",     field: "click", mult: 5.0 },
+    cost_collapse:       { weight: 4, text: "Cost Collapse!",      field: "cost",  mult: 0.5 },
+    wisdom_burst:        { weight: 2, text: "Wisdom Burst!",       wisdomAmount: 2, requiresWisdomUnlock: "gift_of_wisdom" },
   };
 
   it("excludes gated effects when wisdom not owned", () => {
@@ -2156,9 +2178,13 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).not.toContain("free_purchase");
     expect(ids).not.toContain("wisdom_grant");
+    expect(ids).not.toContain("wisdom_burst");
     expect(ids).toContain("aps_boost");
     expect(ids).toContain("empty");
     expect(ids).toContain("avocado_rain");
+    expect(ids).toContain("avocado_singularity");
+    expect(ids).toContain("neural_cascade");
+    expect(ids).toContain("cost_collapse");
   });
 
   it("includes gated effects when wisdom is owned", () => {
@@ -2166,6 +2192,7 @@ describe("getGiftEffectPool", () => {
     const ids = pool.map(([id]) => id);
     expect(ids).toContain("free_purchase");
     expect(ids).toContain("wisdom_grant");
+    expect(ids).toContain("wisdom_burst");
   });
 
   it("excludes negative effects when quality_control owned", () => {
@@ -2208,11 +2235,15 @@ describe("getGiftEffectPool", () => {
     expect(ids).toContain("wisdom_grant");
     expect(ids).toContain("empty");
     expect(ids).toContain("avocado_rain");
+    expect(ids).toContain("avocado_singularity");
+    expect(ids).toContain("neural_cascade");
+    expect(ids).toContain("cost_collapse");
+    expect(ids).toContain("wisdom_burst");
     expect(ids).not.toContain("aps_drain");
     expect(ids).not.toContain("click_drain");
     expect(ids).not.toContain("guac_drain");
     expect(ids).not.toContain("guac_rot");
-    expect(ids).toHaveLength(7);
+    expect(ids).toHaveLength(11);
   });
 });
 
