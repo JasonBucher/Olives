@@ -294,7 +294,7 @@ export function getNextMilestone(count, tuning) {
   return null;
 }
 
-/** Calculate a single producer's per-unit output rate, applying upgrade and milestone multipliers. */
+/** Calculate a single producer's per-unit output rate, applying per-producer upgrade multipliers and milestones. */
 export function calcProducerUnitRate(id, upgrades, tuning, count) {
   let rate = tuning.producers[id].baseRate;
   for (const [upgradeId, upgrade] of Object.entries(tuning.upgrades)) {

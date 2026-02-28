@@ -754,7 +754,7 @@ describe("calcTotalAps", () => {
 
   it("applies achievement global multiplier", () => {
     const producers = { sapling: 10, orchard_row: 0, drone: 0, guac_lab: 0 };
-    // base = 1.5 (milestone), achievement global = 1 + 0.02 = 1.02, total = 1.5 * 1.02 = 1.53
+    // base = 1.5 (milestone), achievement global = 1.02, total = 1.5 * 1.02 = 1.53
     expect(calcTotalAps(producers, {}, 0, 0, tuning, { hello_world: true })).toBeCloseTo(1.53);
   });
 });
@@ -1327,8 +1327,8 @@ describe("calcBaseAps — synergy integration", () => {
   it("returns boosted APS when synergy upgrade is owned and source has units", () => {
     const producers = { sapling: 10, orchard_row: 5 };
     const upgrades = { syn_orchard_sapling: true };
-    // sapling: 10 * 0.1 * 1.5 (milestone) * (1 + 0.05*5) = 10 * 0.1 * 1.5 * 1.25 = 1.875
-    // orchard_row: 5 * 8 = 40 (no milestone, count < 10)
+    // sapling: 10 * 0.1 * 1.5 (milestone@10) * (1 + 0.05*5) = 10 * 0.15 * 1.25 = 1.875
+    // orchard_row: 5 * 8 = 40
     // total = 41.875
     expect(calcBaseAps(producers, upgrades, tuning)).toBeCloseTo(41.875);
   });

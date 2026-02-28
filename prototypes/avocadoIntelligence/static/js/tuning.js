@@ -56,6 +56,19 @@ export const TUNING = {
     foundation_model: { baseCost: 1.5e21,  costGrowth: 1.15, baseRate: 8.3e12,  title: "Foundation Model",   desc: "It learned everything. From avocados. Somehow that was enough." },
   },
 
+  // Global producer milestones — free multipliers at owned-count thresholds.
+  // Layered on top of tiered upgrade multipliers (which cost avocados).
+  milestones: [
+    { count: 10,  mult: 1.5 },
+    { count: 25,  mult: 2 },
+    { count: 50,  mult: 2 },
+    { count: 75,  mult: 2 },
+    { count: 100, mult: 3 },
+    { count: 150, mult: 3 },
+    { count: 200, mult: 4 },
+    { count: 250, mult: 5 },
+  ],
+
   guac: {
     baseConsumption: 200,       // base avocado consumption rate per lab
     consumeExponent: 0.85,      // sublinear scaling: consume = base * n^exp
