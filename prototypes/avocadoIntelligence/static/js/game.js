@@ -2330,6 +2330,96 @@ if (bonusesModal) bonusesModal.addEventListener("click", (e) => {
   if (e.target === bonusesModal) closeBonusesModal();
 });
 
+// --- Stats Modal ---
+const statsModal = document.getElementById("stats-modal");
+const statsModalBody = document.getElementById("stats-modal-body");
+const statsBtn = document.getElementById("stats-btn");
+const statsCloseBtn = document.getElementById("stats-close-btn");
+
+function openStatsModal() {
+  renderStatsModal();
+  statsModal.classList.add("active");
+  statsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeStatsModal() {
+  statsModal.classList.remove("active");
+  statsModal.setAttribute("aria-hidden", "true");
+}
+
+function renderStatsModal() {
+  statsModalBody.innerHTML = "";
+
+  function addSection(title) {
+    const sec = document.createElement("div");
+    sec.className = "bonuses-section";
+    const h = document.createElement("div");
+    h.className = "bonuses-section-title";
+    h.textContent = title;
+    sec.appendChild(h);
+    statsModalBody.appendChild(sec);
+    return sec;
+  }
+
+  function addRow(parent, label, value) {
+    const row = document.createElement("div");
+    row.className = "bonuses-row";
+    row.innerHTML = `<span class="bonuses-label">${label}</span> <span class="bonuses-value">${value}</span>`;
+    parent.appendChild(row);
+  }
+
+  // 1. All-Time
+  const sec1 = addSection("All-Time");
+  addRow(sec1, "Avocados Produced", Calc.formatNumber(state.totalAvocadosAllTime));
+  addRow(sec1, "Total Clicks", Calc.formatNumber(state.totalClicksAllTime));
+  addRow(sec1, "Gifts Opened", String(state.totalGiftsOpened || 0));
+  const giftEffectsSeen = Object.keys(state.giftEffectsSeen || {}).length;
+  const totalGiftEffects = Object.keys(TUNING.wrappedGift.effects).length;
+  addRow(sec1, "Gift Effects Seen", `${giftEffectsSeen} / ${totalGiftEffects}`);
+
+  // 2. Prestige & Distillation
+  const sec2 = addSection("Prestige & Distillation");
+  addRow(sec2, "Prestige Runs", String(state.prestigeCount || 0));
+  addRow(sec2, "Total Wisdom Earned", Calc.formatNumber(state.totalWisdomEarned || 0));
+  const wisdomNodesOwned = Object.keys(state.wisdomUnlocks || {}).length;
+  const totalWisdomNodes = Object.keys(TUNING.wisdomUnlocks).length;
+  addRow(sec2, "Wisdom Nodes Owned", `${wisdomNodesOwned} / ${totalWisdomNodes}`);
+  addRow(sec2, "Distillations", String(state.distillationCount || 0));
+  addRow(sec2, "Model Version", `v${state.modelVersion || 0}.0`);
+
+  // 3. Progress
+  const sec3 = addSection("Progress");
+  const earnedCount = Object.keys(state.achievements || {}).filter(k => state.achievements[k]).length;
+  const totalAchievements = ACHIEVEMENT_ORDER.length;
+  addRow(sec3, "Achievements", `${earnedCount} / ${totalAchievements}`);
+  const ownedUpgradeCount = INVESTMENTS.filter(inv => inv.isOwned(state)).length;
+  addRow(sec3, "Research Purchased", `${ownedUpgradeCount} / ${INVESTMENTS.length}`);
+  const themesUnlocked = (state.unlockedThemes || []).length;
+  const totalThemes = Object.keys(TUNING.themes).length;
+  addRow(sec3, "Themes Unlocked", `${themesUnlocked} / ${totalThemes}`);
+
+  // 4. Time
+  const sec4 = addSection("Time");
+  if (state.meta && state.meta.createdAt) {
+    addRow(sec4, "First Played", new Date(state.meta.createdAt).toLocaleDateString());
+    const elapsed = Date.now() - new Date(state.meta.createdAt).getTime();
+    const days = Math.floor(elapsed / 86400000);
+    const hours = Math.floor((elapsed % 86400000) / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+    addRow(sec4, "Play Time", parts.join(" "));
+  }
+}
+
+if (statsBtn) statsBtn.addEventListener("click", openStatsModal);
+if (statsCloseBtn) statsCloseBtn.addEventListener("click", closeStatsModal);
+if (statsModal) statsModal.addEventListener("click", (e) => {
+  if (e.target === statsModal) closeStatsModal();
+});
+
 // --- Tab switching ---
 function setResearchTab(tabName) {
   const tabs = document.querySelectorAll(".tab-bar .tab");
