@@ -1,5 +1,7 @@
 # Prototypes
 
+**Live site:** https://jasonbucher.github.io/Olives/
+
 This project is structured as a **prototype lab** rather than a single evolving codebase.
 
 Each prototype explores a specific design question (economy loop, UI paradigm, failure mode, etc.).
