@@ -213,6 +213,7 @@ h1 {
   border-radius: 8px;
   background: transparent;
   border: none;
+  touch-action: manipulation;
 }
 
 .btn-pick:hover { background: transparent; }
@@ -530,6 +531,19 @@ h1 {
 
   .section {
     margin-top: 10px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .layout {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .btn-pick {
+    font-size: min(64cqi, 130px);
+    width: 70%;
   }
 }
 
