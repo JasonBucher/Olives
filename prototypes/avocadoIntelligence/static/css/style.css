@@ -138,6 +138,9 @@ h1 {
   border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .btn:hover { background: var(--btnHover); }
@@ -463,6 +466,8 @@ h1 {
   color: #c8ceca;
   letter-spacing: 0.04em;
   cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .model-bar-tooltip {
@@ -487,7 +492,8 @@ h1 {
   transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
 
-.model-bar:hover .model-bar-tooltip {
+.model-bar:hover .model-bar-tooltip,
+.model-bar.touch-active .model-bar-tooltip {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.3s;
@@ -518,7 +524,8 @@ h1 {
   transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
 
-.total-mult-wrapper:hover .total-mult-tooltip {
+.total-mult-wrapper:hover .total-mult-tooltip,
+.total-mult-wrapper.touch-active .total-mult-tooltip {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.3s;
@@ -1059,6 +1066,8 @@ h1 {
   border-radius: 10px;
   cursor: default;
   transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .achievement-tile.earned {
@@ -1109,7 +1118,8 @@ h1 {
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
-.achievement-tile:hover .achievement-tooltip {
+.achievement-tile:hover .achievement-tooltip,
+.achievement-tile.touch-active .achievement-tooltip {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.15s ease 0.2s, visibility 0s linear 0.2s;
