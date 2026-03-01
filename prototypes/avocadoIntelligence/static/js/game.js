@@ -7,6 +7,7 @@ import { checkAchievements, ACHIEVEMENT_ORDER } from "./achievements.js";
 import SessionLog from "./sessionLog.js";
 import { initAnalyzerView } from "./views/analyzerView.js";
 import { initAchievementsView } from "./views/achievementsView.js";
+import { addLongPressTooltip } from "./utils.js";
 
 const STORAGE_PREFIX = "AVO_";
 const STORAGE_KEY = STORAGE_PREFIX + "gameState";
@@ -2765,6 +2766,10 @@ if (state.singularityCount > 0) {
 updateUI();
 captureStateSnapshot("init");
 startLoop();
+// Wire long-press tooltips for touch devices
+const modelBarElForTouch = document.getElementById("model-bar");
+if (modelBarElForTouch) addLongPressTooltip(modelBarElForTouch);
+if (totalMultRowEl) addLongPressTooltip(totalMultRowEl);
 // Start auto-clicker if in NG+
 if (state.singularityCount > 0) {
   startAutoClicker();
