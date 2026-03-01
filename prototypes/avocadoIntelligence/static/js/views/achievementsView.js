@@ -1,6 +1,7 @@
 // Achievements full-screen view — grid rendering, category filters, theme selector
 
 import { TUNING, ACHIEVEMENT_CATEGORIES } from "../tuning.js";
+import { addLongPressTooltip } from "../utils.js";
 
 const ACHIEVEMENT_ORDER = Object.keys(TUNING.achievements);
 
@@ -96,6 +97,8 @@ export function initAchievementsView({ onBack, onThemeChange, onAcknowledge }) {
         tooltip.innerHTML = `<strong>???</strong><br><em>${cfg.hint}</em>`;
       }
       tile.appendChild(tooltip);
+
+      addLongPressTooltip(tile);
 
       gridEl.appendChild(tile);
     }
